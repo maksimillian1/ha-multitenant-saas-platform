@@ -9,7 +9,7 @@ Enterprise-grade, high-availability infrastructure boilerplate designed for B2B 
 * **Compute & Scaling:** AWS EKS, Cilium CNI, Karpenter (Node Autoscaling), KEDA (Event-driven Pod Autoscaling).
 * **Data Layer:** PostgreSQL managed by CloudNativePG (CNPG) with built-in PgBouncer pooling.
 * **Storage & Backups:** AWS S3 for continuous Write-Ahead Log (WAL) streaming and daily snapshots via Barman Cloud.
-* **Message Broker:** Apache Kafka for asynchronous webhook processing and load leveling.
+* **Message Broker:** Apache Kafka (KRaft mode) for asynchronous webhook processing and load leveling without ZooKeeper operational overhead.
 * **Observability & Testing:** Prometheus, Grafana, k6 (Load Testing), Chaos Mesh (Chaos Engineering).
 
 <h3 id="data-flow-diagram">Container and Data Flow Diagram</h2>
@@ -141,3 +141,5 @@ The architecture's resilience is continuously validated using a automated simula
 * `/docs/adr` - Architecture Decision Records (ADR) detailing design trade-offs.
 * `/apps` - Core Go/Node.js high-throughput API implementation.
 ```
+[0001-system-boundaries.md](adr%2F0001-system-boundaries.md)
+[0002-data-isolation-strategy.md](adr%2F0002-data-isolation-strategy.md)
