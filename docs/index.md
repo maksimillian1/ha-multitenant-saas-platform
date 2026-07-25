@@ -2,8 +2,23 @@
 
 Enterprise-grade, high-availability infrastructure boilerplate designed for B2B SaaS applications. Engineered for zero data loss (RPO=0), rapid automated failover (RTO < 5s), and strict multi-tenant isolation under heavy synthetic loads (5000+ RPS).
 
-## Architecture Overview
+## Master Navigation Hub
 
+**IMPORTANT**: This file serves as the Master Navigation Hub. Any Software Design Document (SDD) phase (`specify`, `plan`, `tasks`, `implement`, `verify`) MUST begin by reading this file to determine the affected subsystem.
+
+Specific technical constraints must be sourced from the specialized files below:
+- [Data Tier (Zero Data Loss, RPO=0, RLS)](architecture/data-tier.md)
+- [Ingestion & Telemetry Pipeline (Async Load Leveling)](architecture/ingestion-pipeline.md)
+- [Networking & Security (Hard Multi-Tenant Isolation, Cilium)](architecture/networking-security.md)
+- [Control Plane (Automated Recovery, RTO < 5s)](architecture/control-plane.md)
+- [Operations & Infrastructure (Terraform)](ops/terraform.md)
+- [Contracts](contracts/)
+
+**Override Rule**: Accepted ADRs in [adr/](adr/) hold absolute priority over all other architectural documentation.
+
+---
+
+## Architecture Overview
 
 ### Core Technical Stack
 * **Compute & Scaling:** AWS EKS, Cilium CNI, Karpenter (Node Autoscaling), KEDA (Event-driven Pod Autoscaling).
@@ -140,6 +155,3 @@ The architecture's resilience is continuously validated using a automated simula
 * `/k8s` - Kubernetes manifests, Helm charts, GitOps configuration (ArgoCD), and Cilium policies.
 * `/docs/adr` - Architecture Decision Records (ADR) detailing design trade-offs.
 * `/apps` - Core Go/Node.js high-throughput API implementation.
-```
-[0001-system-boundaries.md](adr%2F0001-system-boundaries.md)
-[0002-data-isolation-strategy.md](adr%2F0002-data-isolation-strategy.md)
