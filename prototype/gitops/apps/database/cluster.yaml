@@ -1,0 +1,41 @@
+apiVersion: v1
+kind: Secret
+metadata:
+  name: minio-creds
+  namespace: database
+type: Opaque
+stringData:
+  accessKeyId: "minioadmin"
+  secretAccessKey: "minioadmin"
+---
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: main-pg-cluster
+  namespace: database
+spec:
+  instances: 3
+  storage:
+    size: 1Gi
+  backup:
+    barmanObjectStore:
+      destinationPath: s3://postgres-backups/
+      endpointURL: http://minio.minio.svc.cluster.local:9000
+      s3Credentials:
+        accessKeyId:
+          name: minio-creds
+          key: accessKeyId
+        secretAccessKey:
+          name: minio-creds
+          key: secretAccessKey
+      wal:
+        compression: gzip
+---
+apiVersion: postgresql.cnpg.io/v1
+kind: Backup
+metadata:
+  name: main-pg-cluster-manual-backup
+  namespace: database
+spec:
+  cluster:
+    name: main-pg-cluster

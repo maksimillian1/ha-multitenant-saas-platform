@@ -1,0 +1,7 @@
+minio:
+  auth:
+    rootUser: minioadmin
+    rootPassword: minioadmin
+  defaultBuckets: "postgres-backups"
+  persistence:
+    enabled: false
