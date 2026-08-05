@@ -6,7 +6,7 @@ Enterprise-grade, high-availability infrastructure boilerplate designed for B2B 
 
 ## Core Architecture
 
-Look [Architecture Diagram](./docs/architecture.md#data-flow-diagram)
+Look [Architecture Diagram](docs/architecture/architecture.mditecture.md#data-flow-diagram)
 
 ### Key constraints:
 TODO
@@ -20,7 +20,7 @@ For specific design justifications, performance baselines, and cost optimization
 ---
 
 ## Directory Structure
-Look [Directory Structure](./docs/architecture.md#directory-structure)
+Look [Directory Structure](docs/architecture/architecture.mditecture.md#directory-structure)
 
 ---
 
