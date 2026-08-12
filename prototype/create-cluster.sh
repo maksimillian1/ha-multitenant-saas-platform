@@ -64,12 +64,12 @@ kubectl wait --for=condition=Ready nodes --all --timeout=5m
 
 # ── 4. install ArgoCD ─────────────────────────────────────────────────────────
 
-echo "Installing ArgoCD chart v7.0.0..."
+echo "Installing ArgoCD chart v10.3.0..."
 helm repo add argo https://argoproj.github.io/argo-helm 2>/dev/null || true
 helm repo update argo
 
 helm upgrade --install argocd argo/argo-cd \
-  --version 7.0.0 \
+  --version 10.3.0 \
   --namespace argocd \
   --create-namespace \
   --wait \
@@ -78,7 +78,7 @@ helm upgrade --install argocd argo/argo-cd \
 # ── 5. apply GitOps ApplicationSet (CNPG + MinIO + Postgres cluster) ──────────
 
 echo "Applying ArgoCD ApplicationSet..."
-kubectl apply -f "${SCRIPT_DIR}/gitops/apps-applicationset.yaml"
+kubectl apply -f "${SCRIPT_DIR}/k8s/apps-applicationset.yaml"
 
 # ── done ──────────────────────────────────────────────────────────────────────
 

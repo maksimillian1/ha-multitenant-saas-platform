@@ -1,4 +1,6 @@
 minio:
+  image:
+    repository: bitnamilegacy/minio
   auth:
     rootUser: minioadmin
     rootPassword: minioadmin
