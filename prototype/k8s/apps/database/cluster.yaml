@@ -16,7 +16,18 @@ metadata:
 spec:
   instances: 3
   storage:
-    size: 1Gi
+    size: 5Gi
+  enableSuperuserAccess: true
+  postgresql:
+    parameters:
+      shared_buffers: "256MB"
+      track_io_timing: "on"
+      log_autovacuum_min_duration: "0"
+      log_lock_waits: "on"
+      log_checkpoints: "on"
+    synchronous:
+      method: any
+      number: 1
   backup:
     barmanObjectStore:
       destinationPath: s3://postgres-backups/
@@ -30,6 +41,19 @@ spec:
           key: secretAccessKey
       wal:
         compression: gzip
+---
+apiVersion: postgresql.cnpg.io/v1
+kind: Pooler
+metadata:
+  name: lab-pooler-rw
+spec:
+  cluster: { name: lab }
+  instances: 1
+  type: rw
+  pgbouncer:
+    poolMode: transaction
+    parameters:
+      default_pool_size: "1"
 ---
 apiVersion: postgresql.cnpg.io/v1
 kind: Backup
