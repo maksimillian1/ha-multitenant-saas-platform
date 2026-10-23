@@ -1,3 +1,3 @@
 # Ingestion & Telemetry Pipeline
 
-[Template: Populate with Kafka, KEDA, and event-driven processing documentation, handling of webhook peaks and load leveling.]
+[Template: Populate with the usage event pipeline (UsageWriteAPI, Kafka, Usage Writer, KEDA), burst handling and load leveling. See ADR-0001, item 4.]

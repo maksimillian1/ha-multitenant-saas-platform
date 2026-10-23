@@ -4,17 +4,17 @@ graph LR
   subgraph diagram ["Container View: HAMSP"]
     style diagram fill:#ffffff,stroke:#ffffff
 
-    25["<div style='font-weight: bold'>Payment Provider</div><div style='font-size: 70%; margin-top: 0px'>[Software System]</div><div style='font-size: 80%; margin-top:10px'>Charges tenants by usage or<br />subscription. v2 (FR-06).</div>"]
-    style 25 fill:#8a8a8a,stroke:#606060,color:#ffffff
+    24["<div style='font-weight: bold'>Payment Provider</div><div style='font-size: 70%; margin-top: 0px'>[Software System]</div><div style='font-size: 80%; margin-top:10px'>Charges tenants by usage or<br />subscription. v2 (FR-06).</div>"]
+    style 24 fill:#8a8a8a,stroke:#606060,color:#ffffff
 
     subgraph 4 ["HAMSP"]
       style 4 fill:#ffffff,stroke:#0b4884,color:#0b4884
 
-      11["<div style='font-weight: bold'>Agent Workload</div><div style='font-size: 70%; margin-top: 0px'>[Container: Kubernetes Pod]</div><div style='font-size: 80%; margin-top:10px'>Isolated pod that runs a<br />tenant's agent code (FR-04).</div>"]
+      11["<div style='font-weight: bold'>Agent Workload</div><div style='font-size: 70%; margin-top: 0px'>[Container: Kubernetes Pod]</div><div style='font-size: 80%; margin-top:10px'>Isolated pod that runs a<br />tenant's agent code (FR-04).<br />How it is started: HAMSP-18.</div>"]
       style 11 fill:#438dd5,stroke:#2e6295,color:#ffffff
       12["<div style='font-weight: bold'>UsageWriteAPI</div><div style='font-size: 70%; margin-top: 0px'>[Container: Go]</div><div style='font-size: 80%; margin-top:10px'>Accepts usage events from the<br />API Gateway and agent<br />workloads, enforces<br />per-tenant rate limits,<br />acknowledges events once they<br />are in Kafka (FR-05, QS-07,<br />QS-08, QS-09).</div>"]
       style 12 fill:#438dd5,stroke:#2e6295,color:#ffffff
-      13["<div style='font-weight: bold'>Egress Exporter</div><div style='font-size: 70%; margin-top: 0px'>[Container: TBD, reads Cilium Hubble]</div><div style='font-size: 80%; margin-top:10px'>Turns network flows into<br />egress usage per tenant<br />(FR-05).</div>"]
+      13["<div style='font-weight: bold'>Egress Exporter</div><div style='font-size: 70%; margin-top: 0px'>[Container: TBD (HAMSP-19)]</div><div style='font-size: 80%; margin-top:10px'>Turns network flows into<br />egress usage per tenant<br />(FR-05).</div>"]
       style 13 fill:#f2f2f2,stroke:#a9a9a9,color:#333333
       14["<div style='font-weight: bold'>Usage Writer</div><div style='font-size: 70%; margin-top: 0px'>[Container: TBD: own consumer or store connector (HAMSP-14)]</div><div style='font-size: 80%; margin-top:10px'>Consumes usage events, drops<br />duplicates by event_id,<br />writes them in batches<br />(QS-06, QS-08, QS-09,<br />HAMSP-7).</div>"]
       style 14 fill:#f2f2f2,stroke:#a9a9a9,color:#333333
@@ -28,7 +28,7 @@ graph LR
       style 19 fill:#f2f2f2,stroke:#a9a9a9,color:#333333
       20[("<div style='font-weight: bold'>Rate Limit Store</div><div style='font-size: 70%; margin-top: 0px'>[Container: Redis, fit checked in HAMSP-15]</div><div style='font-size: 80%; margin-top:10px'>Shared per-tenant rate limit<br />and quota counters (FR-07).<br />Quota counters can be rebuilt<br />from the usage store.</div>")]
       style 20 fill:#438dd5,stroke:#2e6295,color:#ffffff
-      7["<div style='font-weight: bold'>API Gateway</div><div style='font-size: 70%; margin-top: 0px'>[Container: Technology open, see HAMSP-11]</div><div style='font-size: 80%; margin-top:10px'>Single entry point. Validates<br />the JWT, takes tenant_id from<br />it, enforces per-tenant rate<br />limits, routes requests,<br />reports every API call as a<br />usage event (FR-03, FR-05,<br />FR-07).</div>"]
+      7["<div style='font-weight: bold'>API Gateway</div><div style='font-size: 70%; margin-top: 0px'>[Container: Envoy Proxy, behind an AWS NLB]</div><div style='font-size: 80%; margin-top:10px'>Single entry point. Validates<br />the JWT, takes tenant_id from<br />it, enforces per-tenant rate<br />limits, routes requests,<br />reports every API call as a<br />usage event (FR-03, FR-05,<br />FR-07).</div>"]
       style 7 fill:#438dd5,stroke:#2e6295,color:#ffffff
     end
 
@@ -44,6 +44,6 @@ graph LR
     7-- "<div>Routes usage reads</div><div style='font-size: 70%'>[HTTPS]</div>" -->15
     15-- "<div>Reads usage per tenant</div><div style='font-size: 70%'></div>" -->19
     16-. "<div>Reads usage for invoices</div><div style='font-size: 70%'>[HTTPS]</div>" .->15
-    16-. "<div>Reports usage for billing</div><div style='font-size: 70%'>[HTTPS]</div>" .->25
+    16-. "<div>Reports usage for billing</div><div style='font-size: 70%'>[HTTPS]</div>" .->24
 
   end

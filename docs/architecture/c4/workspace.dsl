@@ -31,14 +31,14 @@ workspace "HAMSP" "High-Availability Multi-Tenant SaaS Platform" {
             tenantWeb = container "Tenant Web App" "UI for tenant admins and end users." "SPA, served via CDN" "Web Browser"
             adminPortal = container "Admin Portal" "UI for platform admins." "SPA, served via CDN" "Web Browser"
 
-            apiGateway = container "API Gateway" "Single entry point. Validates the JWT, takes tenant_id from it, enforces per-tenant rate limits, routes requests, reports every API call as a usage event (FR-03, FR-05, FR-07)." "Technology open, see HAMSP-11"
+            apiGateway = container "API Gateway" "Single entry point. Validates the JWT, takes tenant_id from it, enforces per-tenant rate limits, routes requests, reports every API call as a usage event (FR-03, FR-05, FR-07)." "Envoy Proxy, behind an AWS NLB"
             authService = container "Auth Service" "Logs users in and issues tokens. One Organization per tenant (ADR-0003)." "Zitadel"
             tenantMgmt = container "Tenant Management" "Creates, suspends and deletes tenants with all their data (FR-01)." "Go"
             exampleApp = container "ExampleApp" "Minimal tenant service that reads and writes PostgreSQL per tenant. Target of the load and failure tests." "Go" "Test"
-            agentWorkload = container "Agent Workload" "Isolated pod that runs a tenant's agent code (FR-04)." "Kubernetes Pod"
+            agentWorkload = container "Agent Workload" "Isolated pod that runs a tenant's agent code (FR-04). How it is started: HAMSP-18." "Kubernetes Pod"
 
             usageWriteApi = container "UsageWriteAPI" "Accepts usage events from the API Gateway and agent workloads, enforces per-tenant rate limits, acknowledges events once they are in Kafka (FR-05, QS-07, QS-08, QS-09)." "Go"
-            egressExporter = container "Egress Exporter" "Turns network flows into egress usage per tenant (FR-05)." "TBD, reads Cilium Hubble" "Placeholder"
+            egressExporter = container "Egress Exporter" "Turns network flows into egress usage per tenant (FR-05)." "TBD (HAMSP-19)" "Placeholder"
             usageWriter = container "Usage Writer" "Consumes usage events, drops duplicates by event_id, writes them in batches (QS-06, QS-08, QS-09, HAMSP-7)." "TBD: own consumer or store connector (HAMSP-14)" "Placeholder"
             meteringQuery = container "Metering Query Service" "Serves usage per tenant for reading (FR-05)." "Go"
             billing = container "Billing Service" "Invoices tenants by usage or subscription (FR-06)." "Go" "Planned"
@@ -47,7 +47,6 @@ workspace "HAMSP" "High-Availability Multi-Tenant SaaS Platform" {
             kafka = container "Kafka" "Usage events, partitioned by tenant_id (ADR-0001)." "Apache Kafka" "Queue"
             usageStore = container "Usage Analytics Store" "Usage events per tenant, kept 13 months." "TBD (HAMSP-14)" "Database,Placeholder"
             rateLimitStore = container "Rate Limit Store" "Shared per-tenant rate limit and quota counters (FR-07). Quota counters can be rebuilt from the usage store." "Redis, fit checked in HAMSP-15" "Database"
-            tokenCache = container "Token Cache" "Token cache for the Auth Service; may turn out unnecessary." "TBD (HAMSP-15)" "Database,Placeholder"
         }
 
         customerIdp = softwareSystem "Customer Identity Provider" "The tenant's own SSO, SAML or OIDC (FR-02, ADR-0003)." "External"
@@ -79,7 +78,6 @@ workspace "HAMSP" "High-Availability Multi-Tenant SaaS Platform" {
 
         hamsp.authService -> customerIdp "Delegates tenant login" "SAML, OIDC"
         hamsp.authService -> hamsp.postgres "Stores users and organizations" "SQL"
-        hamsp.authService -> hamsp.tokenCache "Caches tokens"
         hamsp.tenantMgmt -> hamsp.authService "Creates the tenant's Organization" "gRPC"
         hamsp.tenantMgmt -> hamsp.postgres "Stores tenants and quotas" "SQL"
         hamsp.tenantMgmt -> kubernetes "Creates tenant namespaces and quotas" "HTTPS"
@@ -110,7 +108,7 @@ workspace "HAMSP" "High-Availability Multi-Tenant SaaS Platform" {
         container hamsp "RequestPath" "L2: how a request reaches tenant data, and how tenants are kept apart." {
             include platformAdmin tenantAdmin endUser
             include hamsp.tenantWeb hamsp.adminPortal hamsp.apiGateway hamsp.authService hamsp.tenantMgmt hamsp.exampleApp
-            include hamsp.postgres hamsp.rateLimitStore hamsp.tokenCache
+            include hamsp.postgres hamsp.rateLimitStore
             include customerIdp kubernetes s3
             autoLayout lr
         }
