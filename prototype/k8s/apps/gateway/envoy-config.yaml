@@ -1,0 +1,116 @@
+# API Gateway on Cilium's built-in Envoy (HAMSP-5 decisions; input for HAMSP-17).
+#
+# For every request:
+#   1. drop any x-tenant-id sent by the client (early header mutation);
+#   2. validate the Zitadel JWT locally against the JWKS (jwt_authn);
+#   3. set x-tenant-id from the Organization ID claim;
+#   4. route by host to ExampleApp or Zitadel.
+# Only Zitadel's own host is reachable without a token; everything else needs one.
+apiVersion: cilium.io/v2
+kind: CiliumEnvoyConfig
+metadata:
+  name: api-gateway
+  namespace: gateway
+spec:
+  services:
+    - name: api-gateway
+      namespace: gateway
+  backendServices:
+    - name: exampleapp
+      namespace: exampleapp
+    - name: zitadel
+      namespace: zitadel
+  resources:
+    - "@type": type.googleapis.com/envoy.config.listener.v3.Listener
+      name: api-gateway
+      filter_chains:
+        - filters:
+            - name: envoy.filters.network.http_connection_manager
+              typed_config:
+                "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
+                stat_prefix: api-gateway
+                use_remote_address: true
+                normalize_path: true
+                merge_slashes: true
+                path_with_escaped_slashes_action: UNESCAPE_AND_REDIRECT
+                early_header_mutation_extensions:
+                  - name: envoy.http.early_header_mutation.header_mutation
+                    typed_config:
+                      "@type": type.googleapis.com/envoy.extensions.http.early_header_mutation.header_mutation.v3.HeaderMutation
+                      mutations:
+                        - remove: x-tenant-id
+                rds:
+                  route_config_name: api-gateway
+                http_filters:
+                  - name: envoy.filters.http.jwt_authn
+                    typed_config:
+                      "@type": type.googleapis.com/envoy.extensions.filters.http.jwt_authn.v3.JwtAuthentication
+                      providers:
+                        zitadel:
+                          issuer: http://zitadel.localtest.me:30080
+                          remote_jwks:
+                            http_uri:
+                              uri: http://zitadel.localtest.me:30080/oauth/v2/keys
+                              cluster: zitadel/zitadel
+                              timeout: 5s
+                            # Short cache: Zitadel creates signing keys lazily and rotates them.
+                            cache_duration: 60s
+                            async_fetch: {}
+                          clock_skew_seconds: 5
+                          # The validated token is not forwarded; services get only the tenant.
+                          forward: false
+                          claim_to_headers:
+                            - header_name: x-tenant-id
+                              claim_name: "urn:zitadel:iam:user:resourceowner:id"
+                      rules:
+                        # Zitadel itself (token endpoint, JWKS, APIs with their own auth).
+                        - match:
+                            prefix: /
+                            headers:
+                              - name: ":authority"
+                                string_match:
+                                  safe_regex:
+                                    regex: "^zitadel\\.localtest\\.me(:30080)?$"
+                        # Everything else requires a valid Zitadel token.
+                        - match:
+                            prefix: /
+                          requires:
+                            provider_name: zitadel
+                  - name: envoy.filters.http.router
+                    typed_config:
+                      "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+    - "@type": type.googleapis.com/envoy.config.route.v3.RouteConfiguration
+      name: api-gateway
+      virtual_hosts:
+        - name: exampleapp
+          domains: ["api.localtest.me", "api.localtest.me:30080"]
+          routes:
+            - match:
+                prefix: /
+              route:
+                cluster: exampleapp/exampleapp
+                timeout: 30s
+        - name: zitadel
+          domains: ["zitadel.localtest.me", "zitadel.localtest.me:30080"]
+          routes:
+            - match:
+                prefix: /
+              route:
+                cluster: zitadel/zitadel
+                timeout: 30s
+    - "@type": type.googleapis.com/envoy.config.cluster.v3.Cluster
+      name: exampleapp/exampleapp
+      connect_timeout: 2s
+      lb_policy: ROUND_ROBIN
+      type: EDS
+    - "@type": type.googleapis.com/envoy.config.cluster.v3.Cluster
+      name: zitadel/zitadel
+      connect_timeout: 2s
+      lb_policy: ROUND_ROBIN
+      type: EDS
+      # Zitadel serves REST and gRPC over h2c on one port.
+      typed_extension_protocol_options:
+        envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
+          "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
+          explicit_http_config:
+            http2_protocol_options: {}

@@ -1,0 +1,32 @@
+# Entry point of the prototype. The Service has no pods behind it: Cilium
+# redirects its traffic into the Envoy listener from envoy-config.yaml, the same
+# way Cilium's own Ingress and Gateway API controllers do. kind maps the
+# NodePort to localhost:30080 (prototype/kind-config.yaml).
+apiVersion: v1
+kind: Service
+metadata:
+  name: api-gateway
+  namespace: gateway
+spec:
+  type: NodePort
+  ports:
+    - name: http
+      port: 80
+      nodePort: 30080
+      protocol: TCP
+---
+# Placeholder endpoint so the Service is not empty; Cilium never forwards to it.
+apiVersion: discovery.k8s.io/v1
+kind: EndpointSlice
+metadata:
+  name: api-gateway-placeholder
+  namespace: gateway
+  labels:
+    kubernetes.io/service-name: api-gateway
+addressType: IPv4
+ports:
+  - name: http
+    port: 9999
+    protocol: TCP
+endpoints:
+  - addresses: ["192.192.192.192"]

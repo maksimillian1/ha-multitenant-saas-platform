@@ -2,6 +2,12 @@ kind: Cluster
 apiVersion: kind.x-k8s.io/v1alpha4
 nodes:
 - role: control-plane
+  # API Gateway NodePort (prototype/k8s/apps/gateway) on localhost:30080.
+  extraPortMappings:
+  - containerPort: 30080
+    hostPort: 30080
+    listenAddress: "127.0.0.1"
+    protocol: TCP
 - role: worker
 - role: worker
 networking:
