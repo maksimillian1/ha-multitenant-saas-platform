@@ -1,0 +1,62 @@
+graph LR
+  linkStyle default fill:#ffffff
+
+  subgraph diagram ["Container View: HAMSP"]
+    style diagram fill:#ffffff,stroke:#ffffff
+
+    1["<div style='font-weight: bold'>Platform Admin</div><div style='font-size: 70%; margin-top: 0px'>[Person]</div><div style='font-size: 80%; margin-top:10px'>Creates, suspends and deletes<br />tenants (FR-01).</div>"]
+    style 1 fill:#08427b,stroke:#052e56,color:#ffffff
+    2["<div style='font-weight: bold'>Tenant Admin</div><div style='font-size: 70%; margin-top: 0px'>[Person]</div><div style='font-size: 80%; margin-top:10px'>Manages the tenant's users,<br />roles, SSO and login branding<br />(FR-02).</div>"]
+    style 2 fill:#08427b,stroke:#052e56,color:#ffffff
+    3["<div style='font-weight: bold'>End User / API Client</div><div style='font-size: 70%; margin-top: 0px'>[Person]</div><div style='font-size: 80%; margin-top:10px'>A tenant's user or machine<br />client. Calls the platform's<br />APIs with a tenant token<br />(FR-03).</div>"]
+    style 3 fill:#08427b,stroke:#052e56,color:#ffffff
+    22["<div style='font-weight: bold'>Customer Identity Provider</div><div style='font-size: 70%; margin-top: 0px'>[Software System]</div><div style='font-size: 80%; margin-top:10px'>The tenant's own SSO, SAML or<br />OIDC (FR-02, ADR-0003).</div>"]
+    style 22 fill:#8a8a8a,stroke:#606060,color:#ffffff
+    23["<div style='font-weight: bold'>Kubernetes API (EKS)</div><div style='font-size: 70%; margin-top: 0px'>[Software System]</div><div style='font-size: 80%; margin-top:10px'>Runs tenant namespaces and<br />agent workloads (FR-01,<br />FR-04, C-01).</div>"]
+    style 23 fill:#8a8a8a,stroke:#606060,color:#ffffff
+    24["<div style='font-weight: bold'>AWS S3</div><div style='font-size: 70%; margin-top: 0px'>[Software System]</div><div style='font-size: 80%; margin-top:10px'>Stores PostgreSQL WAL and<br />backups (ADR-0001, QS-13).</div>"]
+    style 24 fill:#8a8a8a,stroke:#606060,color:#ffffff
+
+    subgraph 4 ["HAMSP"]
+      style 4 fill:#ffffff,stroke:#0b4884,color:#0b4884
+
+      10["<div style='font-weight: bold'>ExampleApp</div><div style='font-size: 70%; margin-top: 0px'>[Container: Go]</div><div style='font-size: 80%; margin-top:10px'>Minimal tenant service that<br />reads and writes PostgreSQL<br />per tenant. Target of the<br />load and failure tests.</div>"]
+      style 10 fill:#5a9e6f,stroke:#3e6e4d,color:#ffffff
+      17[("<div style='font-weight: bold'>PostgreSQL</div><div style='font-size: 70%; margin-top: 0px'>[Container: CloudNativePG]</div><div style='font-size: 80%; margin-top:10px'>Tenant and application data<br />with RLS; separate database<br />for Zitadel (ADR-0002,<br />ADR-0003).</div>")]
+      style 17 fill:#438dd5,stroke:#2e6295,color:#ffffff
+      20[("<div style='font-weight: bold'>Rate Limit Store</div><div style='font-size: 70%; margin-top: 0px'>[Container: Redis, fit checked in HAMSP-15]</div><div style='font-size: 80%; margin-top:10px'>Shared per-tenant rate limit<br />and quota counters (FR-07).<br />Quota counters can be rebuilt<br />from the usage store.</div>")]
+      style 20 fill:#438dd5,stroke:#2e6295,color:#ffffff
+      21[("<div style='font-weight: bold'>Token Cache</div><div style='font-size: 70%; margin-top: 0px'>[Container: TBD (HAMSP-15)]</div><div style='font-size: 80%; margin-top:10px'>Token cache for the Auth<br />Service; may turn out<br />unnecessary.</div>")]
+      style 21 fill:#f2f2f2,stroke:#a9a9a9,color:#333333
+      5["<div style='font-weight: bold'>Tenant Web App</div><div style='font-size: 70%; margin-top: 0px'>[Container: SPA, served via CDN]</div><div style='font-size: 80%; margin-top:10px'>UI for tenant admins and end<br />users.</div>"]
+      style 5 fill:#438dd5,stroke:#2e6295,color:#ffffff
+      6["<div style='font-weight: bold'>Admin Portal</div><div style='font-size: 70%; margin-top: 0px'>[Container: SPA, served via CDN]</div><div style='font-size: 80%; margin-top:10px'>UI for platform admins.</div>"]
+      style 6 fill:#438dd5,stroke:#2e6295,color:#ffffff
+      7["<div style='font-weight: bold'>API Gateway</div><div style='font-size: 70%; margin-top: 0px'>[Container: Technology open, see HAMSP-11]</div><div style='font-size: 80%; margin-top:10px'>Single entry point. Validates<br />the JWT, takes tenant_id from<br />it, enforces per-tenant rate<br />limits, routes requests,<br />reports every API call as a<br />usage event (FR-03, FR-05,<br />FR-07).</div>"]
+      style 7 fill:#438dd5,stroke:#2e6295,color:#ffffff
+      8["<div style='font-weight: bold'>Auth Service</div><div style='font-size: 70%; margin-top: 0px'>[Container: Zitadel]</div><div style='font-size: 80%; margin-top:10px'>Logs users in and issues<br />tokens. One Organization per<br />tenant (ADR-0003).</div>"]
+      style 8 fill:#438dd5,stroke:#2e6295,color:#ffffff
+      9["<div style='font-weight: bold'>Tenant Management</div><div style='font-size: 70%; margin-top: 0px'>[Container: Go]</div><div style='font-size: 80%; margin-top:10px'>Creates, suspends and deletes<br />tenants with all their data<br />(FR-01).</div>"]
+      style 9 fill:#438dd5,stroke:#2e6295,color:#ffffff
+    end
+
+    1-- "<div>Manages tenants</div><div style='font-size: 70%'>[HTTPS]</div>" -->6
+    2-- "<div>Manages users, roles and SSO</div><div style='font-size: 70%'>[HTTPS]</div>" -->5
+    3-- "<div>Uses</div><div style='font-size: 70%'>[HTTPS]</div>" -->5
+    3-- "<div>Calls the APIs directly</div><div style='font-size: 70%'>[HTTPS, WSS]</div>" -->7
+    5-- "<div>Calls the APIs</div><div style='font-size: 70%'>[HTTPS, WSS]</div>" -->7
+    6-- "<div>Calls the admin API</div><div style='font-size: 70%'>[HTTPS]</div>" -->7
+    7-- "<div>Routes login, fetches JWKS</div><div style='font-size: 70%'>[OIDC]</div>" -->8
+    7-- "<div>Checks per-tenant limits</div><div style='font-size: 70%'></div>" -->20
+    7-- "<div>Routes tenant admin requests</div><div style='font-size: 70%'>[HTTPS]</div>" -->9
+    7-- "<div>Routes tenant requests with<br />tenant_id</div><div style='font-size: 70%'>[HTTPS]</div>" -->10
+    8-- "<div>Delegates tenant login</div><div style='font-size: 70%'>[SAML, OIDC]</div>" -->22
+    8-- "<div>Stores users and<br />organizations</div><div style='font-size: 70%'>[SQL]</div>" -->17
+    8-- "<div>Caches tokens</div><div style='font-size: 70%'></div>" -->21
+    9-- "<div>Creates the tenant's<br />Organization</div><div style='font-size: 70%'>[gRPC]</div>" -->8
+    9-- "<div>Stores tenants and quotas</div><div style='font-size: 70%'>[SQL]</div>" -->17
+    9-- "<div>Creates tenant namespaces and<br />quotas</div><div style='font-size: 70%'>[HTTPS]</div>" -->23
+    10-- "<div>Reads and writes rows, SET<br />LOCAL tenant_id</div><div style='font-size: 70%'>[SQL, RLS]</div>" -->17
+    17-- "<div>Streams WAL, stores backups</div><div style='font-size: 70%'>[Barman Cloud]</div>" -->24
+
+  end
