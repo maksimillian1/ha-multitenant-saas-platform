@@ -11,6 +11,11 @@ kind: CiliumEnvoyConfig
 metadata:
   name: api-gateway
   namespace: gateway
+  annotations:
+    # Connect to backends from Envoy's own address (identity "ingress"), as
+    # Cilium's Ingress and Gateway API listeners do. Keeping the client's
+    # address fails for clients outside the cluster (NodePort) with a 500.
+    cec.cilium.io/use-original-source-address: "false"
 spec:
   services:
     - name: api-gateway
