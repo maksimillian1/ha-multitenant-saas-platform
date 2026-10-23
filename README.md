@@ -1,26 +1,27 @@
 # High-Availability Multi-Tenant SaaS Infrastructure Platform
 
-Enterprise-grade, high-availability infrastructure boilerplate designed for B2B SaaS applications. Engineered for zero data loss (RPO=0), rapid automated failover (RTO < 5s), and strict multi-tenant isolation under heavy synthetic loads (5000+ RPS).
+Enterprise-grade, high-availability infrastructure boilerplate designed for B2B SaaS applications. Engineered for zero data loss (RPO=0), rapid automated failover (RTO < 5s), and strict multi-tenant isolation under heavy synthetic loads (up to 20 000 RPS).
 
 ---
 
 ## Core Architecture
 
-Look [Architecture Diagram](./docs/architecture.md#data-flow-diagram)
+See [Architecture Diagrams](docs/index.md#data-flow-diagram) and the [C4 model](docs/architecture/c4/README.md).
 
 ### Key constraints:
-TODO
+See [Requirements & Constraints](docs/architecture/requirements.md) (FR, QS, C).
 
 ### Architectural Deep-Dives (ADR Log)
 For specific design justifications, performance baselines, and cost optimization trade-offs, consult the official Architecture Decision Records matching the current repository state:
 
 * [ADR-0001: System Boundaries & Multi-Tenant Core Components](./docs/adr/0001-system-boundaries.md)
-* [ADR-0002: Data Isolation Strategy for Multi-Tenant Architecture](./docs/adr/0002-data-isolation-strategy)
+* [ADR-0002: Data Isolation Strategy for Multi-Tenant Architecture](./docs/adr/0002-data-isolation-strategy.md)
+* [ADR-0003: Auth Service Implementation (Zitadel)](./docs/adr/0003-auth-service-implementation.md)
 
 ---
 
 ## Directory Structure
-Look [Directory Structure](./docs/architecture.md#directory-structure)
+See [Repository Structure](docs/index.md#directory-structure).
 
 ---
 
