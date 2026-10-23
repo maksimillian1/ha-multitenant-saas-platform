@@ -22,10 +22,12 @@ func TestItemsTableRLSAndAppRole(t *testing.T) {
 	}
 
 	// The connections ExampleApp opens (through PgBouncer) use that role.
+	// cnpg_pooler_pgbouncer is PgBouncer's own auth_query user, not ExampleApp.
 	mustStatus(t, call(t, http.MethodGet, "/items", token(t, tenA), nil), http.StatusOK, "GET /items")
 	users, err := psql(t, `
 		SELECT string_agg(DISTINCT usename, ',') FROM pg_stat_activity
-		WHERE datname = 'exampleapp' AND backend_type = 'client backend' AND pid <> pg_backend_pid()`)
+		WHERE datname = 'exampleapp' AND backend_type = 'client backend' AND pid <> pg_backend_pid()
+		  AND usename <> 'cnpg_pooler_pgbouncer'`)
 	if err != nil {
 		t.Fatal(err)
 	}

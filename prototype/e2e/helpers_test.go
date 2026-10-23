@@ -266,6 +266,6 @@ func psql(t testing.TB, sql string) (string, error) {
 		t.Fatal(err)
 	}
 	out, err := kubectl(ctx, "-n", "database", "exec", primary, "-c", "postgres", "--",
-		"psql", "-U", "postgres", "-d", "exampleapp", "-At", "-v", "ON_ERROR_STOP=1", "-c", sql)
+		"psql", "-U", "postgres", "-d", "exampleapp", "-Atq", "-v", "ON_ERROR_STOP=1", "-c", sql)
 	return strings.TrimSpace(out), err
 }

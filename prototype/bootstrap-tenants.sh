@@ -17,7 +17,7 @@ TENANTS=(tenant-a tenant-b)
 
 # Access tokens live 60 s, so the e2e tests can prove that an expired token is
 # rejected (HAMSP-5 AC-5) without waiting hours.
-ACCESS_TOKEN_LIFETIME="60s"
+ACCESS_TOKEN_LIFETIME="60s"  # protobuf Duration: seconds only
 
 # ── helpers ────────────────────────────────────────────────────────────────────
 
@@ -60,10 +60,12 @@ wait_for "Zitadel behind the API Gateway" 60 zitadel_up
 # ── 2. short token lifetime for the tests ──────────────────────────────────────
 
 echo "Setting access token lifetime to ${ACCESS_TOKEN_LIFETIME}..."
-zitadel PUT /admin/v1/settings/oidc "$(jq -nc --arg l "${ACCESS_TOKEN_LIFETIME}" \
+# On a rerun Zitadel answers 400 "No changes"; any other error stops the script.
+if ! out=$(zitadel PUT /admin/v1/settings/oidc "$(jq -nc --arg l "${ACCESS_TOKEN_LIFETIME}" \
   '{accessTokenLifetime: $l, idTokenLifetime: $l,
-    refreshTokenIdleExpiration: "720h", refreshTokenExpiration: "2160h"}')" >/dev/null \
-  || echo "  (unchanged)"
+    refreshTokenIdleExpiration: "2592000s", refreshTokenExpiration: "7776000s"}')"); then
+  grep -q "No changes" <<<"${out}" || { echo "ERROR: ${out}"; exit 1; }
+fi
 
 # ── 3. one organization and one machine user per tenant ────────────────────────
 
