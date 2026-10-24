@@ -18,6 +18,7 @@ Specific technical constraints must be sourced from the specialized files below:
 - [Operations & Infrastructure (Terraform)](ops/terraform.md)
 - [Contracts](contracts/)
 - [C4 model](architecture/c4/README.md): diagrams generated from [workspace.dsl](architecture/c4/workspace.dsl)
+- [Roadmap](roadmap.md): what belongs to v1 and v2
 
 **Override Rule**: Accepted ADRs in [adr/](adr/) hold absolute priority over all other architectural documentation.
 
