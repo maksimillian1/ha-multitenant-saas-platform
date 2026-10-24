@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"log/slog"
 	"net/http"
 	"net/http/httputil"
@@ -17,6 +18,7 @@ import (
 	"time"
 
 	"github.com/maksimillian1/ha-multitenant-saas-platform/apps/gateway/internal/auth"
+	"github.com/maksimillian1/ha-multitenant-saas-platform/apps/gateway/internal/usage"
 )
 
 const TenantHeader = "x-tenant-id"
@@ -24,6 +26,12 @@ const TenantHeader = "x-tenant-id"
 // Authenticator returns the tenant of a valid access token.
 type Authenticator interface {
 	Tenant(ctx context.Context, token string) (string, error)
+}
+
+// UsageReporter takes the usage event of every request served for a tenant
+// (FR-05). Report must not block.
+type UsageReporter interface {
+	Report(usage.Event)
 }
 
 // Route sends every path equal to Prefix or below it ("/items", "/items/1",
@@ -60,18 +68,20 @@ func ParseRoutes(spec string) ([]Route, error) {
 type Gateway struct {
 	auth   Authenticator
 	routes []Route
+	usage  UsageReporter
 	proxy  *httputil.ReverseProxy
 	log    *slog.Logger
 }
 
 type upstreamKey struct{}
 
-func New(authn Authenticator, routes []Route, log *slog.Logger) *Gateway {
+// New returns the gateway. A nil reporter disables usage reporting.
+func New(authn Authenticator, routes []Route, reporter UsageReporter, log *slog.Logger) *Gateway {
 	// Longest prefix first, so "/items/archive" wins over "/items".
 	routes = append([]Route(nil), routes...)
 	sort.Slice(routes, func(i, j int) bool { return len(routes[i].Prefix) > len(routes[j].Prefix) })
 
-	g := &Gateway{auth: authn, routes: routes, log: log}
+	g := &Gateway{auth: authn, routes: routes, usage: reporter, log: log}
 	g.proxy = &httputil.ReverseProxy{
 		Rewrite: func(pr *httputil.ProxyRequest) {
 			pr.SetURL(pr.In.Context().Value(upstreamKey{}).(*url.URL))
@@ -120,6 +130,20 @@ func (g *Gateway) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Every request served for a tenant is one usage event, whatever its
+	// status. Requests rejected with 401 above have no tenant and none.
+	if g.usage != nil {
+		start := time.Now()
+		rec := &usageRecorder{ResponseWriter: w, status: http.StatusOK}
+		body := &countingBody{ReadCloser: r.Body}
+		r.Body, w = body, rec
+		defer func() {
+			// URL.Path carries no query string; headers and bodies are never reported.
+			g.usage.Report(usage.APICall(tenant, start, r.Method, r.URL.Path, rec.status,
+				time.Since(start), body.n, rec.bytes))
+		}()
+	}
+
 	// Routes are matched only after authentication, so unknown paths do not
 	// reveal which services exist.
 	route := g.match(r.URL.Path)
@@ -129,6 +153,44 @@ func (g *Gateway) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	r.Header.Set(TenantHeader, tenant)
 	g.proxy.ServeHTTP(w, r.WithContext(context.WithValue(r.Context(), upstreamKey{}, route.Upstream)))
+}
+
+// usageRecorder notes the status and the response bytes for the usage event.
+type usageRecorder struct {
+	http.ResponseWriter
+	status      int
+	bytes       int64
+	wroteHeader bool
+}
+
+func (u *usageRecorder) WriteHeader(code int) {
+	if !u.wroteHeader {
+		u.status, u.wroteHeader = code, true
+	}
+	u.ResponseWriter.WriteHeader(code)
+}
+
+func (u *usageRecorder) Write(b []byte) (int, error) {
+	u.wroteHeader = true
+	n, err := u.ResponseWriter.Write(b)
+	u.bytes += int64(n)
+	return n, err
+}
+
+// Unwrap lets http.ResponseController (used by ReverseProxy to flush) reach
+// the real writer.
+func (u *usageRecorder) Unwrap() http.ResponseWriter { return u.ResponseWriter }
+
+// countingBody counts the request bytes read by the upstream.
+type countingBody struct {
+	io.ReadCloser
+	n int64
+}
+
+func (c *countingBody) Read(p []byte) (int, error) {
+	n, err := c.ReadCloser.Read(p)
+	c.n += int64(n)
+	return n, err
 }
 
 func writeError(w http.ResponseWriter, status int, msg string) {

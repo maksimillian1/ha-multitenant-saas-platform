@@ -2,6 +2,7 @@ package proxy
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"io"
 	"log/slog"
@@ -9,7 +10,10 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"strings"
+	"sync"
 	"testing"
+
+	"github.com/maksimillian1/ha-multitenant-saas-platform/apps/gateway/internal/usage"
 )
 
 // fakeAuth accepts "token-<tenant>" and returns <tenant>.
@@ -48,7 +52,7 @@ func newGateway(t *testing.T) (*Gateway, *seen, *seen) {
 	g := New(fakeAuth{}, []Route{
 		{Prefix: "/items", Upstream: upstream(t, "items", items)},
 		{Prefix: "/items/archive", Upstream: upstream(t, "archive", archive)},
-	}, slog.New(slog.NewTextHandler(io.Discard, nil)))
+	}, nil, slog.New(slog.NewTextHandler(io.Discard, nil)))
 	return g, items, archive
 }
 
@@ -123,7 +127,7 @@ func TestRoutesMatchByLongestPrefixOnPathBoundaries(t *testing.T) {
 
 func TestUnreachableUpstreamIs502(t *testing.T) {
 	down, _ := url.Parse("http://127.0.0.1:1")
-	g := New(fakeAuth{}, []Route{{Prefix: "/items", Upstream: down}}, slog.New(slog.NewTextHandler(io.Discard, nil)))
+	g := New(fakeAuth{}, []Route{{Prefix: "/items", Upstream: down}}, nil, slog.New(slog.NewTextHandler(io.Discard, nil)))
 	if w := send(g, "/items", "Bearer token-a"); w.Code != http.StatusBadGateway {
 		t.Fatalf("status %d, want 502", w.Code)
 	}
@@ -141,5 +145,85 @@ func TestParseRoutes(t *testing.T) {
 		if _, err := ParseRoutes(bad); err == nil {
 			t.Errorf("%q: no error", bad)
 		}
+	}
+}
+
+type fakeReporter struct {
+	mu     sync.Mutex
+	events []usage.Event
+}
+
+func (f *fakeReporter) Report(e usage.Event) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.events = append(f.events, e)
+}
+
+func reportingGateway(t *testing.T) (*Gateway, *fakeReporter) {
+	t.Helper()
+	rep := &fakeReporter{}
+	down, _ := url.Parse("http://127.0.0.1:1")
+	g := New(fakeAuth{}, []Route{
+		{Prefix: "/items", Upstream: upstream(t, "items", &seen{})},
+		{Prefix: "/down", Upstream: down},
+	}, rep, slog.New(slog.NewTextHandler(io.Discard, nil)))
+	return g, rep
+}
+
+// AC-1: a served request becomes one api_calls event of the caller's tenant
+// with method, path without query string, status, duration and bytes.
+func TestUsageEventDescribesTheRequest(t *testing.T) {
+	g, rep := reportingGateway(t)
+	r := httptest.NewRequest(http.MethodPost, "/items/42?secret=s3cr3t", strings.NewReader("hello"))
+	r.Header.Set("Authorization", "Bearer token-a")
+	w := httptest.NewRecorder()
+	g.ServeHTTP(w, r)
+	if w.Code != http.StatusOK {
+		t.Fatalf("status %d", w.Code)
+	}
+	if len(rep.events) != 1 {
+		t.Fatalf("%d usage events, want 1", len(rep.events))
+	}
+	e := rep.events[0]
+	if e.TenantID != "a" || e.Metric != "api_calls" || e.Quantity != 1 || e.ID == "" || e.Time.IsZero() {
+		t.Fatalf("event = %+v", e)
+	}
+	a := e.Attributes
+	if a["method"] != "POST" || a["path"] != "/items/42" || a["status"] != 200 ||
+		a["request_bytes"] != int64(5) || a["response_bytes"] != int64(len("items")) {
+		t.Fatalf("attributes = %v", a)
+	}
+	if _, ok := a["duration_ms"]; !ok {
+		t.Fatal("no duration_ms")
+	}
+	if raw, _ := json.Marshal(e); strings.Contains(string(raw), "s3cr3t") || strings.Contains(string(raw), "token-a") {
+		t.Fatalf("the event leaks the query string or the token: %s", raw)
+	}
+}
+
+// Requests served for a tenant are reported whatever their status.
+func TestUsageEventKeepsErrorStatus(t *testing.T) {
+	g, rep := reportingGateway(t)
+	send(g, "/nope", "Bearer token-a")
+	send(g, "/down/1", "Bearer token-b")
+	if len(rep.events) != 2 {
+		t.Fatalf("%d usage events, want 2", len(rep.events))
+	}
+	if rep.events[0].Attributes["status"] != http.StatusNotFound || rep.events[1].Attributes["status"] != http.StatusBadGateway ||
+		rep.events[1].TenantID != "b" {
+		t.Fatalf("events = %+v", rep.events)
+	}
+}
+
+// AC-2: requests rejected with 401 have no tenant and produce no usage event.
+func TestRejectedRequestsAreNotReported(t *testing.T) {
+	g, rep := reportingGateway(t)
+	for _, auth := range []string{"", "Bearer wrong", "Basic token-a"} {
+		if w := send(g, "/items", auth); w.Code != http.StatusUnauthorized {
+			t.Fatalf("auth %q: status %d", auth, w.Code)
+		}
+	}
+	if len(rep.events) != 0 {
+		t.Fatalf("rejected requests produced usage events: %+v", rep.events)
 	}
 }
