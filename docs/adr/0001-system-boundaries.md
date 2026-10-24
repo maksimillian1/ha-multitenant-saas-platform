@@ -37,7 +37,7 @@ We establish the following system boundaries, architectural rules, and multi-ten
     * Agent workloads report their own usage (agent tokens) to UsageWriteAPI directly, not through the Gateway. UsageWriteAPI takes the tenant from the pod identity.
 
 4. **Asynchronous Usage Pipeline (Kafka & KEDA):**
-   Usage events (API calls, agent tokens, network egress; FR-05) are decoupled from the synchronous HTTP path.
+   Usage events (API calls, agent tokens, network egress; FR-05) are decoupled from the synchronous HTTP path. Kafka runs on the Strimzi operator inside EKS ([ADR-0005](0005-kafka-on-strimzi.md)).
     * **Ingestion Contract:** UsageWriteAPI checks the tenant's rate limit, writes the event to a partitioned Apache Kafka topic with `tenant_id` as the key (strict per-tenant ordering), and acknowledges only after Kafka has it (QS-07, QS-09).
     * **Writing:** Usage Writer consumes the topic, drops duplicates by `event_id` (HAMSP-7) and writes batches to the usage store (HAMSP-14). It updates the tenant's quota counters after a unique insert.
     * **Event-Driven Scaling:** Usage Writer is scaled by **KEDA** on Kafka consumer lag. If a specific tenant floods the system, lag grows and KEDA adds consumers; UsageWriteAPI latency for other tenants is unaffected (QS-08). If the usage store is down, events wait in Kafka (QS-09).
