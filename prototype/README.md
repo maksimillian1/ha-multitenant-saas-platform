@@ -46,6 +46,8 @@ go test -C prototype/e2e -count=1 -v ./...
 
 The e2e tests take about two minutes; `-short` skips the token expiry test.
 
+Known issue: in host network mode Cilium 1.19 never sets an address on the Gateway, so it stays `Programmed=False` (`AddressNotAssigned`) and ArgoCD shows the `gateway` app as Progressing. Traffic on port 30080 works.
+
 ## Try it by hand
 
 ```bash
