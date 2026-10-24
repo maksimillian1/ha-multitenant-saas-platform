@@ -23,6 +23,9 @@ spec:
           ports:
             - name: http
               containerPort: 8080
+            # Usage counters; not routed by the public Gateway.
+            - name: metrics
+              containerPort: 9090
           env:
             - name: ISSUER
               value: http://zitadel.localtest.me:30080
@@ -39,6 +42,9 @@ spec:
                 configMapKeyRef: {name: api-gateway-audience, key: audience}
             - name: ROUTES
               value: /items=http://exampleapp.exampleapp.svc:8080
+            # Every API call becomes a usage event (HAMSP-26).
+            - name: USAGE_URL
+              value: http://usage-writeapi.usage.svc:8080/v1/events
           readinessProbe:
             httpGet: {path: /healthz, port: http}
             periodSeconds: 5
