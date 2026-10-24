@@ -61,3 +61,6 @@ __pycache__/
 
 */chunker/debug/**/*
 zprompts/**/*
+
+# HAMSP-5: test tenant credentials written by prototype/bootstrap-tenants.sh
+prototype/.tenants.json

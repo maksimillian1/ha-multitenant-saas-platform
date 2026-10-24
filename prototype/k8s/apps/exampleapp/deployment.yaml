@@ -1,0 +1,58 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: exampleapp
+  namespace: exampleapp
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: exampleapp
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: exampleapp
+    spec:
+      containers:
+        - name: exampleapp
+          # Built and loaded into kind by prototype/create-cluster.sh.
+          image: hamsp/exampleapp:dev
+          imagePullPolicy: IfNotPresent
+          args: ["serve"]
+          ports:
+            - name: http
+              containerPort: 8080
+          env:
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: exampleapp-db
+                  key: DATABASE_URL
+          readinessProbe:
+            httpGet: {path: /readyz, port: http}
+            periodSeconds: 5
+          livenessProbe:
+            httpGet: {path: /healthz, port: http}
+            periodSeconds: 10
+          resources:
+            requests: {cpu: 50m, memory: 32Mi}
+            limits: {memory: 128Mi}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: {drop: ["ALL"]}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: exampleapp
+  namespace: exampleapp
+spec:
+  selector:
+    app.kubernetes.io/name: exampleapp
+  ports:
+    - name: http
+      port: 8080
+      targetPort: http

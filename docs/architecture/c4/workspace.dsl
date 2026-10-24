@@ -39,13 +39,13 @@ workspace "HAMSP" "High-Availability Multi-Tenant SaaS Platform" {
 
             usageWriteApi = container "UsageWriteAPI" "Accepts usage events from the API Gateway and agent workloads, enforces per-tenant rate limits, acknowledges events once they are in Kafka (FR-05, QS-07, QS-08, QS-09)." "Go"
             egressExporter = container "Egress Exporter" "Turns network flows into egress usage per tenant (FR-05)." "TBD (HAMSP-19)" "Placeholder"
-            usageWriter = container "Usage Writer" "Consumes usage events, drops duplicates by event_id, writes them in batches (QS-06, QS-08, QS-09, HAMSP-7)." "TBD: own consumer or store connector (HAMSP-14)" "Placeholder"
+            usageWriter = container "Usage Writer" "Consumes usage events, drops duplicates by event_id, writes them in batches (QS-06, QS-08, QS-09, HAMSP-7)." "Go"
             meteringQuery = container "Metering Query Service" "Serves usage per tenant for reading (FR-05)." "Go"
             billing = container "Billing Service" "Invoices tenants by usage or subscription (FR-06)." "Go" "Planned"
 
             postgres = container "PostgreSQL" "Tenant and application data with RLS; separate database for Zitadel (ADR-0002, ADR-0003)." "CloudNativePG" "Database"
-            kafka = container "Kafka" "Usage events, partitioned by tenant_id (ADR-0001)." "Apache Kafka" "Queue"
-            usageStore = container "Usage Analytics Store" "Usage events per tenant, kept 13 months." "TBD (HAMSP-14)" "Database,Placeholder"
+            kafka = container "Kafka" "Usage events, partitioned by tenant_id (ADR-0001)." "Apache Kafka (Strimzi)" "Queue"
+            usageStore = container "Usage Store" "Usage events per tenant, kept 13 months (ADR-0006)." "v1: own database on the main PostgreSQL; v2: hot, warm and cold tiers" "Database"
             rateLimitStore = container "Rate Limit Store" "Shared per-tenant rate limit and quota counters (FR-07). Quota counters can be rebuilt from the usage store." "Redis, fit checked in HAMSP-15" "Database"
         }
 

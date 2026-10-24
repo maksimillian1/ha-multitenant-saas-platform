@@ -17,6 +17,7 @@ For specific design justifications, performance baselines, and cost optimization
 * [ADR-0001: System Boundaries & Multi-Tenant Core Components](./docs/adr/0001-system-boundaries.md)
 * [ADR-0002: Data Isolation Strategy for Multi-Tenant Architecture](./docs/adr/0002-data-isolation-strategy.md)
 * [ADR-0003: Auth Service Implementation (Zitadel)](./docs/adr/0003-auth-service-implementation.md)
+* [ADR-0004: API Gateway as a Go service behind Cilium Gateway API](./docs/adr/0004-api-gateway-go-service.md)
 
 ---
 

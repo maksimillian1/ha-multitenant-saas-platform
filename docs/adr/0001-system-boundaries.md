@@ -4,6 +4,8 @@ Date: 2026-07-01
 
 Updated: 2026-10-23. Synced with the C4 model ([`docs/architecture/c4/workspace.dsl`](../architecture/c4/workspace.dsl)) and [ADR-0003](0003-auth-service-implementation.md). See HAMSP-11 and HAMSP-13.
 
+Item 1 is amended by [ADR-0004](0004-api-gateway-go-service.md) (Proposed): Cilium Gateway API in front, a Go API Gateway service behind it.
+
 ## Status
 
 Proposed
@@ -35,13 +37,13 @@ We establish the following system boundaries, architectural rules, and multi-ten
     * Agent workloads report their own usage (agent tokens) to UsageWriteAPI directly, not through the Gateway. UsageWriteAPI takes the tenant from the pod identity.
 
 4. **Asynchronous Usage Pipeline (Kafka & KEDA):**
-   Usage events (API calls, agent tokens, network egress; FR-05) are decoupled from the synchronous HTTP path.
+   Usage events (API calls, agent tokens, network egress; FR-05) are decoupled from the synchronous HTTP path. Kafka runs on the Strimzi operator inside EKS ([ADR-0005](0005-kafka-on-strimzi.md)).
     * **Ingestion Contract:** UsageWriteAPI checks the tenant's rate limit, writes the event to a partitioned Apache Kafka topic with `tenant_id` as the key (strict per-tenant ordering), and acknowledges only after Kafka has it (QS-07, QS-09).
-    * **Writing:** Usage Writer consumes the topic, drops duplicates by `event_id` (HAMSP-7) and writes batches to the usage store (HAMSP-14). It updates the tenant's quota counters after a unique insert.
+    * **Writing:** Usage Writer consumes the topic, drops duplicates by `event_id` ([ADR-0007](0007-usage-event-deduplication.md)) and writes batches to the usage store ([ADR-0006](0006-usage-store.md)). It updates the tenant's quota counters after a unique insert.
     * **Event-Driven Scaling:** Usage Writer is scaled by **KEDA** on Kafka consumer lag. If a specific tenant floods the system, lag grows and KEDA adds consumers; UsageWriteAPI latency for other tenants is unaffected (QS-08). If the usage store is down, events wait in Kafka (QS-09).
 
 5. **Isolated Data Tier Boundary (CloudNativePG & PgBouncer):**
-   All relational data is consolidated into a PostgreSQL cluster managed by the CloudNativePG (CNPG) operator. Usage events are not stored here (item 4).
+   All relational data is consolidated into a PostgreSQL cluster managed by the CloudNativePG (CNPG) operator. In v1 it also holds the usage events, in their own database ([ADR-0006](0006-usage-store.md)).
     * **Data Isolation Model:** We implement a **Shared Database with Row-Level Security (RLS)** model (ADR-0002). A shared instance maximizes connection pooling efficiency via built-in PgBouncer, allowing us to hit 5000+ RPS without database backend worker exhaustion.
     * **Database Guardrails:** Every multi-tenant table must enforce `ALTER TABLE ... ENABLE ROW LEVEL SECURITY`. The application middleware must execute a session-level tenant configuration (e.g., `SET LOCAL app.current_tenant_id = '...'`) immediately upon acquiring a connection from the pool.
     * **Auth Data:** Zitadel uses its own database in the same CNPG cluster, separate from application data (ADR-0003).
