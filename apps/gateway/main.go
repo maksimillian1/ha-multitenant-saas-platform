@@ -5,6 +5,8 @@
 // Configuration (environment):
 //
 //	ISSUER            token issuer, e.g. http://zitadel.localtest.me:30080 (required)
+//	AUDIENCE          audience a token must carry: the Zitadel project ID of the
+//	                  platform API (required)
 //	JWKS_URL          default ISSUER + /oauth/v2/keys
 //	ISSUER_DIAL_ADDR  host:port to connect to for the issuer's URLs, e.g.
 //	                  zitadel.zitadel.svc:8080; the Host header stays the issuer's
@@ -48,6 +50,10 @@ func run(log *slog.Logger) error {
 	if issuer == "" {
 		return errors.New("ISSUER is required")
 	}
+	audience := os.Getenv("AUDIENCE")
+	if audience == "" {
+		return errors.New("AUDIENCE is required")
+	}
 	routes, err := proxy.ParseRoutes(os.Getenv("ROUTES"))
 	if err != nil {
 		return err
@@ -56,7 +62,7 @@ func run(log *slog.Logger) error {
 	if err != nil {
 		return err
 	}
-	verifier := auth.NewVerifier(issuer, env("JWKS_URL", issuer+"/oauth/v2/keys"), issuerClient)
+	verifier := auth.NewVerifier(issuer, audience, env("JWKS_URL", issuer+"/oauth/v2/keys"), issuerClient)
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(http.StatusOK) })

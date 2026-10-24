@@ -10,7 +10,7 @@ The contract between the API Gateway (`apps/gateway`, [ADR-0004](../adr/0004-api
 | Set by | The API Gateway only. |
 | Client value | Always dropped. The Gateway removes any `x-tenant-id` sent by the client before it validates the token, then sets the header from the claim. |
 | `Authorization` | Removed by the Gateway; services never see the token. |
-| Missing | The Gateway answers 401 when the token is missing or invalid; such requests never reach a service. If a service still gets a request without the header, it answers 401. |
+| Missing | The Gateway answers 401 when the token is missing, invalid or not issued for the platform API (its `aud` lacks the platform project ID); such requests never reach a service. If a service still gets a request without the header, it answers 401. |
 
 Rules for services:
 

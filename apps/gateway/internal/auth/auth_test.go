@@ -14,7 +14,10 @@ import (
 	"github.com/go-jose/go-jose/v4"
 )
 
-const issuer = "http://zitadel.test"
+const (
+	issuer   = "http://zitadel.test"
+	audience = "platform-api-project"
+)
 
 func newKey(t *testing.T, kid string) jose.JSONWebKey {
 	t.Helper()
@@ -51,13 +54,13 @@ func newTestVerifier(t *testing.T, key jose.JSONWebKey) *Verifier {
 		_ = json.NewEncoder(w).Encode(jwks)
 	}))
 	t.Cleanup(srv.Close)
-	return NewVerifier(issuer, srv.URL, srv.Client())
+	return NewVerifier(issuer, audience, srv.URL, srv.Client())
 }
 
 func claims(mod func(map[string]any)) map[string]any {
 	now := time.Now()
 	c := map[string]any{
-		"iss": issuer, "sub": "user-1", "aud": []string{"client-1"},
+		"iss": issuer, "sub": "user-1", "aud": []string{"client-1", audience},
 		"iat": now.Unix(), "exp": now.Add(time.Minute).Unix(),
 		TenantClaim: "396438053259838069",
 	}
@@ -78,6 +81,15 @@ func TestValidTokenReturnsOrganizationID(t *testing.T) {
 	}
 }
 
+// A single audience may come as a string instead of an array (RFC 7519).
+func TestAudienceAsString(t *testing.T) {
+	key := newKey(t, "k1")
+	tok := sign(t, key, claims(func(c map[string]any) { c["aud"] = audience }))
+	if _, err := newTestVerifier(t, key).Tenant(context.Background(), tok); err != nil {
+		t.Fatal(err)
+	}
+}
+
 func TestInvalidTokensAreRejected(t *testing.T) {
 	key := newKey(t, "k1")
 	v := newTestVerifier(t, key)
@@ -86,15 +98,18 @@ func TestInvalidTokensAreRejected(t *testing.T) {
 	tampered := parts[0] + "." + strings.Split(sign(t, key, claims(func(c map[string]any) { c[TenantClaim] = "other" })), ".")[1] + "." + parts[2]
 
 	cases := map[string]string{
-		"garbage":       "not-a-jwt",
-		"bad signature": tampered,
-		"foreign key":   sign(t, newKey(t, "k1"), claims(nil)),
-		"unknown kid":   sign(t, newKey(t, "k2"), claims(nil)),
-		"other issuer":  sign(t, key, claims(func(c map[string]any) { c["iss"] = "http://evil.test" })),
-		"expired":       sign(t, key, claims(func(c map[string]any) { c["exp"] = time.Now().Add(-time.Second).Unix() })),
-		"no tenant":     sign(t, key, claims(func(c map[string]any) { delete(c, TenantClaim) })),
-		"bad tenant":    sign(t, key, claims(func(c map[string]any) { c[TenantClaim] = "a b" })),
-		"tenant number": sign(t, key, claims(func(c map[string]any) { c[TenantClaim] = 42 })),
+		"garbage":         "not-a-jwt",
+		"bad signature":   tampered,
+		"foreign key":     sign(t, newKey(t, "k1"), claims(nil)),
+		"unknown kid":     sign(t, newKey(t, "k2"), claims(nil)),
+		"other issuer":    sign(t, key, claims(func(c map[string]any) { c["iss"] = "http://evil.test" })),
+		"expired":         sign(t, key, claims(func(c map[string]any) { c["exp"] = time.Now().Add(-time.Second).Unix() })),
+		"no tenant":       sign(t, key, claims(func(c map[string]any) { delete(c, TenantClaim) })),
+		"bad tenant":      sign(t, key, claims(func(c map[string]any) { c[TenantClaim] = "a b" })),
+		"tenant number":   sign(t, key, claims(func(c map[string]any) { c[TenantClaim] = 42 })),
+		"no audience":     sign(t, key, claims(func(c map[string]any) { delete(c, "aud") })),
+		"other audience":  sign(t, key, claims(func(c map[string]any) { c["aud"] = []string{"client-1", "other-project"} })),
+		"audience prefix": sign(t, key, claims(func(c map[string]any) { c["aud"] = audience + "-x" })),
 	}
 	for name, tok := range cases {
 		if tenant, err := v.Tenant(context.Background(), tok); err == nil {
