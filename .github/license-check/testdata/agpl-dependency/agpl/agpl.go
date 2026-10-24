@@ -1,0 +1,3 @@
+package agpl
+
+func Hello() {}
