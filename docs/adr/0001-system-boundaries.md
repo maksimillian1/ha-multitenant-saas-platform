@@ -4,6 +4,8 @@ Date: 2026-07-01
 
 Updated: 2026-10-23. Synced with the C4 model ([`docs/architecture/c4/workspace.dsl`](../architecture/c4/workspace.dsl)) and [ADR-0003](0003-auth-service-implementation.md). See HAMSP-11 and HAMSP-13.
 
+Item 1 is amended by [ADR-0004](0004-api-gateway-go-service.md) (Proposed): Cilium Gateway API in front, a Go API Gateway service behind it.
+
 ## Status
 
 Proposed

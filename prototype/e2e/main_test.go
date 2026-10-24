@@ -20,8 +20,8 @@ func TestMain(m *testing.M) {
 	os.Exit(m.Run())
 }
 
-// waitForGateway waits until a valid token passes the gateway. Right after
-// bootstrap the gateway may still hold a JWKS without Zitadel's new signing key.
+// waitForGateway waits until a valid token passes the gateway, which can take
+// a moment right after the cluster and the tenants were created.
 func waitForGateway(max time.Duration) error {
 	deadline := time.Now().Add(max)
 	var last string

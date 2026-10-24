@@ -41,6 +41,6 @@ The Deployment view (namespaces, node pools, Karpenter, KEDA, Cilium) is not dra
 
 * `/docs` - Documentation: requirements, C4 model, ADRs (`/docs/adr`) and subsystem notes.
 * `/prototype` - Local kind cluster with GitOps manifests (ArgoCD ApplicationSet, CloudNativePG, MinIO).
-* `/apps` - Go services. `apps/exampleapp`: the minimal per-tenant test service (HAMSP-5).
+* `/apps` - Go services: `apps/gateway` (API Gateway, ADR-0004) and `apps/exampleapp` (the minimal per-tenant test service).
 * `/terraform` - Infrastructure as Code for AWS EKS, Karpenter and core cloud dependencies. Empty for now.
 * `/deploy` - Empty for now.

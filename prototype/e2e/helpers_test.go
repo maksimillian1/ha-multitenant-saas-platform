@@ -1,6 +1,6 @@
 // Package e2e tests the walking skeleton (HAMSP-5) on the local kind cluster:
-// client → API Gateway (Cilium Envoy, jwt_authn) → ExampleApp → PgBouncer →
-// PostgreSQL with RLS. Run prototype/create-cluster.sh and
+// client → Cilium Gateway API → API Gateway (Go: JWT, x-tenant-id) →
+// ExampleApp → PgBouncer → PostgreSQL with RLS. Run prototype/create-cluster.sh and
 // prototype/bootstrap-tenants.sh first, then: go test -C prototype/e2e -count=1 ./...
 package e2e
 

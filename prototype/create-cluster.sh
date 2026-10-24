@@ -4,7 +4,9 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
 CLUSTER_NAME="cngp-demo"
-EXAMPLEAPP_IMAGE="hamsp/exampleapp:dev"
+# Go services built locally and loaded into kind: apps/<name> → hamsp/<name>:dev.
+APPS=(exampleapp gateway)
+GATEWAY_API_VERSION="v1.4.1"  # the version Cilium 1.19 supports
 # ArgoCD deploys prototype/k8s/apps from GitHub at this revision. It must be pushed.
 GITOPS_REVISION="${GITOPS_REVISION:-$(git -C "${REPO_DIR}" rev-parse --abbrev-ref HEAD)}"
 
@@ -60,8 +62,13 @@ wait_for_api_server
 
 # ── 3. install Cilium (replaces kube-proxy) ───────────────────────────────────
 
-# envoyConfig.enabled turns on CiliumEnvoyConfig, which runs the API Gateway
-# (prototype/k8s/apps/gateway/envoy-config.yaml).
+# The Gateway API CRDs must exist before Cilium starts its Gateway controller.
+echo "Installing Gateway API CRDs ${GATEWAY_API_VERSION}..."
+kubectl apply --server-side -f \
+  "https://github.com/kubernetes-sigs/gateway-api/releases/download/${GATEWAY_API_VERSION}/standard-install.yaml"
+
+# gatewayAPI.hostNetwork: the public Gateway (prototype/k8s/apps/gateway) binds
+# its port on every node, which kind maps to localhost:30080.
 echo "Installing Cilium CNI v1.19.5..."
 helm repo add cilium https://helm.cilium.io/ 2>/dev/null || true
 helm repo update cilium
@@ -78,7 +85,8 @@ helm upgrade --install cilium cilium/cilium \
   --set kubeProxyReplacement=true \
   --set k8sServiceHost="${API_SERVER_IP}" \
   --set k8sServicePort=6443 \
-  --set envoyConfig.enabled=true \
+  --set gatewayAPI.enabled=true \
+  --set gatewayAPI.hostNetwork.enabled=true \
   --wait \
   --timeout 5m
 
@@ -98,11 +106,13 @@ helm upgrade --install argocd argo/argo-cd \
   --wait \
   --timeout 5m
 
-# ── 5. build ExampleApp and load it into kind ─────────────────────────────────
+# ── 5. build the Go services and load them into kind ──────────────────────────
 
-echo "Building ${EXAMPLEAPP_IMAGE}..."
-docker build -t "${EXAMPLEAPP_IMAGE}" "${REPO_DIR}/apps/exampleapp"
-kind load docker-image "${EXAMPLEAPP_IMAGE}" --name "${CLUSTER_NAME}"
+for app in "${APPS[@]}"; do
+  echo "Building hamsp/${app}:dev..."
+  docker build -t "hamsp/${app}:dev" "${REPO_DIR}/apps/${app}"
+  kind load docker-image "hamsp/${app}:dev" --name "${CLUSTER_NAME}"
+done
 
 # ── 6. apply GitOps ApplicationSet ────────────────────────────────────────────
 # CNPG, MinIO, the Postgres cluster, Zitadel, ExampleApp and the API Gateway.

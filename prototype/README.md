@@ -3,9 +3,12 @@
 A local Kubernetes cluster that runs the walking skeleton (HAMSP-5):
 
 ```
-client → API Gateway (Cilium Envoy: jwt_authn, x-tenant-id) → ExampleApp (Go)
-       → PgBouncer (CNPG Pooler, transaction mode) → PostgreSQL with RLS
+client → Cilium Gateway API (Envoy, routes by host)
+       → API Gateway (Go, apps/gateway: JWT, x-tenant-id, routes by path)
+       → ExampleApp (Go) → PgBouncer (CNPG Pooler, transaction mode) → PostgreSQL with RLS
 ```
+
+The two gateway layers are described in [ADR-0004](../docs/adr/0004-api-gateway-go-service.md).
 
 Zitadel issues the tokens. Everything except Cilium and ArgoCD is deployed by ArgoCD from `k8s/apps/*` (one Application per directory, namespace = directory name).
 
@@ -16,7 +19,7 @@ Zitadel issues the tokens. Everything except Cilium and ArgoCD is deployed by Ar
 | `k8s/apps/database` | PostgreSQL cluster, roles, PgBouncer |
 | `k8s/apps/zitadel` | Zitadel with its own database in the same cluster |
 | `k8s/apps/exampleapp` | ExampleApp, its migration job and network policy |
-| `k8s/apps/gateway` | API Gateway: a `CiliumEnvoyConfig` on Cilium's Envoy, NodePort 30080 |
+| `k8s/apps/gateway` | Public Gateway (Cilium Gateway API, host network port 30080) and the API Gateway service |
 
 Secrets in these manifests are for this local cluster only.
 
@@ -37,7 +40,7 @@ ArgoCD pulls the manifests from GitHub, so push your branch first.
 go test -C prototype/e2e -count=1 -v ./...
 ```
 
-`create-cluster.sh` recreates the kind cluster `cngp-demo`, installs Cilium (with `CiliumEnvoyConfig`) and ArgoCD, builds the ExampleApp image and loads it into kind, and points ArgoCD at the current branch (`GITOPS_REVISION` overrides it).
+`create-cluster.sh` recreates the kind cluster `cngp-demo`, installs the Gateway API CRDs, Cilium (with Gateway API) and ArgoCD, builds the `apps/exampleapp` and `apps/gateway` images and loads them into kind, and points ArgoCD at the current branch (`GITOPS_REVISION` overrides it).
 
 `bootstrap-tenants.sh` waits for Zitadel, creates the organizations `tenant-a` and `tenant-b` with one machine user each, and writes their client credentials to `prototype/.tenants.json` (git-ignored). It also sets the access token lifetime to 60 s for the expiry test.
 

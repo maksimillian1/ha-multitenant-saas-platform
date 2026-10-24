@@ -112,8 +112,7 @@ func TestGatewayRejectsExpiredToken(t *testing.T) {
 	}
 	mustStatus(t, call(t, http.MethodGet, "/items", tok, nil), http.StatusOK, "fresh token")
 
-	// The gateway allows 5 s of clock skew.
-	wait := time.Until(time.Unix(int64(exp), 0)) + 10*time.Second
+	wait := time.Until(time.Unix(int64(exp), 0)) + 5*time.Second
 	if wait > 3*time.Minute {
 		t.Fatalf("token lives %s; run bootstrap-tenants.sh to set the 60 s lifetime", wait)
 	}
@@ -129,16 +128,16 @@ func TestGatewayRejectsExpiredToken(t *testing.T) {
 	}
 }
 
-// AC-6: pods other than the gateway cannot connect to ExampleApp directly.
+// AC-6: pods other than the API Gateway cannot connect to ExampleApp directly.
 func TestDirectAccessToExampleAppIsBlocked(t *testing.T) {
 	for _, ns := range []string{"default", "exampleapp"} {
 		t.Run(ns, func(t *testing.T) {
 			ctx, cancel := context.WithTimeout(context.Background(), 3*time.Minute)
 			defer cancel()
-			// One pod, two requests: the gateway answers (the pod has network),
-			// ExampleApp must not.
+			// One pod, two requests: the API Gateway answers 401 without a token
+			// (the pod has network), ExampleApp must not answer at all.
 			script := `
-code=$(curl -s -m 5 -o /dev/null -w '%{http_code}' -H 'Host: api.localtest.me' http://api-gateway.gateway.svc/items)
+code=$(curl -s -m 5 -o /dev/null -w '%{http_code}' http://api-gateway.gateway.svc:8080/items)
 echo "gateway=$code"
 if curl -s -m 5 -o /dev/null http://exampleapp.exampleapp.svc:8080/healthz; then echo direct=open; else echo direct=blocked; fi`
 			out, err := kubectl(ctx, "-n", ns, "run", "e2e-direct-"+randomID(), "--rm", "-i", "--restart=Never",

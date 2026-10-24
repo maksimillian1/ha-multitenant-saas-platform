@@ -6,8 +6,8 @@ zitadel:
     # Local prototype only. Exactly 32 bytes.
     masterkey: devOnlyMasterkeyForKindPrototype
     configmapConfig:
-      # Clients and the API Gateway reach Zitadel as http://zitadel.localtest.me:30080
-      # (the gateway NodePort). This is also the token issuer.
+      # Clients reach Zitadel as http://zitadel.localtest.me:30080 (the public
+      # Gateway). This is also the token issuer.
       ExternalDomain: zitadel.localtest.me
       ExternalPort: 30080
       ExternalSecure: false
@@ -39,6 +39,14 @@ zitadel:
   # Machine users only; the separate Login UI is not needed.
   login:
     enabled: false
+  # zitadel.localtest.me on the public Gateway (prototype/k8s/apps/gateway).
+  # Zitadel's own APIs do their own authentication, so this route skips the API Gateway.
+  gateway:
+    httpRoute:
+      enabled: true
+      parentRefs:
+        - name: public
+          namespace: gateway
   resources:
     requests: {cpu: 100m, memory: 256Mi}
     limits: {memory: 512Mi}
