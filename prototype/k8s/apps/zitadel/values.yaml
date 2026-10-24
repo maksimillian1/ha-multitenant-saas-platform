@@ -1,0 +1,52 @@
+# Zitadel for the local kind prototype (ADR-0003): own namespace, own database
+# in the CNPG cluster, no code changes. Not a production config (HAMSP-5 out of scope).
+zitadel:
+  replicaCount: 1
+  zitadel:
+    # Local prototype only. Exactly 32 bytes.
+    masterkey: devOnlyMasterkeyForKindPrototype
+    configmapConfig:
+      # Clients reach Zitadel as http://zitadel.localtest.me:30080 (the public
+      # Gateway). This is also the token issuer.
+      ExternalDomain: zitadel.localtest.me
+      ExternalPort: 30080
+      ExternalSecure: false
+      TLS:
+        Enabled: false
+      Database:
+        Postgres:
+          Host: main-pg-cluster-rw.database.svc
+          Port: 5432
+          Database: zitadel
+          MaxOpenConns: 10
+          MaxIdleConns: 5
+          User:
+            Username: zitadel
+            SSL:
+              Mode: require
+          Admin:
+            Username: postgres
+            SSL:
+              Mode: require
+    # Local prototype only. Admin matches prototype/k8s/apps/database/cluster.yaml.
+    secretConfig:
+      Database:
+        Postgres:
+          User:
+            Password: dev-zitadel
+          Admin:
+            Password: dev-postgres-superuser
+  # Machine users only; the separate Login UI is not needed.
+  login:
+    enabled: false
+  # zitadel.localtest.me on the public Gateway (prototype/k8s/apps/gateway).
+  # Zitadel's own APIs do their own authentication, so this route skips the API Gateway.
+  gateway:
+    httpRoute:
+      enabled: true
+      parentRefs:
+        - name: public
+          namespace: gateway
+  resources:
+    requests: {cpu: 100m, memory: 256Mi}
+    limits: {memory: 512Mi}

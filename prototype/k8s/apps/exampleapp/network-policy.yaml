@@ -1,0 +1,21 @@
+# Only the API Gateway may reach ExampleApp, because ExampleApp trusts the
+# x-tenant-id header (HAMSP-5 AC-6). Kubelet probes come from the host and are
+# allowed by Cilium's default.
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: exampleapp-from-gateway-only
+  namespace: exampleapp
+spec:
+  endpointSelector:
+    matchLabels:
+      app.kubernetes.io/name: exampleapp
+  ingress:
+    - fromEndpoints:
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: gateway
+            app.kubernetes.io/name: api-gateway
+      toPorts:
+        - ports:
+            - port: "8080"
+              protocol: TCP
