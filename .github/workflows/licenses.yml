@@ -1,0 +1,43 @@
+name: licenses
+
+on:
+  pull_request:
+    paths:
+      - "apps/**"
+      - ".github/license-check/**"
+      - ".github/workflows/licenses.yml"
+  push:
+    branches: [master]
+    paths:
+      - "apps/**"
+      - ".github/license-check/**"
+      - ".github/workflows/licenses.yml"
+
+jobs:
+  check:
+    # Nothing under /apps may depend on AGPL code (C-03, ADR-0003, HAMSP-21).
+    # Restricted (GPL, LGPL) and unknown licenses fail too.
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.26"
+          cache: false
+      - run: go install github.com/google/go-licenses/v2@v2.0.1
+      - name: Check the Go modules under /apps
+        run: |
+          mapfile -t modules < <(find apps -name go.mod -not -path '*/testdata/*' -exec dirname {} \; | sort)
+          .github/license-check/check.sh "${modules[@]}"
+      - name: The check fails on an AGPL dependency (negative fixture)
+        run: |
+          if .github/license-check/check.sh .github/license-check/testdata/agpl-dependency >fixture.log 2>&1; then
+            cat fixture.log
+            echo "::error::the license check passed on a module with an AGPL dependency"
+            exit 1
+          fi
+          cat fixture.log
+          grep -q "License 'AGPL-3.0'.*'example.com/agpl'" fixture.log
