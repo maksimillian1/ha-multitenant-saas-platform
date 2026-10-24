@@ -1,0 +1,35 @@
+# Only the API Gateway may reach UsageWriteAPI, because UsageWriteAPI trusts
+# tenant_id in the events (HAMSP-26 AC-7). Kubelet probes come from the host
+# and are allowed by Cilium's default.
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: usage-writeapi-from-gateway-only
+  namespace: usage
+spec:
+  endpointSelector:
+    matchLabels:
+      app.kubernetes.io/name: usage-writeapi
+  ingress:
+    - fromEndpoints:
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: gateway
+            app.kubernetes.io/name: api-gateway
+      toPorts:
+        - ports:
+            - port: "8080"
+              protocol: TCP
+---
+# Usage Writer takes no traffic; only kubelet probes from the host reach it.
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: usage-writer-no-ingress
+  namespace: usage
+spec:
+  endpointSelector:
+    matchLabels:
+      app.kubernetes.io/name: usage-writer
+  ingress:
+    - fromEntities:
+        - host
