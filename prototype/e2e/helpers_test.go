@@ -37,9 +37,11 @@ type tenant struct {
 }
 
 type config struct {
-	Issuer  string   `json:"issuer"`
-	Gateway string   `json:"gateway"`
-	Tenants []tenant `json:"tenants"`
+	Issuer  string `json:"issuer"`
+	Gateway string `json:"gateway"`
+	// Audience is the Zitadel project ID of the platform API (HAMSP-22).
+	Audience string   `json:"audience"`
+	Tenants  []tenant `json:"tenants"`
 }
 
 type item struct {
@@ -68,6 +70,9 @@ func loadConfig() error {
 	}
 	if err := json.Unmarshal(raw, &cfg); err != nil {
 		return err
+	}
+	if cfg.Audience == "" {
+		return fmt.Errorf("%s has no audience (rerun prototype/bootstrap-tenants.sh)", path)
 	}
 	if len(cfg.Tenants) < 2 {
 		return fmt.Errorf("%s: need 2 tenants, got %d", path, len(cfg.Tenants))
@@ -100,7 +105,18 @@ func newUUID() string {
 	return fmt.Sprintf("%x-%x-%x-%x-%x", b[0:4], b[4:6], b[6:8], b[8:10], b[10:16])
 }
 
-// token gets a fresh access token for the tenant's machine user.
+// tokenScope asks Zitadel for the Organization ID claim and, if audience is
+// set, for that project in the token's aud.
+func tokenScope(audience string) string {
+	scope := "openid urn:zitadel:iam:user:resourceowner"
+	if audience != "" {
+		scope += " urn:zitadel:iam:org:project:id:" + audience + ":aud"
+	}
+	return scope
+}
+
+// token gets a fresh access token for the tenant's machine user, issued for
+// the platform API.
 func token(t testing.TB, ten tenant) string {
 	t.Helper()
 	tok, err := fetchToken(ten)
@@ -111,9 +127,13 @@ func token(t testing.TB, ten tenant) string {
 }
 
 func fetchToken(ten tenant) (string, error) {
+	return fetchTokenWithScope(ten, tokenScope(cfg.Audience))
+}
+
+func fetchTokenWithScope(ten tenant, scope string) (string, error) {
 	form := url.Values{
 		"grant_type": {"client_credentials"},
-		"scope":      {"openid urn:zitadel:iam:user:resourceowner"},
+		"scope":      {scope},
 	}
 	req, _ := http.NewRequest(http.MethodPost, cfg.Issuer+"/oauth/v2/token", strings.NewReader(form.Encode()))
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
@@ -241,6 +261,21 @@ func jwtParts(t testing.TB, tok string) (header, payload, sig string, claims map
 		t.Fatal(err)
 	}
 	return parts[0], parts[1], parts[2], claims
+}
+
+// hasAudience reports whether a decoded aud claim (a string or an array) holds want.
+func hasAudience(aud any, want string) bool {
+	switch v := aud.(type) {
+	case string:
+		return v == want
+	case []any:
+		for _, a := range v {
+			if a == want {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 // kubectl runs kubectl against the current context and returns stdout.

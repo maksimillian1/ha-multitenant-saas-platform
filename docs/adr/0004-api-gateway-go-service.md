@@ -23,7 +23,7 @@ The entry point has two layers:
 1. **Infrastructure entry: Cilium Gateway API** (Gateway + HTTPRoute on Cilium's Envoy). It terminates the connection (TLS in EKS, behind the NLB), routes by host, and holds no business logic. Zitadel's host is routed straight to Zitadel, because its APIs do their own authentication.
 2. **API Gateway: a Go service** (`apps/gateway`). For every request on the API host it:
    * drops any `x-tenant-id` sent by the client;
-   * validates the Zitadel access token locally against the cached JWKS (`zitadel/oidc`, allowed by ADR-0003): issuer, signature, expiry;
+   * validates the Zitadel access token locally against the cached JWKS (`zitadel/oidc`, allowed by ADR-0003): issuer, signature, expiry, and an audience that holds the Zitadel project ID of the platform API (HAMSP-22), so tokens issued for other applications of the instance are rejected;
    * sets `x-tenant-id` from `urn:zitadel:iam:user:resourceowner:id` and removes the token;
    * routes by path prefix to the owning service.
 
@@ -52,5 +52,5 @@ Services trust `x-tenant-id` only because a `CiliumNetworkPolicy` lets nothing b
 * **Our code is in the hot path of every request**, with one extra hop. It must hold 20 000 RPS with low added latency and survive rolling deploys and Spot interruptions (QS-03, QS-05, QS-10). It needs at least 2 replicas, a PodDisruptionBudget and a k6 test before this ADR is accepted (HAMSP-17).
 * Proxy features Envoy gives for free (timeouts, retries, streaming, WSS) are now `net/http/httputil.ReverseProxy` behaviour and must be tested.
 * A token with an unknown key ID triggers a JWKS fetch; a flood of forged tokens becomes a flood of requests to Zitadel. The refetch needs a rate limit before production.
-* The token audience is not checked yet (HAMSP-22).
+* The audience proves that a token was issued for the platform API, not who may get one: with no project grants, any user of the Zitadel instance can request the platform audience. Limiting it to tenant organizations (project grants, Zitadel's project check) belongs to the tenant lifecycle (HAMSP-6).
 * When accepted, `docs/architecture/c4/workspace.dsl` must show the two layers instead of one "Envoy Proxy" API Gateway.
