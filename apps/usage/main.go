@@ -21,6 +21,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"net/http"
 	"os"
 	"os/signal"
 	"strings"
@@ -30,6 +31,8 @@ import (
 	"github.com/jackc/pgx/v5"
 
 	"github.com/maksimillian1/ha-multitenant-saas-platform/apps/usage/internal/store"
+	"github.com/maksimillian1/ha-multitenant-saas-platform/apps/usage/internal/writeapi"
+	"github.com/maksimillian1/ha-multitenant-saas-platform/apps/usage/internal/writer"
 )
 
 func main() {
@@ -141,7 +144,62 @@ func migrate(ctx context.Context, log *slog.Logger) error {
 	return nil
 }
 
-var errNotImplemented = errors.New("not implemented")
+// serve runs h on LISTEN_ADDR until ctx is done.
+func serve(ctx context.Context, log *slog.Logger, h http.Handler) error {
+	srv := &http.Server{Addr: env("LISTEN_ADDR", ":8080"), Handler: h, ReadHeaderTimeout: 5 * time.Second}
+	go func() {
+		<-ctx.Done()
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+		_ = srv.Shutdown(shutdownCtx)
+	}()
+	log.Info("listening", "addr", srv.Addr)
+	if err := srv.ListenAndServe(); !errors.Is(err, http.ErrServerClosed) {
+		return err
+	}
+	return nil
+}
 
-func runWriteAPI(context.Context, *slog.Logger) error { return errNotImplemented }
-func runWriter(context.Context, *slog.Logger) error   { return errNotImplemented }
+func runWriteAPI(ctx context.Context, log *slog.Logger) error {
+	seeds, err := brokers()
+	if err != nil {
+		return err
+	}
+	k, err := writeapi.NewKafka(seeds, env("KAFKA_TOPIC", "usage-events"))
+	if err != nil {
+		return err
+	}
+	defer k.Close()
+	return serve(ctx, log, writeapi.New(k, log))
+}
+
+func runWriter(ctx context.Context, log *slog.Logger) error {
+	dsn, err := required("DATABASE_URL")
+	if err != nil {
+		return err
+	}
+	seeds, err := brokers()
+	if err != nil {
+		return err
+	}
+	st, err := store.Open(ctx, dsn)
+	if err != nil {
+		return err
+	}
+	defer st.Close()
+	client, err := writer.NewClient(seeds, env("KAFKA_TOPIC", "usage-events"), env("KAFKA_GROUP", "usage-writer"))
+	if err != nil {
+		return err
+	}
+	defer client.Close()
+
+	health := http.NewServeMux()
+	health.HandleFunc("GET /healthz", func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(http.StatusOK) })
+	go func() {
+		if err := serve(ctx, log, health); err != nil {
+			log.Error("health endpoint", "err", err)
+		}
+	}()
+	log.Info("consuming")
+	return writer.New(client, st, log).Run(ctx)
+}
