@@ -44,7 +44,7 @@ workspace "HAMSP" "High-Availability Multi-Tenant SaaS Platform" {
             billing = container "Billing Service" "Invoices tenants by usage or subscription (FR-06)." "Go" "Planned"
 
             postgres = container "PostgreSQL" "Tenant and application data with RLS; separate database for Zitadel (ADR-0002, ADR-0003)." "CloudNativePG" "Database"
-            kafka = container "Kafka" "Usage events, partitioned by tenant_id (ADR-0001)." "Apache Kafka" "Queue"
+            kafka = container "Kafka" "Usage events, partitioned by tenant_id (ADR-0001)." "Apache Kafka (Strimzi)" "Queue"
             usageStore = container "Usage Analytics Store" "Usage events per tenant, kept 13 months." "TBD (HAMSP-14)" "Database,Placeholder"
             rateLimitStore = container "Rate Limit Store" "Shared per-tenant rate limit and quota counters (FR-07). Quota counters can be rebuilt from the usage store." "Redis, fit checked in HAMSP-15" "Database"
         }

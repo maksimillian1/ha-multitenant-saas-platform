@@ -144,7 +144,7 @@ graph LR
       style 15 fill:#438dd5,stroke:#2e6295,color:#ffffff
       16["<div style='font-weight: bold'>Billing Service</div><div style='font-size: 70%; margin-top: 0px'>[Container: Go]</div><div style='font-size: 80%; margin-top:10px'>Invoices tenants by usage or<br />subscription (FR-06).</div>"]
       style 16 fill:#438dd5,stroke:#2e6295,color:#ffffff
-      18["<div style='font-weight: bold'>Kafka</div><div style='font-size: 70%; margin-top: 0px'>[Container: Apache Kafka]</div><div style='font-size: 80%; margin-top:10px'>Usage events, partitioned by<br />tenant_id (ADR-0001).</div>"]
+      18["<div style='font-weight: bold'>Kafka</div><div style='font-size: 70%; margin-top: 0px'>[Container: Apache Kafka (Strimzi)]</div><div style='font-size: 80%; margin-top:10px'>Usage events, partitioned by<br />tenant_id (ADR-0001).</div>"]
       style 18 fill:#438dd5,stroke:#2e6295,color:#ffffff
       19[("<div style='font-weight: bold'>Usage Analytics Store</div><div style='font-size: 70%; margin-top: 0px'>[Container: TBD (HAMSP-14)]</div><div style='font-size: 80%; margin-top:10px'>Usage events per tenant, kept<br />13 months.</div>")]
       style 19 fill:#f2f2f2,stroke:#a9a9a9,color:#333333
