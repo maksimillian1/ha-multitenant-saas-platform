@@ -98,6 +98,39 @@ func TestGatewayRejectsInvalidTokens(t *testing.T) {
 	}
 }
 
+// HAMSP-22: a valid Zitadel token that is not issued for the platform API (no
+// project audience) gets 401 at the gateway and never reaches ExampleApp.
+func TestGatewayRejectsTokenWithoutPlatformAudience(t *testing.T) {
+	valid := token(t, tenA)
+	if _, _, _, claims := jwtParts(t, valid); !hasAudience(claims["aud"], cfg.Audience) {
+		t.Fatalf("token requested with the project scope has aud %v, want it to contain %s", claims["aud"], cfg.Audience)
+	}
+	other, err := fetchTokenWithScope(tenA, tokenScope(""))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, _, _, claims := jwtParts(t, other); hasAudience(claims["aud"], cfg.Audience) {
+		t.Fatalf("token requested without the project scope still has aud %v", claims["aud"])
+	}
+
+	probe := newUUID()
+	r := call(t, http.MethodGet, "/items/"+probe, other, nil)
+	if r.Status != http.StatusUnauthorized {
+		t.Fatalf("token without the platform audience: status %d, want 401; body %s", r.Status, r.Body)
+	}
+
+	// Positive control, as in TestGatewayRejectsInvalidTokens.
+	control := newUUID()
+	mustStatus(t, call(t, http.MethodGet, "/items/"+control, valid, nil), http.StatusNotFound, "valid token, unknown item")
+	logs := exampleAppLogs(t)
+	if !strings.Contains(logs, control) {
+		t.Fatalf("ExampleApp logs miss the control request %s; the log check would prove nothing", control)
+	}
+	if strings.Contains(logs, probe) {
+		t.Fatal("the request with a token for another audience reached ExampleApp")
+	}
+}
+
 // AC-5: an expired Zitadel token is rejected. Takes about a minute, because
 // bootstrap-tenants.sh sets the access token lifetime to 60 s.
 func TestGatewayRejectsExpiredToken(t *testing.T) {

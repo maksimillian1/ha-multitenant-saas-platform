@@ -30,6 +30,13 @@ spec:
             # JWKS from the Zitadel Service with the issuer as Host header.
             - name: ISSUER_DIAL_ADDR
               value: zitadel.zitadel.svc:8080
+            # Zitadel project ID of the platform API, the audience every token
+            # must carry (HAMSP-22). Zitadel generates the ID, so
+            # prototype/bootstrap-tenants.sh creates the project and writes this
+            # ConfigMap; until then the pods wait in CreateContainerConfigError.
+            - name: AUDIENCE
+              valueFrom:
+                configMapKeyRef: {name: api-gateway-audience, key: audience}
             - name: ROUTES
               value: /items=http://exampleapp.exampleapp.svc:8080
           readinessProbe:

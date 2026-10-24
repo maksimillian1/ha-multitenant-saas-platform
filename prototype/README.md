@@ -44,6 +44,8 @@ go test -C prototype/e2e -count=1 -v ./...
 
 `bootstrap-tenants.sh` waits for Zitadel, creates the organizations `tenant-a` and `tenant-b` with one machine user each, and writes their client credentials to `prototype/.tenants.json` (git-ignored). It also sets the access token lifetime to 60 s for the expiry test.
 
+It also creates the Zitadel project `platform-api`. Its ID is the audience every token must carry (HAMSP-22). Zitadel generates the ID, so the script writes it to the ConfigMap `gateway/api-gateway-audience` and restarts the API Gateway. Until the script has run, the API Gateway pods wait in `CreateContainerConfigError` and ArgoCD shows the `gateway` app as Degraded.
+
 The e2e tests take about two minutes; `-short` skips the token expiry test.
 
 Known issue: in host network mode Cilium 1.19 never sets an address on the Gateway, so it stays `Programmed=False` (`AddressNotAssigned`) and ArgoCD shows the `gateway` app as Progressing. Traffic on port 30080 works.
@@ -52,8 +54,9 @@ Known issue: in host network mode Cilium 1.19 never sets an address on the Gatew
 
 ```bash
 TENANT=$(jq -r '.tenants[0] | "\(.client_id):\(.client_secret)"' prototype/.tenants.json)
+AUD=$(jq -r .audience prototype/.tenants.json)
 TOKEN=$(curl -s --connect-to zitadel.localtest.me:30080:127.0.0.1:30080 -u "$TENANT" \
-  -d 'grant_type=client_credentials&scope=openid urn:zitadel:iam:user:resourceowner' \
+  -d "grant_type=client_credentials&scope=openid urn:zitadel:iam:user:resourceowner urn:zitadel:iam:org:project:id:${AUD}:aud" \
   http://zitadel.localtest.me:30080/oauth/v2/token | jq -r .access_token)
 curl -s --connect-to api.localtest.me:30080:127.0.0.1:30080 -H "Authorization: Bearer $TOKEN" \
   -d '{"name":"hello"}' http://api.localtest.me:30080/items
