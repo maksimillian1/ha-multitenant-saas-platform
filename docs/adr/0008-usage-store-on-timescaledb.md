@@ -65,6 +65,8 @@ RLS cannot coexist with compression and aggregates, so the usage database enforc
 
 Only platform services (Usage Writer, later Metering Query Service) connect to the usage cluster. No tenant gets a connection, a role or a query interface to it, so the function and the views guard against bugs in our services, not against tenants writing SQL. If tenants get richer access to their usage in v2, it goes through derived data (for example TimescaleDB jobs or an export to a tenant-facing store), never through direct access to this cluster.
 
+The guardrail is also a licence condition: the TSL allows its features in a "Value Added Product or Service" only while its users cannot define or modify the database schema (TSL section 3.10 (iii)).
+
 ## Considered options
 
 | Option | Why not |
@@ -91,7 +93,7 @@ Only platform services (Usage Writer, later Metering Query Service) connect to t
 **Bad / risks:**
 
 * **Isolation in the usage database depends on one function and two views**, not on RLS. Their tests (HAMSP-25 AC-5, AC-10) carry the weight that RLS policies carry elsewhere, and the CI check must keep every table closed to application roles.
-* **TSL licence.** Using TimescaleDB inside our SaaS is allowed; offering it as a database service is not. Users of this MIT boilerplate inherit the same terms for the usage cluster. Whether our extension image may be pushed to a public registry is open (HAMSP-25).
+* **TSL licence.** Using TimescaleDB inside our SaaS is allowed; offering it as a database service, or letting users change its schema, is not (section 3.10). Users of this MIT boilerplate inherit the same terms for the usage cluster. Section 2.1 (c) allows distributing the binaries "in unmodified standalone form"; our image repackages the unmodified binaries of Timescale's packages with the licence texts, so pushing it to a registry looks allowed, but that reading is not legal advice and is confirmed before the image is published (HAMSP-25).
 * **Our extension image** must be rebuilt for every TimescaleDB and PostgreSQL major version and kept on the same Debian release as the CNPG image.
 * **One more 3-instance cluster** to run and pay for. The cost against C-02 cannot be checked while C-02 is `TODO`.
 * **ImageVolume** needs Kubernetes 1.35 and containerd 2.1+ on every node, also in EKS.
