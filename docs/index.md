@@ -32,7 +32,7 @@ The C4 model in [architecture/c4/workspace.dsl](architecture/c4/workspace.dsl) i
 
 * **System Context (L1):** platform admins, tenant admins and end users use HAMSP. HAMSP depends on the customer's identity provider, the Kubernetes API, AWS S3 and, in v2, a payment provider.
 * **RequestPath (L2):** a request goes through the API Gateway, which validates the JWT, takes `tenant_id` and checks rate limits. It then reaches Tenant Management, ExampleApp or the Auth Service (Zitadel). Data lives in PostgreSQL with RLS.
-* **UsagePipeline (L2):** the API Gateway (API calls), agent workloads (tokens) and the Egress Exporter send usage events to UsageWriteAPI. Events go through Kafka to Usage Writer, which drops duplicates and writes them to the usage store. Metering Query Service reads them back.
+* **UsagePipeline (L2):** the API Gateway (API calls), agent workloads (tokens) and the Egress Exporter send usage events to UsageWriteAPI. Events go through Kafka to Usage Writer, which drops duplicates and writes them to the usage store, a TimescaleDB cluster of its own (ADR-0008). Metering Query Service reads them back.
 
 The Deployment view (namespaces, node pools, Karpenter, KEDA, Cilium) is not drawn yet.
 
@@ -42,6 +42,7 @@ The Deployment view (namespaces, node pools, Karpenter, KEDA, Cilium) is not dra
 
 * `/docs` - Documentation: requirements, C4 model, ADRs (`/docs/adr`) and subsystem notes.
 * `/prototype` - Local kind cluster with GitOps manifests (ArgoCD ApplicationSet, CloudNativePG, MinIO).
-* `/apps` - Go services: `apps/gateway` (API Gateway, ADR-0004) and `apps/exampleapp` (the minimal per-tenant test service).
+* `/apps` - Go services: `apps/gateway` (API Gateway, ADR-0004), `apps/usage` (UsageWriteAPI and Usage Writer) and `apps/exampleapp` (the minimal per-tenant test service).
+* `/images` - Container images that are not Go services: `images/timescaledb`, the TimescaleDB extension image of the usage cluster (ADR-0008). It holds Timescale License (TSL) binaries; see [Data Tier](architecture/data-tier.md).
 * `/terraform` - Infrastructure as Code for AWS EKS, Karpenter and core cloud dependencies. Empty for now.
 * `/deploy` - Empty for now.

@@ -45,7 +45,7 @@ workspace "HAMSP" "High-Availability Multi-Tenant SaaS Platform" {
 
             postgres = container "PostgreSQL" "Tenant and application data with RLS; separate database for Zitadel (ADR-0002, ADR-0003)." "CloudNativePG" "Database"
             kafka = container "Kafka" "Usage events, partitioned by tenant_id (ADR-0001)." "Apache Kafka (Strimzi)" "Queue"
-            usageStore = container "Usage Store" "Usage events per tenant, kept 13 months (ADR-0006)." "v1: own database on the main PostgreSQL; v2: hot, warm and cold tiers" "Database"
+            usageStore = container "Usage Store" "Usage events per tenant, kept 13 months: hot and warm tiers in one hypertable, hourly aggregate. Platform-only (ADR-0006, ADR-0008)." "TimescaleDB on its own CNPG cluster; cold tier in S3 in v2" "Database"
             rateLimitStore = container "Rate Limit Store" "Shared per-tenant rate limit and quota counters (FR-07). Quota counters can be rebuilt from the usage store." "Redis, fit checked in HAMSP-15" "Database"
         }
 
