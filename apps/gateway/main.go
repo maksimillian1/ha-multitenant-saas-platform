@@ -12,6 +12,10 @@
 //	                  zitadel.zitadel.svc:8080; the Host header stays the issuer's
 //	ROUTES            /prefix=http://upstream,... (required)
 //	LISTEN_ADDR       default :8080
+//	USAGE_URL         UsageWriteAPI, e.g. http://usage-writeapi.usage.svc:8080/v1/events;
+//	                  empty disables usage reporting (HAMSP-26)
+//	USAGE_MAX_PENDING unsent usage events at most, default 10000
+//	METRICS_ADDR      metrics listener, default :9090; not routed by the public Gateway
 package main
 
 import (
@@ -23,11 +27,13 @@ import (
 	"net/url"
 	"os"
 	"os/signal"
+	"strconv"
 	"syscall"
 	"time"
 
 	"github.com/maksimillian1/ha-multitenant-saas-platform/apps/gateway/internal/auth"
 	"github.com/maksimillian1/ha-multitenant-saas-platform/apps/gateway/internal/proxy"
+	"github.com/maksimillian1/ha-multitenant-saas-platform/apps/gateway/internal/usage"
 )
 
 func main() {
@@ -64,9 +70,36 @@ func run(log *slog.Logger) error {
 	}
 	verifier := auth.NewVerifier(issuer, audience, env("JWKS_URL", issuer+"/oauth/v2/keys"), issuerClient)
 
+	var reporter proxy.UsageReporter
+	var usageReporter *usage.Reporter
+	if u := os.Getenv("USAGE_URL"); u != "" {
+		limit, err := strconv.Atoi(env("USAGE_MAX_PENDING", "10000"))
+		if err != nil || limit <= 0 {
+			return errors.New("USAGE_MAX_PENDING must be a positive integer")
+		}
+		usageReporter = usage.New(usage.Config{URL: u, Limit: limit}, log)
+		reporter = usageReporter
+	} else {
+		log.Warn("USAGE_URL is not set: API calls are not reported as usage events")
+	}
+
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(http.StatusOK) })
-	mux.Handle("/", accessLog(proxy.New(verifier, routes, log), log))
+	mux.Handle("/", accessLog(proxy.New(verifier, routes, reporter, log), log))
+
+	metrics := http.NewServeMux()
+	metrics.HandleFunc("GET /metrics", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/plain; version=0.0.4")
+		if usageReporter != nil {
+			usageReporter.WriteMetrics(w)
+		}
+	})
+	metricsSrv := &http.Server{Addr: env("METRICS_ADDR", ":9090"), Handler: metrics, ReadHeaderTimeout: 5 * time.Second}
+	go func() {
+		if err := metricsSrv.ListenAndServe(); !errors.Is(err, http.ErrServerClosed) {
+			log.Error("metrics listener", "err", err)
+		}
+	}()
 
 	srv := &http.Server{
 		Addr:              env("LISTEN_ADDR", ":8080"),
@@ -80,6 +113,11 @@ func run(log *slog.Logger) error {
 		shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()
 		_ = srv.Shutdown(shutdownCtx)
+		_ = metricsSrv.Shutdown(shutdownCtx)
+		if usageReporter != nil {
+			// Events still retrying are given up after this and counted as expired.
+			usageReporter.Close(shutdownCtx)
+		}
 	}()
 	log.Info("listening", "addr", srv.Addr, "routes", len(routes))
 	if err := srv.ListenAndServe(); !errors.Is(err, http.ErrServerClosed) {

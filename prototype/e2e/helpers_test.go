@@ -280,8 +280,14 @@ func hasAudience(aud any, want string) bool {
 
 // kubectl runs kubectl against the current context and returns stdout.
 func kubectl(ctx context.Context, args ...string) (string, error) {
+	return kubectlStdin(ctx, "", args...)
+}
+
+// kubectlStdin runs kubectl with stdin, e.g. for kubectl apply -f -.
+func kubectlStdin(ctx context.Context, stdin string, args ...string) (string, error) {
 	var stdout, stderr bytes.Buffer
 	cmd := exec.CommandContext(ctx, "kubectl", args...)
+	cmd.Stdin = strings.NewReader(stdin)
 	cmd.Stdout, cmd.Stderr = &stdout, &stderr
 	err := cmd.Run()
 	if err != nil {
@@ -293,6 +299,12 @@ func kubectl(ctx context.Context, args ...string) (string, error) {
 // psql runs SQL as the postgres superuser on the primary, in the exampleapp database.
 func psql(t testing.TB, sql string) (string, error) {
 	t.Helper()
+	return psqlDB(t, "exampleapp", sql)
+}
+
+// psqlDB runs SQL as the postgres superuser on the primary, in database db.
+func psqlDB(t testing.TB, db, sql string) (string, error) {
+	t.Helper()
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
 	defer cancel()
 	primary, err := kubectl(ctx, "-n", "database", "get", "cluster", "main-pg-cluster",
@@ -301,6 +313,6 @@ func psql(t testing.TB, sql string) (string, error) {
 		t.Fatal(err)
 	}
 	out, err := kubectl(ctx, "-n", "database", "exec", primary, "-c", "postgres", "--",
-		"psql", "-U", "postgres", "-d", "exampleapp", "-Atq", "-v", "ON_ERROR_STOP=1", "-c", sql)
+		"psql", "-U", "postgres", "-d", db, "-Atq", "-v", "ON_ERROR_STOP=1", "-c", sql)
 	return strings.TrimSpace(out), err
 }
