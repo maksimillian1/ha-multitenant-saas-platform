@@ -4,7 +4,7 @@ Date: 2026-10-25
 
 ## Status
 
-Proposed
+Accepted
 
 Decided in HAMSP-25. Amends [ADR-0006](0006-usage-store.md): the usage database leaves the main cluster, and the hot and warm tiers are one TimescaleDB hypertable. Amends [ADR-0002](0002-data-isolation-strategy.md) for the usage database: isolation there is enforced by a write function and views, not by RLS. Keeps [ADR-0007](0007-usage-event-deduplication.md).
 
@@ -100,4 +100,22 @@ Only platform services (Usage Writer, later Metering Query Service) connect to t
 
 ## Measurements
 
-Filled in after the benchmark on kind (HAMSP-25 AC-12).
+`prototype/bench/usage-tiers.sh` on the kind usage cluster (3 instances, synchronous replication, laptop disk), 2026-10-25: 10 M events over 10 days, 100 tenants. 80% are `api_calls` with the attributes the API Gateway sends, including a random UUID in the path, which compresses badly; the rest are token and egress events without attributes.
+
+| What | Result |
+|---|---|
+| Load, through synchronous replication | 67 000 events/s |
+| Size before compression, heap + indexes | 397 bytes per event |
+| Columnstore policy, ~1.5 days of chunks | 11.4 s, 563 MB → 96 MB: **ratio 5.8** |
+| Late duplicate, original in a compressed chunk (p50 / p95) | 0.76 / 4.4 ms, not stored |
+| Late duplicate, original in an uncompressed chunk (p50 / p95) | 0.73 / 4.3 ms, not stored |
+| New late event into a compressed chunk (p50 / p95) | 0.11 / 1.8 ms |
+| Aggregate: first refresh over all data | 9.2 s, 71 700 rows, 9 MB |
+| Aggregate: policy refresh after 500 late events | 0.1 s |
+| One tenant's sum over 10 days: raw events / aggregate | 7 250 ms / 5 ms, same result |
+
+What follows from it:
+
+* A late duplicate costs the same whether its original is compressed or not, so the 8-day hot window is about cheap writes and corrections, not about deduplication.
+* Billing and quotas must read the aggregate: three orders of magnitude faster than summing raw events.
+* At Sizing (170 M events a day) this is about 67 GB a day uncompressed and 12 GB a day compressed, per instance: about 0.5 TB for the hot 8 days and 4.5 TB for the rest of 13 months, times 3 instances. Real attributes may compress better than the random UUIDs here, but the cold tier in S3 (v2) is what brings the cluster down to a size that restores within QS-13; raw events older than a few months should move there first.

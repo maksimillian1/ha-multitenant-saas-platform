@@ -64,7 +64,7 @@ kubectl -n usage-db exec usage-pg-cluster-1 -c postgres -- psql -U postgres -d u
 
 The API Gateway's usage counters (sent, dropped, failed attempts) are on its metrics port 9090: `kubectl -n gateway port-forward deploy/api-gateway 9090` and `curl localhost:9090/metrics`.
 
-The CNPG operator is 1.30. A cluster created with CNPG 1.23 (before HAMSP-25) cannot jump to 1.30 directly: 1.30 rejects the plain-HTTP status port of instances created before 1.24. Upgrade it through 1.29.1 first and let the instances roll (commit `62b33ae`), then to 1.30.
+The CNPG operator is 1.30. A cluster created with CNPG 1.23 (before HAMSP-25) cannot jump to 1.30 directly: 1.30 rejects the plain-HTTP status port of instances created before 1.24. Upgrade it through 1.29.1 first and let the instances roll (commit `62b33ae`), then to 1.30. On such a cluster the old `usage` database and roles in `main-pg-cluster` are dropped by the `legacy-usage` Database resource and `ensure: absent` roles once PgBouncer closes its idle server connections to them (`server_idle_timeout`, 10 minutes).
 
 Known issue: in host network mode Cilium 1.19 never sets an address on the Gateway, so it stays `Programmed=False` (`AddressNotAssigned`) and ArgoCD shows the `gateway` app as Progressing. Traffic on port 30080 works.
 
