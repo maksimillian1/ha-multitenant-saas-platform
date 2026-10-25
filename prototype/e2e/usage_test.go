@@ -56,6 +56,41 @@ func waitForUsageRows(t testing.TB, path string, want int, within time.Duration)
 	}
 }
 
+// waitForUsagePaths waits until each path has exactly one usage event, then
+// checks that no more arrive. One query per poll, so hundreds of paths are
+// checked in seconds.
+func waitForUsagePaths(t testing.TB, paths []string, within time.Duration) {
+	t.Helper()
+	count := func() (rows, distinct int) {
+		out, err := psqlDB(t, "usage", "SELECT count(*) || ' ' || count(DISTINCT attributes->>'path') FROM usage_events WHERE attributes->>'path' IN ("+idList(paths)+")")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := fmt.Sscan(out, &rows, &distinct); err != nil {
+			t.Fatalf("count: %q", out)
+		}
+		return rows, distinct
+	}
+	deadline := time.Now().Add(within)
+	for {
+		rows, distinct := count()
+		if rows > distinct {
+			t.Fatalf("%d usage events for %d paths: some calls are stored twice", rows, distinct)
+		}
+		if distinct == len(paths) {
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("%d of %d calls stored", distinct, len(paths))
+		}
+		time.Sleep(time.Second)
+	}
+	time.Sleep(3 * time.Second)
+	if rows, _ := count(); rows != len(paths) {
+		t.Fatalf("%d usage events for %d calls after settling", rows, len(paths))
+	}
+}
+
 func idList(ids []string) string {
 	return "'" + strings.Join(ids, "','") + "'"
 }
@@ -306,9 +341,7 @@ spec:
 	}
 
 	restore()
-	for _, p := range paths {
-		waitForUsageRows(t, p, 1, 90*time.Second)
-	}
+	waitForUsagePaths(t, paths, 90*time.Second)
 }
 
 // directAccess runs a curl pod in ns with the given labels and returns its output.
@@ -508,10 +541,7 @@ spec:
 	if err != nil || out != "1" {
 		t.Fatalf("usage database: %q, %v", out, err)
 	}
-	deadline := time.Now().Add(3 * time.Minute)
-	for _, p := range paths {
-		waitForUsageRows(t, p, 1, time.Until(deadline))
-	}
+	waitForUsagePaths(t, paths, 3*time.Minute)
 }
 
 // AC-14 / QS-17: one Kafka broker pod is deleted while events flow; every
