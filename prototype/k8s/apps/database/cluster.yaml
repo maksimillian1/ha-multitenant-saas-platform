@@ -71,6 +71,9 @@ metadata:
   namespace: database
 spec:
   instances: 3
+  # Pinned: without imageName every operator upgrade moves the cluster to the
+  # operator's default image, which for CNPG 1.30 is PostgreSQL 18.
+  imageName: ghcr.io/cloudnative-pg/postgresql:16.3
   storage:
     size: 5Gi
   enableSuperuserAccess: true
