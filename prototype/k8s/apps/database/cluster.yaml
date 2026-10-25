@@ -124,10 +124,14 @@ spec:
       log_autovacuum_min_duration: "0"
       log_lock_waits: "on"
       log_checkpoints: "on"
-  # Quorum synchronous replication: a commit waits for ANY 1 standby.
-  # spec.postgresql.synchronous needs CNPG 1.24+; the operator here is 1.23.
-  minSyncReplicas: 1
-  maxSyncReplicas: 1
+    # Quorum synchronous replication: a commit waits for ANY 1 standby.
+    synchronous:
+      method: any
+      number: 1
+  # A rolling update (new image, new operator) moves the primary to an updated
+  # standby first instead of restarting it in place, so writes stop only for
+  # the switchover.
+  primaryUpdateMethod: switchover
   backup:
     barmanObjectStore:
       destinationPath: s3://postgres-backups/
