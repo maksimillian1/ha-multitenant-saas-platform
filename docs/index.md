@@ -18,6 +18,7 @@ Specific technical constraints must be sourced from the specialized files below:
 - [Operations & Infrastructure (Terraform)](ops/terraform.md)
 - [Contracts](contracts/)
 - [C4 model](architecture/c4/README.md): diagrams generated from [workspace.dsl](architecture/c4/workspace.dsl)
+- [Roadmap](roadmap.md): what belongs to v1 and v2
 
 **Override Rule**: Accepted ADRs in [adr/](adr/) hold absolute priority over all other architectural documentation.
 
@@ -41,6 +42,6 @@ The Deployment view (namespaces, node pools, Karpenter, KEDA, Cilium) is not dra
 
 * `/docs` - Documentation: requirements, C4 model, ADRs (`/docs/adr`) and subsystem notes.
 * `/prototype` - Local kind cluster with GitOps manifests (ArgoCD ApplicationSet, CloudNativePG, MinIO).
-* `/apps` - Go services. Empty for now.
+* `/apps` - Go services: `apps/gateway` (API Gateway, ADR-0004) and `apps/exampleapp` (the minimal per-tenant test service).
 * `/terraform` - Infrastructure as Code for AWS EKS, Karpenter and core cloud dependencies. Empty for now.
 * `/deploy` - Empty for now.

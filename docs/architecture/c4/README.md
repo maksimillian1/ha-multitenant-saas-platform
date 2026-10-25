@@ -138,16 +138,16 @@ graph LR
       style 12 fill:#438dd5,stroke:#2e6295,color:#ffffff
       13["<div style='font-weight: bold'>Egress Exporter</div><div style='font-size: 70%; margin-top: 0px'>[Container: TBD (HAMSP-19)]</div><div style='font-size: 80%; margin-top:10px'>Turns network flows into<br />egress usage per tenant<br />(FR-05).</div>"]
       style 13 fill:#f2f2f2,stroke:#a9a9a9,color:#333333
-      14["<div style='font-weight: bold'>Usage Writer</div><div style='font-size: 70%; margin-top: 0px'>[Container: TBD: own consumer or store connector (HAMSP-14)]</div><div style='font-size: 80%; margin-top:10px'>Consumes usage events, drops<br />duplicates by event_id,<br />writes them in batches<br />(QS-06, QS-08, QS-09,<br />HAMSP-7).</div>"]
-      style 14 fill:#f2f2f2,stroke:#a9a9a9,color:#333333
+      14["<div style='font-weight: bold'>Usage Writer</div><div style='font-size: 70%; margin-top: 0px'>[Container: Go]</div><div style='font-size: 80%; margin-top:10px'>Consumes usage events, drops<br />duplicates by event_id,<br />writes them in batches<br />(QS-06, QS-08, QS-09,<br />HAMSP-7).</div>"]
+      style 14 fill:#438dd5,stroke:#2e6295,color:#ffffff
       15["<div style='font-weight: bold'>Metering Query Service</div><div style='font-size: 70%; margin-top: 0px'>[Container: Go]</div><div style='font-size: 80%; margin-top:10px'>Serves usage per tenant for<br />reading (FR-05).</div>"]
       style 15 fill:#438dd5,stroke:#2e6295,color:#ffffff
       16["<div style='font-weight: bold'>Billing Service</div><div style='font-size: 70%; margin-top: 0px'>[Container: Go]</div><div style='font-size: 80%; margin-top:10px'>Invoices tenants by usage or<br />subscription (FR-06).</div>"]
       style 16 fill:#438dd5,stroke:#2e6295,color:#ffffff
-      18["<div style='font-weight: bold'>Kafka</div><div style='font-size: 70%; margin-top: 0px'>[Container: Apache Kafka]</div><div style='font-size: 80%; margin-top:10px'>Usage events, partitioned by<br />tenant_id (ADR-0001).</div>"]
+      18["<div style='font-weight: bold'>Kafka</div><div style='font-size: 70%; margin-top: 0px'>[Container: Apache Kafka (Strimzi)]</div><div style='font-size: 80%; margin-top:10px'>Usage events, partitioned by<br />tenant_id (ADR-0001).</div>"]
       style 18 fill:#438dd5,stroke:#2e6295,color:#ffffff
-      19[("<div style='font-weight: bold'>Usage Analytics Store</div><div style='font-size: 70%; margin-top: 0px'>[Container: TBD (HAMSP-14)]</div><div style='font-size: 80%; margin-top:10px'>Usage events per tenant, kept<br />13 months.</div>")]
-      style 19 fill:#f2f2f2,stroke:#a9a9a9,color:#333333
+      19[("<div style='font-weight: bold'>Usage Store</div><div style='font-size: 70%; margin-top: 0px'>[Container: v1: own database on the main PostgreSQL; v2: hot, warm and cold tiers]</div><div style='font-size: 80%; margin-top:10px'>Usage events per tenant, kept<br />13 months (ADR-0006).</div>")]
+      style 19 fill:#438dd5,stroke:#2e6295,color:#ffffff
       20[("<div style='font-weight: bold'>Rate Limit Store</div><div style='font-size: 70%; margin-top: 0px'>[Container: Redis, fit checked in HAMSP-15]</div><div style='font-size: 80%; margin-top:10px'>Shared per-tenant rate limit<br />and quota counters (FR-07).<br />Quota counters can be rebuilt<br />from the usage store.</div>")]
       style 20 fill:#438dd5,stroke:#2e6295,color:#ffffff
       7["<div style='font-weight: bold'>API Gateway</div><div style='font-size: 70%; margin-top: 0px'>[Container: Envoy Proxy, behind an AWS NLB]</div><div style='font-size: 80%; margin-top:10px'>Single entry point. Validates<br />the JWT, takes tenant_id from<br />it, enforces per-tenant rate<br />limits, routes requests,<br />reports every API call as a<br />usage event (FR-03, FR-05,<br />FR-07).</div>"]

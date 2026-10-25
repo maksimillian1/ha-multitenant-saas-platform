@@ -1,0 +1,73 @@
+# API Gateway (apps/gateway, ADR-0004): validates the Zitadel JWT, sets
+# x-tenant-id from the Organization ID claim and routes by path prefix.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: api-gateway
+  namespace: gateway
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: api-gateway
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: api-gateway
+    spec:
+      containers:
+        - name: api-gateway
+          # Built and loaded into kind by prototype/create-cluster.sh.
+          image: hamsp/gateway:dev
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 8080
+            # Usage counters; not routed by the public Gateway.
+            - name: metrics
+              containerPort: 9090
+          env:
+            - name: ISSUER
+              value: http://zitadel.localtest.me:30080
+            # The issuer's name does not resolve inside the cluster; fetch the
+            # JWKS from the Zitadel Service with the issuer as Host header.
+            - name: ISSUER_DIAL_ADDR
+              value: zitadel.zitadel.svc:8080
+            # Zitadel project ID of the platform API, the audience every token
+            # must carry (HAMSP-22). Zitadel generates the ID, so
+            # prototype/bootstrap-tenants.sh creates the project and writes this
+            # ConfigMap; until then the pods wait in CreateContainerConfigError.
+            - name: AUDIENCE
+              valueFrom:
+                configMapKeyRef: {name: api-gateway-audience, key: audience}
+            - name: ROUTES
+              value: /items=http://exampleapp.exampleapp.svc:8080
+            # Every API call becomes a usage event (HAMSP-26).
+            - name: USAGE_URL
+              value: http://usage-writeapi.usage.svc:8080/v1/events
+          readinessProbe:
+            httpGet: {path: /healthz, port: http}
+            periodSeconds: 5
+          livenessProbe:
+            httpGet: {path: /healthz, port: http}
+            periodSeconds: 10
+          resources:
+            requests: {cpu: 50m, memory: 32Mi}
+            limits: {memory: 128Mi}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: {drop: ["ALL"]}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: api-gateway
+  namespace: gateway
+spec:
+  selector:
+    app.kubernetes.io/name: api-gateway
+  ports:
+    - name: http
+      port: 8080
+      targetPort: http

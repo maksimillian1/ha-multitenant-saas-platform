@@ -7,17 +7,23 @@ spec:
   generators:
     - git:
         repoURL: 'https://github.com/maksimillian1/ha-multitenant-saas-platform.git'
-        revision: HAMSP-initial-documentation
+        # create-cluster.sh replaces master with GITOPS_REVISION (default: the current branch).
+        revision: master
         directories:
           - path: prototype/k8s/apps/*
   template:
     metadata:
       name: '{{path.basename}}'
+      annotations:
+        # Compare against a server-side dry run, which applies CRD defaults
+        # and the CNPG webhook. A client-side diff keeps the Cluster (managed
+        # roles) and the HTTPRoutes OutOfSync forever.
+        argocd.argoproj.io/compare-options: ServerSideDiff=true
     spec:
       project: default
       source:
         repoURL: 'https://github.com/maksimillian1/ha-multitenant-saas-platform.git'
-        targetRevision: HAMSP-initial-documentation
+        targetRevision: master
         path: '{{path}}'
       destination:
         server: 'https://kubernetes.default.svc'
@@ -26,6 +32,14 @@ spec:
         automated:
           prune: true
           selfHeal: true
+        # Apps depend on each other (the database, Zitadel, the gateway), so a
+        # first sync can fail until its dependency is up.
+        retry:
+          limit: 20
+          backoff:
+            duration: 10s
+            factor: 2
+            maxDuration: 2m
         syncOptions:
           - CreateNamespace=true
           - ServerSideApply=true
