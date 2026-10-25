@@ -30,7 +30,7 @@ Check the issue against this list. For each item, decide whether it is answered 
 | Load path | Synchronous API or Kafka. Rate limits. Behaviour at 10× load. |
 | Failure modes | Database, Kafka or an external dependency is down: what the caller gets, what retries, what timeouts. |
 | Contracts | Request, response or event shape. Whether it goes into `docs/contracts/`. |
-| Operations | Terraform/GitOps changes (C-06), config and secrets, cost against C-02. |
+| Operations | Terraform/GitOps changes (C-04), config and secrets, cost against C-02, arm64 (C-06). |
 | Verifiability | Each criterion is observable and has a test level: unit, integration, k6, Chaos Mesh. |
 
 Skip any area that does not apply to this feature.
