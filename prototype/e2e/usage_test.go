@@ -450,6 +450,9 @@ func TestUsageSurvivesDatabaseOutage(t *testing.T) {
 	if testing.Short() {
 		t.Skip("takes over 5 minutes")
 	}
+	// No other policy selects the pooler, and a policy with only ingressDeny
+	// rules turns on default deny for ingress, which would cut ExampleApp off
+	// too. enableDefaultDeny keeps the deny limited to Usage Writer.
 	restore := applyTemporary(t, `
 apiVersion: cilium.io/v2
 kind: CiliumNetworkPolicy
@@ -460,6 +463,8 @@ spec:
   endpointSelector:
     matchLabels:
       cnpg.io/poolerName: main-pg-cluster-pooler-rw
+  enableDefaultDeny:
+    ingress: false
   ingressDeny:
     - fromEndpoints:
         - matchLabels:
