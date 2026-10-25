@@ -6,6 +6,9 @@ REPO_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
 CLUSTER_NAME="cngp-demo"
 # Go services built locally and loaded into kind: apps/<name> → hamsp/<name>:dev.
 APPS=(exampleapp gateway usage)
+# TimescaleDB extension image of the usage cluster (ADR-0008), mounted by CNPG
+# through ImageVolume. The tag must match prototype/k8s/apps/usage-db.
+TIMESCALEDB_IMAGE="hamsp/timescaledb:2.27.2-pg18"
 GATEWAY_API_VERSION="v1.4.1"  # the version Cilium 1.19 supports
 # ArgoCD deploys prototype/k8s/apps from GitHub at this revision. It must be pushed.
 GITOPS_REVISION="${GITOPS_REVISION:-$(git -C "${REPO_DIR}" rev-parse --abbrev-ref HEAD)}"
@@ -106,13 +109,17 @@ helm upgrade --install argocd argo/argo-cd \
   --wait \
   --timeout 5m
 
-# ── 5. build the Go services and load them into kind ──────────────────────────
+# ── 5. build the Go services and the TimescaleDB image, load them into kind ───
 
 for app in "${APPS[@]}"; do
   echo "Building hamsp/${app}:dev..."
   docker build -t "hamsp/${app}:dev" "${REPO_DIR}/apps/${app}"
   kind load docker-image "hamsp/${app}:dev" --name "${CLUSTER_NAME}"
 done
+
+echo "Building ${TIMESCALEDB_IMAGE}..."
+docker build -t "${TIMESCALEDB_IMAGE}" "${REPO_DIR}/images/timescaledb"
+kind load docker-image "${TIMESCALEDB_IMAGE}" --name "${CLUSTER_NAME}"
 
 # ── 6. apply GitOps ApplicationSet ────────────────────────────────────────────
 # CNPG, MinIO, the Postgres cluster, Zitadel, ExampleApp, the API Gateway,

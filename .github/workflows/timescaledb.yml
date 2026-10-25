@@ -1,0 +1,27 @@
+name: timescaledb
+
+on:
+  pull_request:
+    paths:
+      - "images/timescaledb/**"
+      - ".github/workflows/timescaledb.yml"
+  push:
+    branches: [master]
+    paths:
+      - "images/timescaledb/**"
+      - ".github/workflows/timescaledb.yml"
+
+jobs:
+  build:
+    # The extension image of the usage cluster (ADR-0008), built natively on
+    # both architectures (C-06) and smoke-tested against the CNPG PostgreSQL
+    # image it is mounted into. Not pushed: whether TSL binaries may go to a
+    # registry is still open (HAMSP-25).
+    strategy:
+      matrix:
+        runner: [ubuntu-24.04, ubuntu-24.04-arm]
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker build -t hamsp/timescaledb:ci images/timescaledb
+      - run: images/timescaledb/smoke-test.sh hamsp/timescaledb:ci
