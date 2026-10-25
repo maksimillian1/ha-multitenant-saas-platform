@@ -1,0 +1,158 @@
+# The usage cluster (ADR-0008): its own CNPG cluster for the usage database,
+# PostgreSQL 18 with TimescaleDB (TSL) from our extension image. It is
+# platform-only: Usage Writer (and later Metering Query Service) connect, no
+# tenant ever does. Credentials in this directory are for the local kind
+# prototype only.
+apiVersion: v1
+kind: Secret
+metadata:
+  name: minio-creds
+  namespace: usage-db
+type: Opaque
+stringData:
+  accessKeyId: "minioadmin"
+  secretAccessKey: "minioadmin"
+---
+# Owner of the usage database. Only the usage migrate job uses it.
+apiVersion: v1
+kind: Secret
+metadata:
+  name: usage-owner
+  namespace: usage-db
+type: kubernetes.io/basic-auth
+stringData:
+  username: usage_owner
+  password: dev-usage-owner
+---
+# Runtime role of Usage Writer: not the owner, NOSUPERUSER, NOBYPASSRLS. It
+# may only execute write_usage_events (ADR-0008).
+apiVersion: v1
+kind: Secret
+metadata:
+  name: usage-writer
+  namespace: usage-db
+type: kubernetes.io/basic-auth
+stringData:
+  username: usage_writer
+  password: dev-usage-writer
+---
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: usage-pg-cluster
+  namespace: usage-db
+spec:
+  instances: 3
+  # The system image still carries the Barman Cloud tools for the in-tree
+  # backup (HAMSP-29). images/timescaledb must match its Debian release.
+  imageName: ghcr.io/cloudnative-pg/postgresql:18.6-system-trixie
+  storage:
+    size: 10Gi
+  bootstrap:
+    initdb:
+      database: usage
+      owner: usage_owner
+      secret:
+        name: usage-owner
+  managed:
+    roles:
+      - name: usage_writer
+        ensure: present
+        login: true
+        superuser: false
+        bypassrls: false
+        createdb: false
+        createrole: false
+        inherit: false
+        passwordSecret:
+          name: usage-writer
+      # Reads the tenant views; Metering Query Service gets a login with
+      # HAMSP-9.
+      - name: usage_reader
+        ensure: present
+        login: false
+        superuser: false
+        bypassrls: false
+        createdb: false
+        createrole: false
+        inherit: false
+  postgresql:
+    # TimescaleDB from our extension image, mounted read-only through
+    # ImageVolume (Kubernetes 1.35, containerd 2.1+). Built and loaded into
+    # kind by prototype/create-cluster.sh.
+    extensions:
+      - name: timescaledb
+        image:
+          reference: hamsp/timescaledb:2.27.2-pg18
+          pullPolicy: IfNotPresent
+    shared_preload_libraries:
+      - timescaledb
+    parameters:
+      shared_buffers: "256MB"
+      track_io_timing: "on"
+      log_lock_waits: "on"
+      log_checkpoints: "on"
+      timescaledb.telemetry_level: "off"
+      # Policy jobs (columnstore, aggregate refresh, retention) run as
+      # background workers on the primary.
+      timescaledb.max_background_workers: "4"
+      max_worker_processes: "16"
+    # Quorum synchronous replication: a commit waits for ANY 1 standby.
+    synchronous:
+      method: any
+      number: 1
+  primaryUpdateMethod: switchover
+  backup:
+    barmanObjectStore:
+      destinationPath: s3://postgres-backups/
+      endpointURL: http://minio.minio.svc.cluster.local:9000
+      s3Credentials:
+        accessKeyId:
+          name: minio-creds
+          key: accessKeyId
+        secretAccessKey:
+          name: minio-creds
+          key: secretAccessKey
+      wal:
+        compression: gzip
+---
+# Creates the timescaledb extension in the usage database as the superuser;
+# the migrations need it and check it (store.RequireTimescaleDB).
+apiVersion: postgresql.cnpg.io/v1
+kind: Database
+metadata:
+  name: usage
+  namespace: usage-db
+spec:
+  name: usage
+  owner: usage_owner
+  cluster:
+    name: usage-pg-cluster
+  extensions:
+    - name: timescaledb
+      ensure: present
+---
+# PgBouncer in front of the primary. Usage Writer connects here.
+apiVersion: postgresql.cnpg.io/v1
+kind: Pooler
+metadata:
+  name: usage-pg-cluster-pooler-rw
+  namespace: usage-db
+spec:
+  cluster:
+    name: usage-pg-cluster
+  instances: 1
+  type: rw
+  pgbouncer:
+    poolMode: transaction
+    parameters:
+      default_pool_size: "4"
+---
+apiVersion: postgresql.cnpg.io/v1
+kind: Backup
+metadata:
+  name: usage-pg-cluster-manual-backup
+  namespace: usage-db
+spec:
+  cluster:
+    name: usage-pg-cluster

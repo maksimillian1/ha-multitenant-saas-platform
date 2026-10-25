@@ -7,10 +7,10 @@ client → Cilium Gateway API (Envoy, routes by host)
        → API Gateway (Go, apps/gateway: JWT, x-tenant-id, routes by path)
        → ExampleApp (Go) → PgBouncer (CNPG Pooler, transaction mode) → PostgreSQL with RLS
 
-API Gateway → UsageWriteAPI → Kafka (Strimzi) → Usage Writer → usage database (same PostgreSQL cluster)
+API Gateway → UsageWriteAPI → Kafka (Strimzi) → Usage Writer → PgBouncer → usage cluster (PostgreSQL 18 + TimescaleDB)
 ```
 
-Every API call through the API Gateway becomes one usage event ([contract](../docs/contracts/usage-events.md), [ADR-0005](../docs/adr/0005-kafka-on-strimzi.md), [ADR-0006](../docs/adr/0006-usage-store.md), [ADR-0007](../docs/adr/0007-usage-event-deduplication.md)).
+Every API call through the API Gateway becomes one usage event ([contract](../docs/contracts/usage-events.md), [ADR-0005](../docs/adr/0005-kafka-on-strimzi.md), [ADR-0006](../docs/adr/0006-usage-store.md), [ADR-0007](../docs/adr/0007-usage-event-deduplication.md)). The usage database runs on its own CNPG cluster with TimescaleDB under the Timescale License ([ADR-0008](../docs/adr/0008-usage-store-on-timescaledb.md)).
 
 The two gateway layers are described in [ADR-0004](../docs/adr/0004-api-gateway-go-service.md).
 
@@ -20,12 +20,13 @@ Zitadel issues the tokens. Everything except Cilium and ArgoCD is deployed by Ar
 |---|---|
 | `k8s/apps/cnpg-system` | CloudNativePG operator |
 | `k8s/apps/minio` | S3 for Barman backups |
-| `k8s/apps/database` | PostgreSQL cluster, roles, PgBouncer |
+| `k8s/apps/database` | Main PostgreSQL cluster, roles, PgBouncer |
+| `k8s/apps/usage-db` | Usage cluster: PostgreSQL 18 with TimescaleDB (ImageVolume), the `usage` database, roles, PgBouncer |
 | `k8s/apps/zitadel` | Zitadel with its own database in the same cluster |
 | `k8s/apps/exampleapp` | ExampleApp, its migration job and network policy |
 | `k8s/apps/gateway` | Public Gateway (Cilium Gateway API, host network port 30080) and the API Gateway service |
 | `k8s/apps/kafka` | Strimzi operator, a Kafka cluster of 3 dual-role KRaft nodes and the `usage-events` topic |
-| `k8s/apps/usage` | UsageWriteAPI, Usage Writer and the job that creates the `usage` database |
+| `k8s/apps/usage` | UsageWriteAPI, Usage Writer and the job that migrates the `usage` database |
 
 Secrets in these manifests are for this local cluster only.
 
@@ -46,7 +47,7 @@ ArgoCD pulls the manifests from GitHub, so push your branch first.
 go test -C prototype/e2e -count=1 -v ./...
 ```
 
-`create-cluster.sh` recreates the kind cluster `cngp-demo`, installs the Gateway API CRDs, Cilium (with Gateway API) and ArgoCD, builds the `apps/exampleapp`, `apps/gateway` and `apps/usage` images and loads them into kind, and points ArgoCD at the current branch (`GITOPS_REVISION` overrides it).
+`create-cluster.sh` recreates the kind cluster `cngp-demo`, installs the Gateway API CRDs, Cilium (with Gateway API) and ArgoCD, builds the `apps/exampleapp`, `apps/gateway` and `apps/usage` images and the TimescaleDB extension image (`images/timescaledb`) and loads them into kind, and points ArgoCD at the current branch (`GITOPS_REVISION` overrides it).
 
 `bootstrap-tenants.sh` waits for Zitadel, creates the organizations `tenant-a` and `tenant-b` with one machine user each, and writes their client credentials to `prototype/.tenants.json` (git-ignored). It also sets the access token lifetime to 60 s for the expiry test.
 
@@ -57,11 +58,13 @@ The e2e tests take about ten minutes, most of it the usage outage tests (UsageWr
 Usage events, as the superuser:
 
 ```bash
-kubectl -n database exec main-pg-cluster-1 -c postgres -- psql -U postgres -d usage \
+kubectl -n usage-db exec usage-pg-cluster-1 -c postgres -- psql -U postgres -d usage \
   -c "SELECT tenant_id, attributes->>'path', attributes->>'status', event_time FROM usage_events ORDER BY event_time DESC LIMIT 10"
 ```
 
 The API Gateway's usage counters (sent, dropped, failed attempts) are on its metrics port 9090: `kubectl -n gateway port-forward deploy/api-gateway 9090` and `curl localhost:9090/metrics`.
+
+The CNPG operator is 1.30. A cluster created with CNPG 1.23 (before HAMSP-25) cannot jump to 1.30 directly: 1.30 rejects the plain-HTTP status port of instances created before 1.24. Upgrade it through 1.29.1 first and let the instances roll (commit `62b33ae`), then to 1.30.
 
 Known issue: in host network mode Cilium 1.19 never sets an address on the Gateway, so it stays `Programmed=False` (`AddressNotAssigned`) and ArgoCD shows the `gateway` app as Progressing. Traffic on port 30080 works.
 
