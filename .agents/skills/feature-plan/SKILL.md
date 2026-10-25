@@ -43,7 +43,7 @@ Keep it short: the plan is a map, not the code. Show it to the user and ask befo
 **Docs check**
 - ADR-0002 (RLS): new table `x` gets RLS and a policy on `app.current_tenant_id`.
 - QS-01: covered by the AC-2 integration test.
-- C-06: the new Helm values go through ArgoCD.
+- C-04: the new Helm values go through ArgoCD.
 
 **Steps**
 - [ ] S1: <what> — `<paths>` — AC-1
