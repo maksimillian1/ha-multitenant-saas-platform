@@ -74,4 +74,5 @@ Things that are not up for debate. A technology choice that could reasonably go 
 | C-03 | Project code is MIT-licensed. Nothing under `/apps` may depend on AGPL code; CI enforces this. | `LICENSE`, ADR-0003.  |
 | C-04 | Infrastructure is created only through Terraform and GitOps (ArgoCD). No manual changes in the cluster. | Reproducibility.      |
 | C-05 | Non arguable techstack: terraform, k8s, cnpg, kafka. They are not re-argued in ADRs. | High performance tech |
+| C-06 | Runs on arm64 (AWS Graviton) wherever possible. Every image we build is multi-arch (`linux/amd64` and `linux/arm64`); a third-party component without an arm64 image needs a stated reason and runs on an amd64 node pool. CI checks that `/apps` builds for arm64. | Cost (C-02, QS-14); HAMSP-27. |
  
