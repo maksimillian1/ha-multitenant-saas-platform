@@ -37,7 +37,7 @@ Run the commands from the Test map. Group rows that share a command. Long runs (
 Ask the user before each write:
 
 - **requirements.md:** for each QS-xx whose test ran, set its Status to `Pass (<YYYY-MM-DD>, HAMSP-N)` or `Fail (<YYYY-MM-DD>, HAMSP-N)`. Leave QS rows that did not run unchanged.
-- **Linear:** tick the AC checkboxes whose tests passed (`save_issue`). Leave the rest unticked. Never change the issue status; the GitHub integration does that.
+- **Linear:** tick the AC checkboxes whose tests passed (`save_issue`). Leave the rest unticked. Change the issue status only as `AGENTS.md` step 5 allows: a Ready sub-issue merged into its integration branch may be set to Done.
 - Problems outside the issue's scope become new issues in Triage, linked to this one (see `AGENTS.md`).
 
 ## 5. Report

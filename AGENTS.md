@@ -11,7 +11,7 @@ Tasks live in Linear: team key `HAMSP`, issue IDs look like `HAMSP-42`. Use the 
    * PR title starts with `HAMSP-<N>`.
 3. **Comment on the issue at the end of the session.** One comment: what was done, what was not done or not verified, the PR link, and any new issues you created.
 4. **New problems go to Triage.** A bug, risk or open question outside the issue's scope becomes a new issue in Triage, linked to the current one. Do not fix it in the current branch, do not put it in Backlog, do not set its priority.
-5. **Do not change issue status.** The GitHub integration moves issues to In Progress and Done. Never set Done or Canceled yourself.
+5. **Issue status.** The GitHub integration moves issues to In Progress and Done. One exception: a sub-issue that is merged into its integration branch (e.g. `HAMSP-23-platform-skeleton`) and that `feature-verify` reports Ready may be set to Done. An issue that is Not ready stays open. Never set Canceled yourself.
 
 ## Feature workflow
 
