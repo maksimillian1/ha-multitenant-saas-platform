@@ -1,0 +1,6 @@
+# Strimzi operator (ADR-0005). It watches its own namespace, where the Kafka
+# cluster in templates/ lives.
+strimzi-kafka-operator:
+  resources:
+    requests: {cpu: 100m, memory: 256Mi}
+    limits: {memory: 384Mi}

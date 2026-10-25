@@ -42,6 +42,28 @@ stringData:
   username: exampleapp
   password: dev-exampleapp
 ---
+# Owner of the usage database (ADR-0006). Only the usage migrate job uses it.
+apiVersion: v1
+kind: Secret
+metadata:
+  name: usage-owner
+  namespace: database
+type: kubernetes.io/basic-auth
+stringData:
+  username: usage_owner
+  password: dev-usage-owner
+---
+# Runtime role of Usage Writer: not the owner, NOSUPERUSER, NOBYPASSRLS (HAMSP-26 AC-11).
+apiVersion: v1
+kind: Secret
+metadata:
+  name: usage-writer
+  namespace: database
+type: kubernetes.io/basic-auth
+stringData:
+  username: usage_writer
+  password: dev-usage-writer
+---
 apiVersion: postgresql.cnpg.io/v1
 kind: Cluster
 metadata:
@@ -72,6 +94,26 @@ spec:
         inherit: false
         passwordSecret:
           name: exampleapp-db
+      # The usage database is created by the usage migrate job; CNPG 1.23 has
+      # no Database resource (ADR-0006).
+      - name: usage_owner
+        ensure: present
+        login: true
+        superuser: false
+        createdb: false
+        createrole: false
+        passwordSecret:
+          name: usage-owner
+      - name: usage_writer
+        ensure: present
+        login: true
+        superuser: false
+        bypassrls: false
+        createdb: false
+        createrole: false
+        inherit: false
+        passwordSecret:
+          name: usage-writer
   postgresql:
     parameters:
       shared_buffers: "256MB"

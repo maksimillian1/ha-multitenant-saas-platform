@@ -1,0 +1,95 @@
+# Kafka for the usage pipeline (ADR-0005, HAMSP-26): 3 dual-role KRaft nodes
+# with the production durability settings, small enough for kind.
+# SkipDryRunOnMissingResource: the CRDs come from the operator chart in the
+# same sync; ArgoCD retries until they exist.
+apiVersion: kafka.strimzi.io/v1
+kind: KafkaNodePool
+metadata:
+  name: dual-role
+  labels:
+    strimzi.io/cluster: usage-kafka
+  annotations:
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
+spec:
+  replicas: 3
+  roles:
+    - controller
+    - broker
+  resources:
+    requests: {cpu: 100m, memory: 640Mi}
+    limits: {memory: 768Mi}
+  jvmOptions:
+    "-Xms": 384m
+    "-Xmx": 384m
+  storage:
+    type: jbod
+    volumes:
+      - id: 0
+        type: persistent-claim
+        size: 2Gi
+        kraftMetadata: shared
+        deleteClaim: true
+---
+apiVersion: kafka.strimzi.io/v1
+kind: Kafka
+metadata:
+  name: usage-kafka
+  annotations:
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
+spec:
+  kafka:
+    version: 4.3.1
+    metadataVersion: 4.3-IV0
+    # No rack awareness here: kind nodes have no zone label. In EKS each broker
+    # sits in its own AZ (ADR-0005, rack.topologyKey: topology.kubernetes.io/zone).
+    listeners:
+      - name: plain
+        port: 9092
+        type: internal
+        tls: false
+        # Strimzi turns these into a NetworkPolicy: only UsageWriteAPI and
+        # Usage Writer reach the client listener (HAMSP-26 AC-8). Anyone else
+        # could write usage events for any tenant.
+        networkPolicyPeers:
+          - namespaceSelector:
+              matchLabels:
+                kubernetes.io/metadata.name: usage
+            podSelector:
+              matchLabels:
+                app.kubernetes.io/name: usage-writeapi
+          - namespaceSelector:
+              matchLabels:
+                kubernetes.io/metadata.name: usage
+            podSelector:
+              matchLabels:
+                app.kubernetes.io/name: usage-writer
+    config:
+      default.replication.factor: 3
+      min.insync.replicas: 2
+      offsets.topic.replication.factor: 3
+      transaction.state.log.replication.factor: 3
+      transaction.state.log.min.isr: 2
+      unclean.leader.election.enable: false
+      auto.create.topics.enable: false
+  entityOperator:
+    topicOperator:
+      resources:
+        requests: {cpu: 50m, memory: 192Mi}
+        limits: {memory: 256Mi}
+---
+# Key tenant_id (docs/contracts/usage-events.md). Retention covers the 7-day
+# event_time window UsageWriteAPI accepts.
+apiVersion: kafka.strimzi.io/v1
+kind: KafkaTopic
+metadata:
+  name: usage-events
+  labels:
+    strimzi.io/cluster: usage-kafka
+  annotations:
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
+spec:
+  partitions: 6
+  replicas: 3
+  config:
+    min.insync.replicas: 2
+    retention.ms: 604800000

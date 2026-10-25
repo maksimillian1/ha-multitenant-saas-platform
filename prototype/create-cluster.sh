@@ -5,7 +5,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
 CLUSTER_NAME="cngp-demo"
 # Go services built locally and loaded into kind: apps/<name> → hamsp/<name>:dev.
-APPS=(exampleapp gateway)
+APPS=(exampleapp gateway usage)
 GATEWAY_API_VERSION="v1.4.1"  # the version Cilium 1.19 supports
 # ArgoCD deploys prototype/k8s/apps from GitHub at this revision. It must be pushed.
 GITOPS_REVISION="${GITOPS_REVISION:-$(git -C "${REPO_DIR}" rev-parse --abbrev-ref HEAD)}"
@@ -115,7 +115,8 @@ for app in "${APPS[@]}"; do
 done
 
 # ── 6. apply GitOps ApplicationSet ────────────────────────────────────────────
-# CNPG, MinIO, the Postgres cluster, Zitadel, ExampleApp and the API Gateway.
+# CNPG, MinIO, the Postgres cluster, Zitadel, ExampleApp, the API Gateway,
+# Strimzi with the usage Kafka cluster and the usage services.
 
 echo "Applying ArgoCD ApplicationSet (revision ${GITOPS_REVISION})..."
 sed -E "s#^( *(target)?[rR]evision:) master\$#\1 ${GITOPS_REVISION}#" \
