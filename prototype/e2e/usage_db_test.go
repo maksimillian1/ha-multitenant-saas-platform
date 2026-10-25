@@ -45,8 +45,10 @@ func TestUsageClusterRunsTimescaleDB(t *testing.T) {
 		                 current_setting('synchronous_standby_names') LIKE 'ANY 1 (%',
 		                 (SELECT extversion FROM pg_extension WHERE extname = 'timescaledb'),
 		                 current_setting('timescaledb.license'),
-		                 (SELECT string_agg(proc_name, ',' ORDER BY proc_name) FROM timescaledb_information.jobs
-		                  WHERE proc_name LIKE 'policy_%' AND scheduled))`)
+		                 (SELECT string_agg(proc_name, ',' ORDER BY proc_name) FROM timescaledb_information.jobs j
+		                  LEFT JOIN timescaledb_information.continuous_aggregates c
+		                         ON c.materialization_hypertable_name = j.hypertable_name
+		                  WHERE coalesce(c.view_name, j.hypertable_name) IN ('usage_events', 'usage_hourly') AND j.scheduled))`)
 	if err != nil {
 		t.Fatal(err)
 	}
