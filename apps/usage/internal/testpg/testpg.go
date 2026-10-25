@@ -1,7 +1,8 @@
 // Package testpg gives tests a fresh, migrated usage database. It needs a
-// PostgreSQL superuser DSN in TEST_DATABASE_URL, e.g.
-// postgres://postgres:postgres@localhost:5432/postgres?sslmode=disable.
-// CI sets it (.github/workflows/usage.yml); locally the tests are skipped without it.
+// superuser DSN of a PostgreSQL server with TimescaleDB (TSL) in
+// TEST_DATABASE_URL, e.g. postgres://postgres:postgres@localhost:5432/postgres?sslmode=disable
+// against timescale/timescaledb:2.27.2-pg18. CI sets it
+// (.github/workflows/usage.yml); locally the tests are skipped without it.
 package testpg
 
 import (
@@ -20,6 +21,7 @@ import (
 const (
 	OwnerRole  = "usage_owner"
 	WriterRole = "usage_writer"
+	ReaderRole = "usage_reader" // NOLOGIN here; tests use SET ROLE
 	password   = "test-only-password"
 )
 
@@ -43,8 +45,9 @@ func dsnFor(t testing.TB, base, user, db string) string {
 	return u.String()
 }
 
-// New creates the two roles like the CNPG cluster does, then a fresh database
-// through store.CreateDatabase, and applies the migrations as the owner.
+// New creates the roles and a fresh database with the timescaledb extension,
+// like the usage cluster's managed roles and Database resource do, and applies
+// the migrations as the owner.
 func New(t testing.TB) DB {
 	t.Helper()
 	base := os.Getenv("TEST_DATABASE_URL")
@@ -62,7 +65,8 @@ func New(t testing.TB) DB {
 		fmt.Sprintf(`DO $$ BEGIN
 			IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = '%[1]s') THEN CREATE ROLE %[1]s LOGIN; END IF;
 			IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = '%[2]s') THEN CREATE ROLE %[2]s LOGIN; END IF;
-		END $$`, OwnerRole, WriterRole),
+			IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = '%[3]s') THEN CREATE ROLE %[3]s NOLOGIN; END IF;
+		END $$`, OwnerRole, WriterRole, ReaderRole),
 		fmt.Sprintf("ALTER ROLE %s PASSWORD '%s'", OwnerRole, password),
 		fmt.Sprintf("ALTER ROLE %s PASSWORD '%s' NOSUPERUSER NOBYPASSRLS", WriterRole, password),
 	} {
@@ -72,10 +76,19 @@ func New(t testing.TB) DB {
 	}
 
 	name := fmt.Sprintf("usage_test_%d", time.Now().UnixNano())
-	if _, err := store.CreateDatabase(ctx, admin, name, OwnerRole); err != nil {
+	if _, err := admin.Exec(ctx, fmt.Sprintf("CREATE DATABASE %s OWNER %s", name, OwnerRole)); err != nil {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _, _ = admin.Exec(ctx, fmt.Sprintf("DROP DATABASE %s WITH (FORCE)", name)) })
+
+	super, err := pgx.Connect(ctx, dsnFor(t, base, "", name))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { super.Close(ctx) })
+	if _, err := super.Exec(ctx, "CREATE EXTENSION IF NOT EXISTS timescaledb"); err != nil {
+		t.Fatal(err)
+	}
 
 	owner, err := pgx.Connect(ctx, dsnFor(t, base, OwnerRole, name))
 	if err != nil {
@@ -85,11 +98,6 @@ func New(t testing.TB) DB {
 	if err := store.Migrate(ctx, owner); err != nil {
 		t.Fatal(err)
 	}
-	super, err := pgx.Connect(ctx, dsnFor(t, base, "", name))
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { super.Close(ctx) })
 	return DB{Name: name, Super: super, Owner: owner, WriterDSN: dsnFor(t, base, WriterRole, name)}
 }
 

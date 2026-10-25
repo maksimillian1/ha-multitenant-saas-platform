@@ -3,6 +3,7 @@ package store
 import (
 	"context"
 	"embed"
+	"errors"
 	"fmt"
 	"io/fs"
 	"sort"
@@ -16,26 +17,33 @@ var migrations embed.FS
 // migrationLockID serialises concurrent migration runs (pg_advisory_xact_lock).
 const migrationLockID = 5_000_011
 
-// CreateDatabase creates the database owned by owner if it does not exist. It
-// needs a superuser connection: CNPG 1.23 has no Database resource, so the
-// migrate job creates the usage database itself (ADR-0006).
-func CreateDatabase(ctx context.Context, admin *pgx.Conn, name, owner string) (created bool, err error) {
-	var exists bool
-	if err := admin.QueryRow(ctx, "SELECT EXISTS (SELECT 1 FROM pg_database WHERE datname = $1)", name).Scan(&exists); err != nil {
-		return false, err
+// RequireTimescaleDB fails unless the TimescaleDB extension is installed in the
+// database with its Timescale License features (ADR-0008). CNPG's Database
+// resource creates the extension; the migrations need its columnstore and
+// continuous aggregates, which the Apache 2 edition does not have.
+func RequireTimescaleDB(ctx context.Context, conn *pgx.Conn) error {
+	var version, license string
+	err := conn.QueryRow(ctx, `SELECT extversion, current_setting('timescaledb.license')
+		FROM pg_extension WHERE extname = 'timescaledb'`).Scan(&version, &license)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return errors.New("the timescaledb extension is not installed in this database")
 	}
-	if exists {
-		return false, nil
+	if err != nil {
+		return err
 	}
-	_, err = admin.Exec(ctx, fmt.Sprintf("CREATE DATABASE %s OWNER %s",
-		pgx.Identifier{name}.Sanitize(), pgx.Identifier{owner}.Sanitize()))
-	return err == nil, err
+	if license != "timescale" {
+		return fmt.Errorf("timescaledb %s runs with license %q, want \"timescale\" (TSL features)", version, license)
+	}
+	return nil
 }
 
 // Migrate applies the embedded migrations in file name order. Each file runs in
 // its own transaction and is recorded in schema_migrations. It must run as the
 // owner role of the database, not as Usage Writer's role.
 func Migrate(ctx context.Context, conn *pgx.Conn) error {
+	if err := RequireTimescaleDB(ctx, conn); err != nil {
+		return err
+	}
 	if _, err := conn.Exec(ctx, `CREATE TABLE IF NOT EXISTS schema_migrations (
 		version    text        PRIMARY KEY,
 		applied_at timestamptz NOT NULL DEFAULT now()
@@ -81,18 +89,27 @@ func Migrate(ctx context.Context, conn *pgx.Conn) error {
 	return nil
 }
 
-// UnprotectedTables returns every table with a tenant_id column, partitions
-// included, that does not have row level security both enabled and forced. An
-// empty result means every multi-tenant table is covered by RLS (QS-01).
+// UnprotectedTables returns every relation with a tenant_id column, chunks and
+// partitions included, that an application role could use to reach another
+// tenant's rows. An empty result means tenant isolation holds (QS-01).
+//
+// The usage database cannot use RLS everywhere (ADR-0008), so a table passes
+// if it has RLS enabled and forced, or if nobody but its owner has a privilege
+// on it. A view passes if nobody but its owner has a privilege on it, or if it
+// is a security_barrier view that filters by app.current_tenant_id.
 func UnprotectedTables(ctx context.Context, conn *pgx.Conn) ([]string, error) {
 	rows, err := conn.Query(ctx, `
 		SELECT n.nspname || '.' || c.relname
 		FROM pg_class c
 		JOIN pg_namespace n ON n.oid = c.relnamespace
 		JOIN pg_attribute a ON a.attrelid = c.oid AND a.attname = 'tenant_id' AND NOT a.attisdropped
-		WHERE c.relkind IN ('r', 'p')
+		WHERE c.relkind IN ('r', 'p', 'v', 'm')
 		  AND n.nspname NOT IN ('pg_catalog', 'information_schema')
-		  AND NOT (c.relrowsecurity AND c.relforcerowsecurity)
+		  AND EXISTS (SELECT 1 FROM aclexplode(c.relacl) acl WHERE acl.grantee <> c.relowner)
+		  AND NOT CASE WHEN c.relkind IN ('r', 'p') THEN c.relrowsecurity AND c.relforcerowsecurity
+		               WHEN c.relkind = 'v' THEN coalesce('security_barrier=true' = ANY (c.reloptions), false)
+		                                         AND pg_get_viewdef(c.oid) LIKE '%app.current_tenant_id%'
+		               ELSE false END
 		ORDER BY 1`)
 	if err != nil {
 		return nil, err

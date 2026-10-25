@@ -2,7 +2,7 @@
 //
 //	usage writeapi   UsageWriteAPI: accepts usage events and produces them to Kafka
 //	usage writer     Usage Writer: consumes Kafka and stores the events once
-//	usage migrate    creates the usage database and applies its migrations
+//	usage migrate    applies the migrations to the usage database
 //
 // Configuration (environment):
 //
@@ -10,9 +10,9 @@
 //	KAFKA_TOPIC            default usage-events
 //	KAFKA_GROUP            default usage-writer (writer)
 //	DATABASE_URL           Usage Writer's role, through PgBouncer (writer)
-//	ADMIN_DATABASE_URL     superuser, creates the database (migrate)
-//	MIGRATE_DATABASE_URL   owner role of the usage database (migrate)
-//	DATABASE_NAME, DATABASE_OWNER   default usage, usage_owner (migrate)
+//	MIGRATE_DATABASE_URL   owner role of the usage database (migrate); CNPG's
+//	                       Database resource creates the database and the
+//	                       timescaledb extension (ADR-0008)
 //	LISTEN_ADDR            default :8080 (writeapi, writer health)
 package main
 
@@ -102,28 +102,12 @@ func connect(ctx context.Context, log *slog.Logger, dsn string) (*pgx.Conn, erro
 }
 
 func migrate(ctx context.Context, log *slog.Logger) error {
-	adminDSN, err := required("ADMIN_DATABASE_URL")
-	if err != nil {
-		return err
-	}
 	ownerDSN, err := required("MIGRATE_DATABASE_URL")
 	if err != nil {
 		return err
 	}
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Minute)
 	defer cancel()
-
-	admin, err := connect(ctx, log, adminDSN)
-	if err != nil {
-		return err
-	}
-	name, owner := env("DATABASE_NAME", "usage"), env("DATABASE_OWNER", "usage_owner")
-	created, err := store.CreateDatabase(ctx, admin, name, owner)
-	admin.Close(context.Background())
-	if err != nil {
-		return fmt.Errorf("create database %s: %w", name, err)
-	}
-	log.Info("database", "name", name, "created", created)
 
 	conn, err := connect(ctx, log, ownerDSN)
 	if err != nil {
@@ -138,7 +122,7 @@ func migrate(ctx context.Context, log *slog.Logger) error {
 		return err
 	}
 	if len(unprotected) > 0 {
-		return fmt.Errorf("tables with tenant_id but without enabled and forced RLS: %v", unprotected)
+		return fmt.Errorf("relations with tenant_id open to application roles without tenant isolation: %v", unprotected)
 	}
 	log.Info("migrations applied")
 	return nil
