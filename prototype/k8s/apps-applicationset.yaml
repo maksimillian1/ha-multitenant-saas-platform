@@ -14,6 +14,11 @@ spec:
   template:
     metadata:
       name: '{{path.basename}}'
+      annotations:
+        # Compare against a server-side dry run, which applies CRD defaults
+        # and the CNPG webhook. A client-side diff keeps the Cluster (managed
+        # roles) and the HTTPRoutes OutOfSync forever.
+        argocd.argoproj.io/compare-options: ServerSideDiff=true
     spec:
       project: default
       source:
