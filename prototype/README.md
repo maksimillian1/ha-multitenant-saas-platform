@@ -82,6 +82,8 @@ curl -s --connect-to api.localtest.me:30080:127.0.0.1:30080 -H "Authorization: B
 
 `*.localtest.me` resolves to 127.0.0.1 in public DNS; `--connect-to` makes it work without DNS too.
 
+The same in a browser: `go run -C prototype/authdemo .` and open http://127.0.0.1:8090. The page gets tokens for both tenants, shows their claims, calls the API with a valid, missing or tampered token and runs the auth and isolation checks in one click. It reads the client secrets from `.tenants.json` and proxies to port 30080, so it is for this local cluster only.
+
 ## ExampleApp API
 
 | Request | Answer |

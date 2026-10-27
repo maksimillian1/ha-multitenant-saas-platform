@@ -19,7 +19,7 @@ psql() { kubectl -n "${NS}" exec -i "${PRIMARY}" -c postgres -- psql -U postgres
 psql -d postgres -q -c "DROP DATABASE IF EXISTS ${DB} WITH (FORCE)" -c "CREATE DATABASE ${DB}"
 [[ "${KEEP:-0}" == "1" ]] || trap 'psql -d postgres -q -c "DROP DATABASE IF EXISTS ${DB} WITH (FORCE)"' EXIT
 psql -d "${DB}" -q -c "CREATE EXTENSION timescaledb"
-cat "${REPO_DIR}"/apps/usage/internal/store/migrations/*.sql | psql -d "${DB}" -q >/dev/null
+cat "${REPO_DIR}"/apps/usage/store/migrations/*.sql | psql -d "${DB}" -q >/dev/null
 
 echo "Primary ${PRIMARY}: ${EVENTS:-10000000} events, ${TENANTS:-100} tenants, ${DAYS:-10} days"
 psql -d "${DB}" -q -v events="${EVENTS:-10000000}" -v tenants="${TENANTS:-100}" -v days="${DAYS:-10}" \

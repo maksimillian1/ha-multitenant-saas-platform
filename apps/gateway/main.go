@@ -2,174 +2,105 @@
 // infrastructure entry point (Cilium Gateway API), validates the Zitadel JWT,
 // sets x-tenant-id and routes by path prefix to the platform services.
 //
-// Configuration (environment):
+// Configuration (environment): see core.LoadConfig.
 //
-//	ISSUER            token issuer, e.g. http://zitadel.localtest.me:30080 (required)
-//	AUDIENCE          audience a token must carry: the Zitadel project ID of the
-//	                  platform API (required)
-//	JWKS_URL          default ISSUER + /oauth/v2/keys
-//	ISSUER_DIAL_ADDR  host:port to connect to for the issuer's URLs, e.g.
-//	                  zitadel.zitadel.svc:8080; the Host header stays the issuer's
-//	ROUTES            /prefix=http://upstream,... (required)
-//	LISTEN_ADDR       default :8080
-//	USAGE_URL         UsageWriteAPI, e.g. http://usage-writeapi.usage.svc:8080/v1/events;
-//	                  empty disables usage reporting (HAMSP-26)
-//	USAGE_MAX_PENDING unsent usage events at most, default 10000
-//	METRICS_ADDR      metrics listener, default :9090; not routed by the public Gateway
+//	ISSUER, AUDIENCE, ROUTES   required
+//	JWKS_URL                   default ISSUER + /oauth/v2/keys
+//	ISSUER_DIAL_ADDR, USAGE_URL, USAGE_MAX_PENDING (default 10000)
+//	LISTEN_ADDR (default :8080), METRICS_ADDR (default :9090)
 package main
 
 import (
 	"context"
 	"errors"
 	"log/slog"
-	"net"
 	"net/http"
-	"net/url"
 	"os"
 	"os/signal"
 	"strconv"
 	"syscall"
 	"time"
 
-	"github.com/maksimillian1/ha-multitenant-saas-platform/apps/gateway/internal/auth"
-	"github.com/maksimillian1/ha-multitenant-saas-platform/apps/gateway/internal/proxy"
-	"github.com/maksimillian1/ha-multitenant-saas-platform/apps/gateway/internal/usage"
+	"github.com/maksimillian1/ha-multitenant-saas-platform/apps/gateway/auth"
+	"github.com/maksimillian1/ha-multitenant-saas-platform/apps/gateway/core"
+	"github.com/maksimillian1/ha-multitenant-saas-platform/apps/gateway/health"
+	"github.com/maksimillian1/ha-multitenant-saas-platform/apps/gateway/proxy"
+	"github.com/maksimillian1/ha-multitenant-saas-platform/apps/gateway/usage"
 )
 
 func main() {
 	log := slog.New(slog.NewJSONHandler(os.Stdout, nil))
-	if err := run(log); err != nil {
+	cfg := core.LoadConfig()
+	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+	defer stop()
+
+	proxyService, usageService, healthService, err := bootstrapServices(cfg, log)
+	if err != nil {
+		log.Error("bootstrap failed", "err", err)
+		os.Exit(1)
+	}
+
+	mux := http.NewServeMux()
+	mux.HandleFunc("GET /healthz", healthService.Handler)
+	mux.Handle("/", core.AccessLog(http.HandlerFunc(proxyService.Handler), log))
+
+	metrics := http.NewServeMux()
+	if usageService != nil {
+		metrics.HandleFunc("GET /metrics", usageService.MetricsHandler)
+	} else {
+		metrics.HandleFunc("GET /metrics", func(w http.ResponseWriter, r *http.Request) {})
+	}
+	go func() {
+		if err := core.Serve(ctx, log, cfg.MetricsAddr, metrics); err != nil {
+			log.Error("metrics listener", "err", err)
+		}
+	}()
+
+	err = core.Serve(ctx, log, cfg.ListenAddr, mux)
+	if usageService != nil {
+		// Events still retrying are given up after this and counted as expired.
+		closeCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		usageService.Close(closeCtx)
+		cancel()
+	}
+	if err != nil {
 		log.Error("exit", "err", err)
 		os.Exit(1)
 	}
 }
 
-func env(key, fallback string) string {
-	if v := os.Getenv(key); v != "" {
-		return v
-	}
-	return fallback
-}
-
-func run(log *slog.Logger) error {
-	issuer := os.Getenv("ISSUER")
-	if issuer == "" {
-		return errors.New("ISSUER is required")
-	}
-	audience := os.Getenv("AUDIENCE")
-	if audience == "" {
-		return errors.New("AUDIENCE is required")
-	}
-	routes, err := proxy.ParseRoutes(os.Getenv("ROUTES"))
-	if err != nil {
-		return err
-	}
-	issuerClient, err := issuerHTTPClient(issuer, os.Getenv("ISSUER_DIAL_ADDR"))
-	if err != nil {
-		return err
-	}
-	verifier := auth.NewVerifier(issuer, audience, env("JWKS_URL", issuer+"/oauth/v2/keys"), issuerClient)
-
-	var reporter proxy.UsageReporter
-	var usageReporter *usage.Reporter
-	if u := os.Getenv("USAGE_URL"); u != "" {
-		limit, err := strconv.Atoi(env("USAGE_MAX_PENDING", "10000"))
-		if err != nil || limit <= 0 {
-			return errors.New("USAGE_MAX_PENDING must be a positive integer")
+// bootstrapServices returns a nil usage service when USAGE_URL is not set.
+func bootstrapServices(cfg core.Config, log *slog.Logger) (*proxy.Service, *usage.Service, *health.Service, error) {
+	for key, val := range map[string]string{"ISSUER": cfg.Issuer, "AUDIENCE": cfg.Audience} {
+		if err := core.Required(key, val); err != nil {
+			return nil, nil, nil, err
 		}
-		usageReporter = usage.New(usage.Config{URL: u, Limit: limit}, log)
-		reporter = usageReporter
+	}
+	routes, err := proxy.ParseRoutes(cfg.Routes)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	issuerClient, err := auth.NewIssuerClient(cfg.Issuer, cfg.IssuerDialAddr)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	verifier := auth.NewVerifier(cfg.Issuer, cfg.Audience, cfg.JWKSURL, issuerClient)
+
+	var reporter core.UsageReporter
+	var usageService *usage.Service
+	if cfg.UsageURL != "" {
+		limit, err := strconv.Atoi(cfg.UsageMaxPending)
+		if err != nil || limit <= 0 {
+			return nil, nil, nil, errors.New("USAGE_MAX_PENDING must be a positive integer")
+		}
+		usageService = usage.NewService(cfg.UsageURL, limit, log)
+		reporter = usageService
 	} else {
 		log.Warn("USAGE_URL is not set: API calls are not reported as usage events")
 	}
 
-	mux := http.NewServeMux()
-	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(http.StatusOK) })
-	mux.Handle("/", accessLog(proxy.New(verifier, routes, reporter, log), log))
+	proxyService := proxy.NewService(verifier, routes, reporter, log)
+	healthService := health.NewService()
 
-	metrics := http.NewServeMux()
-	metrics.HandleFunc("GET /metrics", func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "text/plain; version=0.0.4")
-		if usageReporter != nil {
-			usageReporter.WriteMetrics(w)
-		}
-	})
-	metricsSrv := &http.Server{Addr: env("METRICS_ADDR", ":9090"), Handler: metrics, ReadHeaderTimeout: 5 * time.Second}
-	go func() {
-		if err := metricsSrv.ListenAndServe(); !errors.Is(err, http.ErrServerClosed) {
-			log.Error("metrics listener", "err", err)
-		}
-	}()
-
-	srv := &http.Server{
-		Addr:              env("LISTEN_ADDR", ":8080"),
-		Handler:           mux,
-		ReadHeaderTimeout: 5 * time.Second,
-	}
-	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
-	defer stop()
-	go func() {
-		<-ctx.Done()
-		shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-		defer cancel()
-		_ = srv.Shutdown(shutdownCtx)
-		_ = metricsSrv.Shutdown(shutdownCtx)
-		if usageReporter != nil {
-			// Events still retrying are given up after this and counted as expired.
-			usageReporter.Close(shutdownCtx)
-		}
-	}()
-	log.Info("listening", "addr", srv.Addr, "routes", len(routes))
-	if err := srv.ListenAndServe(); !errors.Is(err, http.ErrServerClosed) {
-		return err
-	}
-	return nil
-}
-
-// issuerHTTPClient fetches the JWKS. With dialAddr set, connections to the
-// issuer's host go to dialAddr instead: inside the cluster the public issuer
-// name does not resolve, but Zitadel must still see it as the Host header.
-func issuerHTTPClient(issuer, dialAddr string) (*http.Client, error) {
-	u, err := url.Parse(issuer)
-	if err != nil {
-		return nil, err
-	}
-	port := u.Port()
-	if port == "" {
-		port = "80"
-		if u.Scheme == "https" {
-			port = "443"
-		}
-	}
-	issuerAddr := net.JoinHostPort(u.Hostname(), port)
-	dialer := &net.Dialer{Timeout: 5 * time.Second}
-	transport := http.DefaultTransport.(*http.Transport).Clone()
-	transport.DialContext = func(ctx context.Context, network, addr string) (net.Conn, error) {
-		if dialAddr != "" && addr == issuerAddr {
-			addr = dialAddr
-		}
-		return dialer.DialContext(ctx, network, addr)
-	}
-	return &http.Client{Timeout: 10 * time.Second, Transport: transport}, nil
-}
-
-type statusRecorder struct {
-	http.ResponseWriter
-	status int
-}
-
-func (s *statusRecorder) WriteHeader(code int) {
-	s.status = code
-	s.ResponseWriter.WriteHeader(code)
-}
-
-func accessLog(next http.Handler, log *slog.Logger) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		start := time.Now()
-		rec := &statusRecorder{ResponseWriter: w, status: http.StatusOK}
-		next.ServeHTTP(rec, r)
-		log.InfoContext(r.Context(), "request",
-			"method", r.Method, "path", r.URL.Path, "status", rec.status,
-			"tenant_id", r.Header.Get(proxy.TenantHeader), "duration_ms", time.Since(start).Milliseconds())
-	})
+	return proxyService, usageService, healthService, nil
 }

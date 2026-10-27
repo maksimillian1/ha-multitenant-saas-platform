@@ -3,11 +3,12 @@
 //
 //	exampleapp serve     serve the HTTP API as the application role (DATABASE_URL)
 //	exampleapp migrate   apply migrations as the owner role (MIGRATE_DATABASE_URL)
+//
+// Configuration (environment): see core.LoadConfig.
 package main
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -16,14 +17,15 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/jackc/pgx/v5"
-
-	"github.com/maksimillian1/ha-multitenant-saas-platform/apps/exampleapp/internal/api"
-	"github.com/maksimillian1/ha-multitenant-saas-platform/apps/exampleapp/internal/store"
+	"github.com/maksimillian1/ha-multitenant-saas-platform/apps/exampleapp/core"
+	"github.com/maksimillian1/ha-multitenant-saas-platform/apps/exampleapp/health"
+	"github.com/maksimillian1/ha-multitenant-saas-platform/apps/exampleapp/items"
+	"github.com/maksimillian1/ha-multitenant-saas-platform/apps/exampleapp/store"
 )
 
 func main() {
 	log := slog.New(slog.NewJSONHandler(os.Stdout, nil))
+	cfg := core.LoadConfig()
 	cmd := "serve"
 	if len(os.Args) > 1 {
 		cmd = os.Args[1]
@@ -34,9 +36,9 @@ func main() {
 	var err error
 	switch cmd {
 	case "serve":
-		err = serve(ctx, log)
+		err = serve(ctx, cfg, log)
 	case "migrate":
-		err = migrate(ctx, log)
+		err = migrate(ctx, cfg, log)
 	default:
 		err = fmt.Errorf("unknown command %q", cmd)
 	}
@@ -46,65 +48,52 @@ func main() {
 	}
 }
 
-func env(key, fallback string) string {
-	if v := os.Getenv(key); v != "" {
-		return v
-	}
-	return fallback
-}
-
-func serve(ctx context.Context, log *slog.Logger) error {
-	dsn := os.Getenv("DATABASE_URL")
-	if dsn == "" {
-		return errors.New("DATABASE_URL is required")
-	}
-	st, err := store.Open(ctx, dsn)
+func serve(ctx context.Context, cfg core.Config, log *slog.Logger) error {
+	itemsService, healthService, closeAll, err := bootstrapServices(ctx, cfg, log)
 	if err != nil {
 		return err
 	}
-	defer st.Close()
+	defer closeAll()
 
-	srv := &http.Server{
-		Addr:              env("LISTEN_ADDR", ":8080"),
-		Handler:           api.NewHandler(st, st.Ping, log),
-		ReadHeaderTimeout: 5 * time.Second,
-	}
-	go func() {
-		<-ctx.Done()
-		shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-		defer cancel()
-		_ = srv.Shutdown(shutdownCtx)
-	}()
-	log.Info("listening", "addr", srv.Addr)
-	if err := srv.ListenAndServe(); !errors.Is(err, http.ErrServerClosed) {
-		return err
-	}
-	return nil
+	mux := http.NewServeMux()
+	mux.HandleFunc("GET /healthz", healthService.LiveHandler)
+	mux.HandleFunc("GET /readyz", healthService.ReadyHandler)
+	mux.HandleFunc("POST /items", itemsService.CreateHandler)
+	mux.HandleFunc("GET /items", itemsService.ListHandler)
+	mux.HandleFunc("GET /items/{id}", itemsService.GetHandler)
+	mux.HandleFunc("PUT /items/{id}", itemsService.UpdateHandler)
+	mux.HandleFunc("DELETE /items/{id}", itemsService.DeleteHandler)
+
+	return core.Serve(ctx, log, cfg.ListenAddr, core.AccessLog(mux, log))
 }
 
-// migrate retries the connection for up to 5 minutes, because on a fresh
-// cluster the database may still be starting when the job runs.
-func migrate(ctx context.Context, log *slog.Logger) error {
-	dsn := os.Getenv("MIGRATE_DATABASE_URL")
-	if dsn == "" {
-		return errors.New("MIGRATE_DATABASE_URL is required")
+func bootstrapServices(ctx context.Context, cfg core.Config, log *slog.Logger) (*items.Service, *health.Service, func(), error) {
+	if err := core.Required("DATABASE_URL", cfg.DatabaseURL); err != nil {
+		return nil, nil, nil, err
+	}
+	st, err := store.Open(ctx, cfg.DatabaseURL)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+
+	itemsService := items.NewService(st, log)
+	healthService := health.NewService(st.Ping)
+
+	return itemsService, healthService, st.Close, nil
+}
+
+// migrate waits up to 5 minutes for the database, then applies the migrations
+// and fails if any multi-tenant table is left without RLS (QS-01).
+func migrate(ctx context.Context, cfg core.Config, log *slog.Logger) error {
+	if err := core.Required("MIGRATE_DATABASE_URL", cfg.MigrateDatabaseURL); err != nil {
+		return err
 	}
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Minute)
 	defer cancel()
 
-	var conn *pgx.Conn
-	var err error
-	for {
-		conn, err = pgx.Connect(ctx, dsn)
-		if err == nil {
-			break
-		}
-		log.Warn("database not reachable, retrying", "err", err)
-		select {
-		case <-ctx.Done():
-			return err
-		case <-time.After(5 * time.Second):
-		}
+	conn, err := store.Connect(ctx, log, cfg.MigrateDatabaseURL)
+	if err != nil {
+		return err
 	}
 	defer conn.Close(context.Background())
 
