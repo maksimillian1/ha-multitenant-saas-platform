@@ -1,23 +1,14 @@
 // Command gateway is the API Gateway (ADR-0004). It sits behind the
 // infrastructure entry point (Cilium Gateway API), validates the Zitadel JWT,
 // sets x-tenant-id and routes by path prefix to the platform services.
-//
-// Configuration (environment): see core.LoadConfig.
-//
-//	ISSUER, AUDIENCE, ROUTES   required
-//	JWKS_URL                   default ISSUER + /oauth/v2/keys
-//	ISSUER_DIAL_ADDR, USAGE_URL, USAGE_MAX_PENDING (default 10000)
-//	LISTEN_ADDR (default :8080), METRICS_ADDR (default :9090)
 package main
 
 import (
 	"context"
-	"errors"
 	"log/slog"
 	"net/http"
 	"os"
 	"os/signal"
-	"strconv"
 	"syscall"
 	"time"
 
@@ -71,10 +62,8 @@ func main() {
 
 // bootstrapServices returns a nil usage service when USAGE_URL is not set.
 func bootstrapServices(cfg core.Config, log *slog.Logger) (*proxy.Service, *usage.Service, *health.Service, error) {
-	for key, val := range map[string]string{"ISSUER": cfg.Issuer, "AUDIENCE": cfg.Audience} {
-		if err := core.Required(key, val); err != nil {
-			return nil, nil, nil, err
-		}
+	if err := cfg.Validate(); err != nil {
+		return nil, nil, nil, err
 	}
 	routes, err := proxy.ParseRoutes(cfg.Routes)
 	if err != nil {
@@ -89,11 +78,7 @@ func bootstrapServices(cfg core.Config, log *slog.Logger) (*proxy.Service, *usag
 	var reporter core.UsageReporter
 	var usageService *usage.Service
 	if cfg.UsageURL != "" {
-		limit, err := strconv.Atoi(cfg.UsageMaxPending)
-		if err != nil || limit <= 0 {
-			return nil, nil, nil, errors.New("USAGE_MAX_PENDING must be a positive integer")
-		}
-		usageService = usage.NewService(cfg.UsageURL, limit, log)
+		usageService = usage.NewService(cfg.UsageURL, cfg.UsageMaxPending, log)
 		reporter = usageService
 	} else {
 		log.Warn("USAGE_URL is not set: API calls are not reported as usage events")

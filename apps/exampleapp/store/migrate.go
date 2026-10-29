@@ -67,7 +67,7 @@ func Migrate(ctx context.Context, conn *pgx.Conn) error {
 
 // UnprotectedTables returns every table with a tenant_id column that does not
 // have row level security both enabled and forced. An empty result means every
-// multi-tenant table is covered by RLS (QS-01).
+// multi-tenant table is covered by RLS.
 func UnprotectedTables(ctx context.Context, conn *pgx.Conn) ([]string, error) {
 	rows, err := conn.Query(ctx, `
 		SELECT n.nspname || '.' || c.relname

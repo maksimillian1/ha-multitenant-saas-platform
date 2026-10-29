@@ -5,7 +5,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
 CLUSTER_NAME="cngp-demo"
 # Go services built locally and loaded into kind: apps/<name> → hamsp/<name>:dev.
-APPS=(exampleapp gateway usage)
+APPS=(exampleapp gateway usage admin)
 # TimescaleDB extension image of the usage cluster (ADR-0008), mounted by CNPG
 # through ImageVolume. The tag must match prototype/k8s/apps/usage-db.
 TIMESCALEDB_IMAGE="hamsp/timescaledb:2.27.2-pg18"

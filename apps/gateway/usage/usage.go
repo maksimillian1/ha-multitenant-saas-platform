@@ -1,5 +1,5 @@
 // Package usage reports every API call as a usage event to UsageWriteAPI
-// (docs/contracts/usage-events.md, HAMSP-26). Each event is one asynchronous
+// (docs/contracts/usage-events.md). Each event is one asynchronous
 // request with retries, so the client's response never waits for usage. At
 // most Limit events may be unsent at a time; beyond that new events are
 // dropped and counted, so an outage of UsageWriteAPI cannot exhaust the
@@ -21,10 +21,7 @@ import (
 	"github.com/maksimillian1/ha-multitenant-saas-platform/apps/gateway/core"
 )
 
-const (
-	defaultLimit    = 10000
-	defaultRetryFor = 15 * time.Minute
-)
+const defaultRetryFor = 15 * time.Minute
 
 type Service struct {
 	URL string // UsageWriteAPI, e.g. http://usage-writeapi.usage.svc:8080/v1/events
@@ -43,9 +40,6 @@ type Service struct {
 }
 
 func NewService(url string, limit int, log *slog.Logger) *Service {
-	if limit <= 0 {
-		limit = defaultLimit
-	}
 	return &Service{
 		URL:      url,
 		RetryFor: defaultRetryFor,
@@ -59,7 +53,6 @@ func NewService(url string, limit int, log *slog.Logger) *Service {
 	}
 }
 
-// Report queues the event and returns at once. It never blocks the request.
 func (r *Service) Report(e core.UsageEvent) {
 	select {
 	case r.slots <- struct{}{}:
@@ -130,13 +123,11 @@ func (r *Service) Close(ctx context.Context) {
 	}
 }
 
-// MetricsHandler serves the counters to Prometheus.
 func (r *Service) MetricsHandler(w http.ResponseWriter, req *http.Request) {
 	w.Header().Set("Content-Type", "text/plain; version=0.0.4")
 	r.WriteMetrics(w)
 }
 
-// WriteMetrics writes the counters in the Prometheus text format.
 func (r *Service) WriteMetrics(w io.Writer) {
 	for _, m := range []struct {
 		name, help, kind string

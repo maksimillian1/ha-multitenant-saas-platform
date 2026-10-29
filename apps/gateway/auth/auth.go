@@ -1,7 +1,7 @@
 // Package auth validates Zitadel access tokens locally against the issuer's
 // JWKS (ADR-0003) and returns the caller's tenant: the Organization ID claim.
 // A token must carry the platform API's audience, so a token issued for
-// another application of the same Zitadel instance is rejected (HAMSP-22).
+// another application of the same Zitadel instance is rejected.
 package auth
 
 import (

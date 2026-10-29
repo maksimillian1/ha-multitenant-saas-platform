@@ -15,18 +15,17 @@ import (
 	"github.com/google/uuid"
 )
 
-// Metrics a sender may report. Agent tokens (HAMSP-18) and egress (HAMSP-19)
-// are added with their senders.
+// Metrics a sender may report. Agent tokens and egress are added with their
+// senders.
 var Metrics = map[string]bool{
 	"api_calls": true,
 }
 
 const (
-	MaxBatch         = 1000
-	MaxAttributes    = 4 << 10
-	MaxAge           = 7 * 24 * time.Hour
-	MaxClockSkew     = 5 * time.Minute
-	attributesObject = '{'
+	MaxBatch      = 1000
+	MaxAttributes = 4 << 10
+	MaxAge        = 7 * 24 * time.Hour
+	MaxClockSkew  = 5 * time.Minute
 )
 
 var tenantRe = regexp.MustCompile(`^[A-Za-z0-9_-]{1,64}$`)
@@ -66,7 +65,7 @@ func (e Event) Validate(now time.Time) error {
 		if len(e.Attributes) > MaxAttributes {
 			return fmt.Errorf("attributes exceed %d bytes", MaxAttributes)
 		}
-		if a := bytes.TrimSpace(e.Attributes); len(a) == 0 || a[0] != attributesObject || !json.Valid(a) {
+		if a := bytes.TrimSpace(e.Attributes); len(a) == 0 || a[0] != '{' || !json.Valid(a) {
 			return errors.New("attributes must be a JSON object")
 		}
 	}

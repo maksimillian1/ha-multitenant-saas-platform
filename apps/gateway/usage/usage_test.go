@@ -124,7 +124,7 @@ func TestRejectedEventIsNotRetried(t *testing.T) {
 		w.WriteHeader(http.StatusBadRequest)
 	}))
 	defer srv.Close()
-	r := NewService(srv.URL, 0, quiet)
+	r := NewService(srv.URL, 10, quiet)
 	r.Report(event())
 	waitFor(t, "rejection", func() bool { return metric(r, "usage_events_rejected_total") == "1" })
 	r.Close(context.Background())
@@ -139,7 +139,7 @@ func TestEventIsGivenUpAfterRetryFor(t *testing.T) {
 		w.WriteHeader(http.StatusServiceUnavailable)
 	}))
 	defer srv.Close()
-	r := NewService(srv.URL, 0, quiet)
+	r := NewService(srv.URL, 10, quiet)
 	r.RetryFor = 20 * time.Millisecond
 	r.Backoff = func(int) time.Duration { return time.Millisecond }
 	r.Report(event())

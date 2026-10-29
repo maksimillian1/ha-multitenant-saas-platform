@@ -27,6 +27,7 @@ Zitadel issues the tokens. Everything except Cilium and ArgoCD is deployed by Ar
 | `k8s/apps/gateway` | Public Gateway (Cilium Gateway API, host network port 30080) and the API Gateway service |
 | `k8s/apps/kafka` | Strimzi operator, a Kafka cluster of 3 dual-role KRaft nodes and the `usage-events` topic |
 | `k8s/apps/usage` | UsageWriteAPI, Usage Writer and the job that migrates the `usage` database |
+| `k8s/apps/admin` | Super admin app (Go BFF with a React SPA, ADR-0009) behind a Zitadel browser sign-in, on `admin.localtest.me` |
 
 Secrets in these manifests are for this local cluster only.
 
@@ -47,7 +48,7 @@ ArgoCD pulls the manifests from GitHub, so push your branch first.
 go test -C prototype/e2e -count=1 -v ./...
 ```
 
-`create-cluster.sh` recreates the kind cluster `cngp-demo`, installs the Gateway API CRDs, Cilium (with Gateway API) and ArgoCD, builds the `apps/exampleapp`, `apps/gateway` and `apps/usage` images and the TimescaleDB extension image (`images/timescaledb`) and loads them into kind, and points ArgoCD at the current branch (`GITOPS_REVISION` overrides it).
+`create-cluster.sh` recreates the kind cluster `cngp-demo`, installs the Gateway API CRDs, Cilium (with Gateway API) and ArgoCD, builds the `apps/exampleapp`, `apps/gateway`, `apps/usage` and `apps/admin` images and the TimescaleDB extension image (`images/timescaledb`) and loads them into kind, and points ArgoCD at the current branch (`GITOPS_REVISION` overrides it).
 
 `bootstrap-tenants.sh` waits for Zitadel, creates the organizations `tenant-a` and `tenant-b` with one machine user each, and writes their client credentials to `prototype/.tenants.json` (git-ignored). It also sets the access token lifetime to 60 s for the expiry test.
 
@@ -83,6 +84,20 @@ curl -s --connect-to api.localtest.me:30080:127.0.0.1:30080 -H "Authorization: B
 `*.localtest.me` resolves to 127.0.0.1 in public DNS; `--connect-to` makes it work without DNS too.
 
 The same in a browser: `go run -C prototype/authdemo .` and open http://127.0.0.1:8090. The page gets tokens for both tenants, shows their claims, calls the API with a valid, missing or tampered token and runs the auth and isolation checks in one click. It reads the client secrets from `.tenants.json` and proxies to port 30080, so it is for this local cluster only.
+
+## Super admin page
+
+`apps/admin` serves a one-page React SPA at http://admin.localtest.me:30080 (ADR-0009). Without a session it redirects to Zitadel's login. Zitadel lets in only users with a role in the project `platform-admin` (`projectRoleCheck`). The API requires the `super-admin` role, taken from the ID token: the SPA reads the session from `GET /api/me` and shows the dashboard with the role, or its access denied page on 403. The session is an encrypted cookie that lasts an hour; the tokens stay on the server.
+
+`bootstrap-tenants.sh` sets it up. It switches the instance to Zitadel's built-in login (the instance requires Login V2, which this cluster does not deploy), creates the project, the role and an OIDC web app, writes the app's client and a session key to the Secret `admin/admin-oidc`, and creates three human users in the IAM admin's organization: `super-admin` with the role (dashboard), `viewer` with the role `viewer` only (access denied page) and `regular-user` with no role (Zitadel refuses the sign-in). Their passwords are new on every run:
+
+```bash
+jq -r '.admin.users[] | "\(.username)  \(.password)  roles: \(.roles)"' prototype/.tenants.json
+```
+
+Zitadel may offer to set up a second factor after the password; skip it.
+
+The SPA lives in `apps/admin/ui/app` (Node 22, `.nvmrc`). `npm run dev` proxies `/api` and `/auth` to a Go server on `localhost:8080`; signing in through it needs `PUBLIC_URL=http://localhost:5173` and that callback URL added to the Zitadel app, which the bootstrap does not do. The API is described in `apps/admin/openapi.yaml`: after changing it, run `go generate ./...` in `apps/admin` and `npm run gen:api` in `apps/admin/ui/app`. CI fails when the generated types are out of date.
 
 ## ExampleApp API
 

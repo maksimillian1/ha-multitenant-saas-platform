@@ -1,7 +1,6 @@
 // Package store is the usage store of ADR-0006: the only way into the usage
 // tables. They live in a TimescaleDB hypertable on the usage cluster
-// (ADR-0008), which Usage Writer reaches only through write_usage_events. The
-// read side follows HAMSP-9.
+// (ADR-0008), which Usage Writer reaches only through write_usage_events.
 package store
 
 import (
@@ -66,7 +65,6 @@ func (s *Postgres) Write(ctx context.Context, events []core.Event) ([]core.Event
 	}
 	var fresh []core.Event
 	err := pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
-		fresh = fresh[:0]
 		for _, tenant := range order {
 			group := byTenant[tenant]
 			// set_config(..., true) is SET LOCAL: write_usage_events accepts only this tenant's events.

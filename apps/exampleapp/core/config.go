@@ -26,7 +26,6 @@ func LoadConfig() Config {
 	}
 }
 
-// Required fails when the setting of env var key is empty.
 func Required(key, val string) error {
 	if val == "" {
 		return fmt.Errorf("%s is required", key)

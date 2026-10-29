@@ -1,17 +1,8 @@
-// Command usage runs the usage pipeline of ADR-0001 item 4 (HAMSP-26):
+// Command usage runs the usage pipeline:
 //
 //	usage writeapi   UsageWriteAPI: accepts usage events and produces them to Kafka
 //	usage writer     Usage Writer: consumes Kafka and stores the events once
 //	usage migrate    applies the migrations to the usage database
-//
-// Configuration (environment): see core.LoadConfig.
-//
-//	KAFKA_BROKERS          required (writeapi, writer)
-//	KAFKA_TOPIC            default usage-events
-//	KAFKA_GROUP            default usage-writer (writer)
-//	DATABASE_URL           required (writer)
-//	MIGRATE_DATABASE_URL   required (migrate)
-//	LISTEN_ADDR            default :8080 (writeapi, writer health)
 package main
 
 import (
@@ -138,7 +129,7 @@ func bootstrapWriter(ctx context.Context, cfg core.Config, log *slog.Logger) (*w
 }
 
 // migrate waits up to 5 minutes for the database, then applies the migrations
-// and fails if any relation with tenant_id is left open to another tenant (QS-01).
+// and fails if any relation with tenant_id is left open to another tenant.
 func migrate(ctx context.Context, cfg core.Config, log *slog.Logger) error {
 	if err := core.Required("MIGRATE_DATABASE_URL", cfg.MigrateDatabaseURL); err != nil {
 		return err

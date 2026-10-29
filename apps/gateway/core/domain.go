@@ -38,8 +38,8 @@ type Authenticator interface {
 	Tenant(ctx context.Context, token string) (string, error)
 }
 
-// UsageReporter takes the usage event of every request served for a tenant
-// (FR-05). Report must not block.
+// UsageReporter takes the usage event of every request served for a tenant.
+// Report must not block.
 type UsageReporter interface {
 	Report(UsageEvent)
 }

@@ -30,7 +30,7 @@ func (s *statusRecorder) WriteHeader(code int) {
 }
 
 // AccessLog logs every request that reaches ExampleApp, probes excepted. The
-// e2e tests use it to prove that rejected requests never get here (AC-5).
+// e2e tests use it to prove that rejected requests never get here.
 func AccessLog(next http.Handler, log *slog.Logger) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/healthz" || r.URL.Path == "/readyz" {

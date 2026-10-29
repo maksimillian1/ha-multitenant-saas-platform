@@ -42,7 +42,7 @@ The Deployment view (namespaces, node pools, Karpenter, KEDA, Cilium) is not dra
 
 * `/docs` - Documentation: requirements, C4 model, ADRs (`/docs/adr`) and subsystem notes.
 * `/prototype` - Local kind cluster with GitOps manifests (ArgoCD ApplicationSet, CloudNativePG, MinIO).
-* `/apps` - Go services: `apps/gateway` (API Gateway, ADR-0004), `apps/usage` (UsageWriteAPI and Usage Writer) and `apps/exampleapp` (the minimal per-tenant test service).
+* `/apps` - Go services: `apps/gateway` (API Gateway, ADR-0004), `apps/usage` (UsageWriteAPI and Usage Writer), `apps/exampleapp` (the minimal per-tenant test service) and `apps/admin` (the super admin app, a Go BFF with a React SPA, ADR-0009).
 * `/images` - Container images that are not Go services: `images/timescaledb`, the TimescaleDB extension image of the usage cluster (ADR-0008). It holds Timescale License (TSL) binaries; see [Data Tier](architecture/data-tier.md).
 * `/terraform` - Infrastructure as Code for AWS EKS, Karpenter and core cloud dependencies. Empty for now.
 * `/deploy` - Empty for now.

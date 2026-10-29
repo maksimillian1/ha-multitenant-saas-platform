@@ -9,6 +9,7 @@ import (
 	"log/slog"
 	"net/http"
 	"regexp"
+	"unicode/utf8"
 
 	"github.com/maksimillian1/ha-multitenant-saas-platform/apps/exampleapp/core"
 )
@@ -135,7 +136,7 @@ func decodeName(w http.ResponseWriter, r *http.Request) (string, bool) {
 		core.WriteError(w, http.StatusBadRequest, "invalid JSON body")
 		return "", false
 	}
-	if req.Name == "" || len(req.Name) > maxNameLen {
+	if req.Name == "" || utf8.RuneCountInString(req.Name) > maxNameLen {
 		core.WriteError(w, http.StatusBadRequest, "name must be 1-200 characters")
 		return "", false
 	}

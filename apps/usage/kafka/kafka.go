@@ -1,5 +1,5 @@
 // Package kafka connects the usage pipeline to the usage topic: UsageWriteAPI
-// produces to it and Usage Writer consumes from it (ADR-0001 item 4).
+// produces to it and Usage Writer consumes from it.
 package kafka
 
 import (
@@ -13,7 +13,7 @@ import (
 )
 
 // Producer produces every event to the topic with tenant_id as the key, so one
-// tenant's events keep their order (ADR-0001 item 4). Writes wait for all
+// tenant's events keep their order. Writes wait for all
 // in-sync replicas and the producer is idempotent, so a retried send is not
 // written twice (ADR-0005).
 type Producer struct {

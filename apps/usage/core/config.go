@@ -7,15 +7,11 @@ import (
 )
 
 type Config struct {
-	ListenAddr   string // writeapi, writer health
-	KafkaBrokers string // host:port,... (writeapi, writer)
-	KafkaTopic   string
-	KafkaGroup   string // writer
-	// DatabaseURL is Usage Writer's role, through PgBouncer (writer).
-	DatabaseURL string
-	// MigrateDatabaseURL is the owner role of the usage database (migrate).
-	// CNPG's Database resource creates the database and the timescaledb
-	// extension (ADR-0008).
+	ListenAddr         string
+	KafkaBrokers       string
+	KafkaTopic         string
+	KafkaGroup         string
+	DatabaseURL        string
 	MigrateDatabaseURL string
 }
 
@@ -37,7 +33,6 @@ func LoadConfig() Config {
 	}
 }
 
-// Required fails when the setting of env var key is empty.
 func Required(key, val string) error {
 	if val == "" {
 		return fmt.Errorf("%s is required", key)
@@ -49,5 +44,9 @@ func (c Config) Brokers() ([]string, error) {
 	if err := Required("KAFKA_BROKERS", c.KafkaBrokers); err != nil {
 		return nil, err
 	}
-	return strings.Split(c.KafkaBrokers, ","), nil
+	brokers := strings.Split(c.KafkaBrokers, ",")
+	for i := range brokers {
+		brokers[i] = strings.TrimSpace(brokers[i])
+	}
+	return brokers, nil
 }

@@ -91,7 +91,7 @@ func Migrate(ctx context.Context, conn *pgx.Conn) error {
 
 // UnprotectedTables returns every relation with a tenant_id column, chunks and
 // partitions included, that an application role could use to reach another
-// tenant's rows. An empty result means tenant isolation holds (QS-01).
+// tenant's rows. An empty result means tenant isolation holds.
 //
 // The usage database cannot use RLS everywhere (ADR-0008), so a table passes
 // if it has RLS enabled and forced, or if nobody but its owner has a privilege

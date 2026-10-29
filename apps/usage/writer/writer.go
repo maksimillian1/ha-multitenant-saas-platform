@@ -1,4 +1,4 @@
-// Package writer is Usage Writer (ADR-0001 item 4): it consumes the usage
+// Package writer is Usage Writer: it consumes the usage
 // topic and stores every event once (ADR-0007). It commits a batch's offsets
 // only after the database transaction committed, so a crash in between makes
 // Kafka deliver the batch again, and the store's dedup key turns the replay
@@ -29,7 +29,7 @@ type Service struct {
 	Log    *slog.Logger
 
 	// afterStore runs between the database commit and the offset commit.
-	// Tests use it to simulate a crash there (AC-10).
+	// Tests use it to simulate a crash there.
 	afterStore func() error
 
 	Stored    atomic.Int64 // new events stored
@@ -92,7 +92,7 @@ func (w *Service) decode(ctx context.Context, records []*kgo.Record) []core.Even
 }
 
 // storeWithRetry retries until the batch is stored or ctx is done. While the
-// database is down nothing is committed, so the events wait in Kafka (QS-09).
+// database is down nothing is committed, so the events wait in Kafka.
 func (w *Service) storeWithRetry(ctx context.Context, events []core.Event) bool {
 	if len(events) == 0 {
 		return true

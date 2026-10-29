@@ -3,8 +3,6 @@
 //
 //	exampleapp serve     serve the HTTP API as the application role (DATABASE_URL)
 //	exampleapp migrate   apply migrations as the owner role (MIGRATE_DATABASE_URL)
-//
-// Configuration (environment): see core.LoadConfig.
 package main
 
 import (
@@ -83,7 +81,7 @@ func bootstrapServices(ctx context.Context, cfg core.Config, log *slog.Logger) (
 }
 
 // migrate waits up to 5 minutes for the database, then applies the migrations
-// and fails if any multi-tenant table is left without RLS (QS-01).
+// and fails if any multi-tenant table is left without RLS.
 func migrate(ctx context.Context, cfg core.Config, log *slog.Logger) error {
 	if err := core.Required("MIGRATE_DATABASE_URL", cfg.MigrateDatabaseURL); err != nil {
 		return err
