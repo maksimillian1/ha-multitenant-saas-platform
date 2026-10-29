@@ -1,5 +1,6 @@
-# Creates the usage database and applies its migrations on every sync, before
-# the deployments roll out (sync wave 0 < 1).
+# Applies the usage migrations on every sync, before the deployments roll out
+# (sync wave 0 < 1). It fails until the usage cluster's Database resource has
+# created the timescaledb extension; the Job retries.
 apiVersion: batch/v1
 kind: Job
 metadata:
@@ -24,8 +25,6 @@ spec:
           imagePullPolicy: IfNotPresent
           args: ["migrate"]
           env:
-            - name: ADMIN_DATABASE_URL
-              valueFrom: {secretKeyRef: {name: usage-db, key: ADMIN_DATABASE_URL}}
             - name: MIGRATE_DATABASE_URL
               valueFrom: {secretKeyRef: {name: usage-db, key: MIGRATE_DATABASE_URL}}
           resources:

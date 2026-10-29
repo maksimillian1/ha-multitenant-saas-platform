@@ -302,17 +302,30 @@ func psql(t testing.TB, sql string) (string, error) {
 	return psqlDB(t, "exampleapp", sql)
 }
 
-// psqlDB runs SQL as the postgres superuser on the primary, in database db.
+// psqlDB runs SQL as the postgres superuser on the main cluster's primary, in database db.
 func psqlDB(t testing.TB, db, sql string) (string, error) {
+	t.Helper()
+	return psqlCluster(t, "database", "main-pg-cluster", db, sql)
+}
+
+// psqlUsage runs SQL as the postgres superuser on the usage cluster's primary,
+// in the usage database (ADR-0008).
+func psqlUsage(t testing.TB, sql string) (string, error) {
+	t.Helper()
+	return psqlCluster(t, "usage-db", "usage-pg-cluster", "usage", sql)
+}
+
+// psqlCluster runs SQL as the postgres superuser on the primary of a CNPG cluster.
+func psqlCluster(t testing.TB, ns, cluster, db, sql string) (string, error) {
 	t.Helper()
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
 	defer cancel()
-	primary, err := kubectl(ctx, "-n", "database", "get", "cluster", "main-pg-cluster",
+	primary, err := kubectl(ctx, "-n", ns, "get", "cluster", cluster,
 		"-o", "jsonpath={.status.currentPrimary}")
 	if err != nil {
 		t.Fatal(err)
 	}
-	out, err := kubectl(ctx, "-n", "database", "exec", primary, "-c", "postgres", "--",
+	out, err := kubectl(ctx, "-n", ns, "exec", primary, "-c", "postgres", "--",
 		"psql", "-U", "postgres", "-d", db, "-Atq", "-v", "ON_ERROR_STOP=1", "-c", sql)
 	return strings.TrimSpace(out), err
 }

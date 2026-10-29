@@ -13,12 +13,13 @@ on:
 
 jobs:
   test:
-    # Applies all migrations to a clean PostgreSQL and fails if any table with a
-    # tenant_id column lacks enabled and forced RLS (QS-01, HAMSP-26 AC-11).
+    # Applies all migrations to a clean TimescaleDB (TSL edition, the version of
+    # images/timescaledb) and fails if any relation with a tenant_id column is
+    # open to an application role without tenant isolation (QS-01, ADR-0008).
     runs-on: ubuntu-latest
     services:
       postgres:
-        image: postgres:16
+        image: timescale/timescaledb:2.27.2-pg18
         env:
           POSTGRES_PASSWORD: postgres
         ports: ["5432:5432"]

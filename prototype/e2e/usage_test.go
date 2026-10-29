@@ -1,8 +1,8 @@
 package e2e
 
 // Usage pipeline (HAMSP-26): API Gateway → UsageWriteAPI → Kafka → Usage Writer
-// → the usage database. Events are found by their path (a probe UUID per test)
-// or their event_id, as the superuser, which bypasses RLS.
+// → the usage database on the usage cluster (ADR-0008). Events are found by
+// their path (a probe UUID per test) or their event_id, as the superuser.
 
 import (
 	"bufio"
@@ -24,7 +24,7 @@ import (
 // usageRows returns how many usage events have the given path.
 func usageRows(t testing.TB, path string) int {
 	t.Helper()
-	out, err := psqlDB(t, "usage", fmt.Sprintf("SELECT count(*) FROM usage_events WHERE attributes->>'path' = '%s'", path))
+	out, err := psqlUsage(t, fmt.Sprintf("SELECT count(*) FROM usage_events WHERE attributes->>'path' = '%s'", path))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -62,7 +62,7 @@ func waitForUsageRows(t testing.TB, path string, want int, within time.Duration)
 func waitForUsagePaths(t testing.TB, paths []string, within time.Duration) {
 	t.Helper()
 	count := func() (rows, distinct int) {
-		out, err := psqlDB(t, "usage", "SELECT count(*) || ' ' || count(DISTINCT attributes->>'path') FROM usage_events WHERE attributes->>'path' IN ("+idList(paths)+")")
+		out, err := psqlUsage(t, "SELECT count(*) || ' ' || count(DISTINCT attributes->>'path') FROM usage_events WHERE attributes->>'path' IN ("+idList(paths)+")")
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -101,7 +101,7 @@ func storedIDs(t testing.TB, ids []string) int {
 	if len(ids) == 0 {
 		return 0
 	}
-	out, err := psqlDB(t, "usage", "SELECT count(*) FROM usage_events WHERE event_id::text IN ("+idList(ids)+")")
+	out, err := psqlUsage(t, "SELECT count(*) FROM usage_events WHERE event_id::text IN ("+idList(ids)+")")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -265,7 +265,7 @@ func TestAPICallIsStoredAsUsageEvent(t *testing.T) {
 			mustStatus(t, call(t, http.MethodGet, path+"?note=secret-"+probe, token(t, ten), nil), http.StatusNotFound, "GET unknown item")
 			waitForUsageRows(t, path, 1, 30*time.Second)
 
-			out, err := psqlDB(t, "usage", fmt.Sprintf(`
+			out, err := psqlUsage(t, fmt.Sprintf(`
 				SELECT concat_ws('|', tenant_id, metric, quantity, attributes->>'method', attributes->>'status',
 				                 attributes ?& array['duration_ms', 'request_bytes', 'response_bytes'],
 				                 attributes::text LIKE '%%secret%%')
@@ -439,21 +439,24 @@ func TestUsageWriterRestartsStoreOnce(t *testing.T) {
 	}
 }
 
-// AC-11: usage_events has forced RLS; Usage Writer connects as a role that does
-// not own it, is NOSUPERUSER NOBYPASSRLS, and sees nothing without a tenant.
-func TestUsageTableRLSAndWriterRole(t *testing.T) {
-	out, err := psqlDB(t, "usage", `
-		SELECT concat_ws('|', c.relrowsecurity, c.relforcerowsecurity, pg_get_userbyid(c.relowner),
-		                 r.rolsuper, r.rolbypassrls)
+// AC-11 of HAMSP-26, HAMSP-25 AC-4/AC-5: Usage Writer connects to the usage
+// cluster as a role that is NOSUPERUSER NOBYPASSRLS and owns nothing; it has no
+// privilege on usage_events and writes only through write_usage_events.
+func TestUsageTablesClosedToWriterRole(t *testing.T) {
+	out, err := psqlUsage(t, `
+		SELECT concat_ws('|', pg_get_userbyid(c.relowner), r.rolsuper, r.rolbypassrls,
+		                 has_table_privilege('usage_writer', c.oid, 'SELECT,INSERT,UPDATE,DELETE'),
+		                 has_function_privilege('usage_writer',
+		                     'write_usage_events(uuid[], timestamptz[], text[], text[], bigint[], text[])', 'EXECUTE'))
 		FROM pg_class c, pg_roles r
 		WHERE c.oid = 'public.usage_events'::regclass AND r.rolname = 'usage_writer'`)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if want := "t|t|usage_owner|f|f"; out != want {
-		t.Fatalf("rowsecurity|forcerowsecurity|owner|rolsuper|rolbypassrls = %q, want %q", out, want)
+	if want := "usage_owner|f|f|f|t"; out != want {
+		t.Fatalf("owner|rolsuper|rolbypassrls|table privilege|execute write_usage_events = %q, want %q", out, want)
 	}
-	users, err := psqlDB(t, "usage", `
+	users, err := psqlUsage(t, `
 		SELECT string_agg(DISTINCT usename, ',') FROM pg_stat_activity
 		WHERE datname = 'usage' AND backend_type = 'client backend' AND pid <> pg_backend_pid()
 		  AND usename NOT IN ('cnpg_pooler_pgbouncer', 'postgres', 'usage_owner')`)
@@ -463,16 +466,13 @@ func TestUsageTableRLSAndWriterRole(t *testing.T) {
 	if users != "usage_writer" {
 		t.Fatalf("roles connected to the usage database = %q, want only usage_writer", users)
 	}
-	n, err := psqlDB(t, "usage", "SET ROLE usage_writer; SELECT count(*) FROM usage_events")
-	if err != nil {
-		t.Fatal(err)
+	_, err = psqlUsage(t, "SET ROLE usage_writer; SELECT count(*) FROM usage_events")
+	if err == nil || !strings.Contains(err.Error(), "permission denied") {
+		t.Fatalf("SELECT on usage_events as usage_writer: err = %v, want permission denied", err)
 	}
-	if n != "0" {
-		t.Fatalf("SELECT without tenant context returned %s rows, want 0", n)
-	}
-	_, err = psqlDB(t, "usage", "SET ROLE usage_writer; INSERT INTO usage_events (event_id, event_time, tenant_id, metric, quantity) VALUES (gen_random_uuid(), now(), '"+tenA.OrgID+"', 'api_calls', 1)")
-	if err == nil || !strings.Contains(err.Error(), "row-level security") {
-		t.Fatalf("INSERT without tenant context: err = %v, want a row-level security violation", err)
+	_, err = psqlUsage(t, "SET ROLE usage_writer; SELECT * FROM write_usage_events(ARRAY[gen_random_uuid()], ARRAY[now()], ARRAY['"+tenA.OrgID+"'], ARRAY['api_calls'], ARRAY[1::bigint], ARRAY['{}'])")
+	if err == nil || !strings.Contains(err.Error(), "no tenant") {
+		t.Fatalf("write without tenant context: err = %v, want the function to reject it", err)
 	}
 }
 
@@ -484,18 +484,18 @@ func TestUsageSurvivesDatabaseOutage(t *testing.T) {
 		t.Skip("takes over 5 minutes")
 	}
 	// No other policy selects the pooler, and a policy with only ingressDeny
-	// rules turns on default deny for ingress, which would cut ExampleApp off
-	// too. enableDefaultDeny keeps the deny limited to Usage Writer.
+	// rules turns on default deny for ingress, which would cut off the
+	// operator too. enableDefaultDeny keeps the deny limited to Usage Writer.
 	restore := applyTemporary(t, `
 apiVersion: cilium.io/v2
 kind: CiliumNetworkPolicy
 metadata:
   name: e2e-usage-db-outage
-  namespace: database
+  namespace: usage-db
 spec:
   endpointSelector:
     matchLabels:
-      cnpg.io/poolerName: main-pg-cluster-pooler-rw
+      cnpg.io/poolerName: usage-pg-cluster-pooler-rw
   enableDefaultDeny:
     ingress: false
   ingressDeny:
@@ -537,7 +537,7 @@ spec:
 	}
 
 	restore()
-	out, err := psqlDB(t, "usage", "SELECT 1") // the database itself was never down
+	out, err := psqlUsage(t, "SELECT 1") // the database itself was never down
 	if err != nil || out != "1" {
 		t.Fatalf("usage database: %q, %v", out, err)
 	}

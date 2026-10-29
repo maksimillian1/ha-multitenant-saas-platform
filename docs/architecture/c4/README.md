@@ -146,7 +146,7 @@ graph LR
       style 16 fill:#438dd5,stroke:#2e6295,color:#ffffff
       18["<div style='font-weight: bold'>Kafka</div><div style='font-size: 70%; margin-top: 0px'>[Container: Apache Kafka (Strimzi)]</div><div style='font-size: 80%; margin-top:10px'>Usage events, partitioned by<br />tenant_id (ADR-0001).</div>"]
       style 18 fill:#438dd5,stroke:#2e6295,color:#ffffff
-      19[("<div style='font-weight: bold'>Usage Store</div><div style='font-size: 70%; margin-top: 0px'>[Container: v1: own database on the main PostgreSQL; v2: hot, warm and cold tiers]</div><div style='font-size: 80%; margin-top:10px'>Usage events per tenant, kept<br />13 months (ADR-0006).</div>")]
+      19[("<div style='font-weight: bold'>Usage Store</div><div style='font-size: 70%; margin-top: 0px'>[Container: TimescaleDB on its own CNPG cluster; cold tier in S3 in v2]</div><div style='font-size: 80%; margin-top:10px'>Usage events per tenant, kept<br />13 months: hot and warm tiers<br />in one hypertable, hourly<br />aggregate. Platform-only<br />(ADR-0006, ADR-0008).</div>")]
       style 19 fill:#438dd5,stroke:#2e6295,color:#ffffff
       20[("<div style='font-weight: bold'>Rate Limit Store</div><div style='font-size: 70%; margin-top: 0px'>[Container: Redis, fit checked in HAMSP-15]</div><div style='font-size: 80%; margin-top:10px'>Shared per-tenant rate limit<br />and quota counters (FR-07).<br />Quota counters can be rebuilt<br />from the usage store.</div>")]
       style 20 fill:#438dd5,stroke:#2e6295,color:#ffffff
