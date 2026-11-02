@@ -48,7 +48,7 @@ ArgoCD pulls the manifests from GitHub, so push your branch first.
 go test -C prototype/e2e -count=1 -v ./...
 ```
 
-`create-cluster.sh` recreates the kind cluster `cngp-demo`, installs the Gateway API CRDs, Cilium (with Gateway API) and ArgoCD, builds the `apps/exampleapp`, `apps/gateway`, `apps/usage` and `apps/admin` images and the TimescaleDB extension image (`images/timescaledb`) and loads them into kind, and points ArgoCD at the current branch (`GITOPS_REVISION` overrides it).
+`create-cluster.sh` recreates the kind cluster `cngp-demo`, installs the Gateway API CRDs, Cilium (with Gateway API) and ArgoCD, builds the `apps/exampleapp`, `apps/gateway`, `apps/usage` and `apps/admin` images and loads them into kind (the usage cluster pulls the TimescaleDB extension image from GHCR, `images/timescaledb`), and points ArgoCD at the current branch (`GITOPS_REVISION` overrides it).
 
 `bootstrap-tenants.sh` waits for Zitadel, creates the organizations `tenant-a` and `tenant-b` with one machine user each, and writes their client credentials to `prototype/.tenants.json` (git-ignored). It also sets the access token lifetime to 60 s for the expiry test.
 

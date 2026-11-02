@@ -3,6 +3,8 @@
 # image with the extension's files mounted the way CNPG's ImageVolume does
 # (dynamic_library_path, extension_control_path), then checks that the TSL
 # features work: licence, columnstore compression and a continuous aggregate.
+# Then checks the upgrade path: a database created at the previous release,
+# whose library the image also carries, updates to the current one.
 #
 # Usage: smoke-test.sh <extension image> [<postgresql image>]
 set -euo pipefail
@@ -17,6 +19,14 @@ docker create --name "${NAME}-ext" "${EXT_IMAGE}" /none >/dev/null
 docker cp "${NAME}-ext:/lib" "${EXT_DIR}/lib"
 docker cp "${NAME}-ext:/share" "${EXT_DIR}/share"
 chmod -R a+rX "${EXT_DIR}"
+# timescaledb-tsl-<version>.so for each release in the image, oldest first.
+VERSIONS=$(ls "${EXT_DIR}/lib" | sed -nE 's/^timescaledb-tsl-(.+)\.so$/\1/p' | sort -V)
+CURRENT=$(echo "${VERSIONS}" | tail -1)
+PREVIOUS=$(echo "${VERSIONS}" | head -1)
+if [[ "${CURRENT}" == "${PREVIOUS}" ]]; then
+  echo "the image carries one release (${CURRENT}); the previous one is missing" >&2
+  exit 1
+fi
 
 # $libdir and $system keep the image's own libraries and extensions reachable,
 # as CNPG does.
@@ -45,4 +55,20 @@ CREATE MATERIALIZED VIEW t_hourly WITH (timescaledb.continuous) AS
   SELECT tenant_id, time_bucket('1 hour', at) AS bucket, sum(v) AS v FROM t GROUP BY 1, 2 WITH NO DATA;
 CALL refresh_continuous_aggregate('t_hourly', NULL, now());
 SELECT 'aggregated=' || sum(v) FROM t_hourly;
+SQL
+
+docker exec -i "${NAME}" psql -U postgres -v ON_ERROR_STOP=1 -Atq <<SQL
+CREATE DATABASE upgrade;
+\\c upgrade
+CREATE EXTENSION timescaledb VERSION '${PREVIOUS}';
+SELECT 'previous=' || extversion FROM pg_extension WHERE extname = 'timescaledb';
+CREATE TABLE t (at timestamptz NOT NULL, v bigint NOT NULL);
+SELECT create_hypertable('t', by_range('at')) IS NOT NULL;
+INSERT INTO t VALUES (now(), 1);
+SQL
+# ALTER EXTENSION ... UPDATE must be the first command of a fresh session.
+docker exec -i "${NAME}" psql -U postgres -d upgrade -X -v ON_ERROR_STOP=1 -Atq <<SQL
+ALTER EXTENSION timescaledb UPDATE TO '${CURRENT}';
+SELECT 'updated=' || extversion FROM pg_extension WHERE extname = 'timescaledb';
+SELECT 'rows=' || count(*) FROM t;
 SQL

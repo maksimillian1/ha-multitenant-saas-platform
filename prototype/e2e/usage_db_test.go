@@ -36,8 +36,9 @@ func TestUsageClusterRunsTimescaleDB(t *testing.T) {
 		t.Errorf("backup phase = %q, want completed", got)
 	}
 	primary := get("cluster", "usage-pg-cluster", "{.status.currentPrimary}")
-	if got := get("pod", primary, "{.spec.volumes[?(@.image)].image.reference}"); got != "hamsp/timescaledb:2.27.2-pg18" {
-		t.Errorf("image volume of %s = %q, want hamsp/timescaledb:2.27.2-pg18", primary, got)
+	const ext = "ghcr.io/maksimillian1/ha-multitenant-saas-platform/timescaledb:2.27.2-18-trixie"
+	if got := get("pod", primary, "{.spec.volumes[?(@.image)].image.reference}"); got != ext {
+		t.Errorf("image volume of %s = %q, want %s", primary, got, ext)
 	}
 
 	out, err := psqlUsage(t, `

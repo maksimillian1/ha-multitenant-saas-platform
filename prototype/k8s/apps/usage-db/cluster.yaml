@@ -78,12 +78,13 @@ spec:
         inherit: false
   postgresql:
     # TimescaleDB from our extension image, mounted read-only through
-    # ImageVolume (Kubernetes 1.35, containerd 2.1+). Built and loaded into
-    # kind by prototype/create-cluster.sh.
+    # ImageVolume (Kubernetes 1.35, containerd 2.1+). Published to GHCR by
+    # .github/workflows/timescaledb.yml, which checks this tag; changing it is
+    # how TimescaleDB is upgraded and rolled back (images/timescaledb/README.md).
     extensions:
       - name: timescaledb
         image:
-          reference: hamsp/timescaledb:2.27.2-pg18
+          reference: ghcr.io/maksimillian1/ha-multitenant-saas-platform/timescaledb:2.27.2-18-trixie
           pullPolicy: IfNotPresent
     shared_preload_libraries:
       - timescaledb
@@ -131,6 +132,9 @@ spec:
   extensions:
     - name: timescaledb
       ensure: present
+      # Pinned, so a new extension image does not update the extension; the
+      # update is its own step (images/timescaledb/README.md).
+      version: "2.27.2"
 ---
 # PgBouncer in front of the primary. Usage Writer connects here.
 apiVersion: postgresql.cnpg.io/v1

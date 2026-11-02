@@ -9,4 +9,4 @@ Two CNPG clusters, both with 3 instances, quorum synchronous replication (ANY 1)
 
 The CNPG operator is 1.30. Both clusters still use the in-tree Barman backup, which CNPG removes in 1.31 (HAMSP-29).
 
-**Licence:** TimescaleDB's columnstore, continuous aggregates and policies are under the Timescale License (TSL), not Apache 2.0. The TSL allows using them inside our own service; it does not allow offering TimescaleDB as a database service. The extension image is built from `images/timescaledb`; everything else in the data tier is open source under OSI licences.
+**Licence:** TimescaleDB's columnstore, continuous aggregates and policies are under the Timescale License (TSL), not Apache 2.0. The TSL allows using them inside our own service; it does not allow offering TimescaleDB as a database service. The extension image is built from `images/timescaledb`, which carries the unmodified TSL binaries, and published to GHCR; everything else in the data tier is open source under OSI licences.
