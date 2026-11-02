@@ -14,7 +14,7 @@ The image holds the TSL builds from Timescale's Debian repository, unmodified, n
 
 ## Versions
 
-`.github/workflows/timescaledb.yml` builds both architectures, runs `smoke-test.sh` on each and publishes the tag from the Dockerfile's `ARG`s on `master`, `HAMSP-23-platform-skeleton` or a manual run. A published tag is never overwritten, so every version stays available for a rollback. A pull request fails if `prototype/k8s/apps/usage-db/cluster.yaml` references another tag than the Dockerfile builds.
+`.github/workflows/timescaledb.yml` builds both architectures, runs `smoke-test.sh` on each and publishes the tag from the Dockerfile's `ARG`s: on `master`, on `HAMSP-23-platform-skeleton` and on pull requests from this repository, so a branch's cluster can pull a new version before the merge. A published tag is never overwritten, so every version stays available for a rollback. A pull request fails if `prototype/k8s/apps/usage-db/cluster.yaml` references another tag than the Dockerfile builds.
 
 Each image carries two releases: `TIMESCALEDB_VERSION` with the loader, and `TIMESCALEDB_PREVIOUS_VERSION`. The loader loads the library of the version the database's extension is at, so the image works for a database at either release. The smoke test creates a database at the previous release and updates it.
 

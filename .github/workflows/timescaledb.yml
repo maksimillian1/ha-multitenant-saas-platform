@@ -12,8 +12,6 @@ on:
       - "images/timescaledb/**"
       - "prototype/k8s/apps/usage-db/cluster.yaml"
       - ".github/workflows/timescaledb.yml"
-  # Publishes a new version from any branch, e.g. before it is merged.
-  workflow_dispatch:
 
 env:
   IMAGE: ghcr.io/${{ github.repository }}/timescaledb
@@ -56,7 +54,14 @@ jobs:
     # A published tag is never overwritten: rolling back means referencing the
     # previous tag (images/timescaledb/README.md). A changed image needs a new
     # version in the Dockerfile.
-    if: github.event_name != 'pull_request'
+    #
+    # Also runs on pull requests from this repository, so the cluster of the
+    # branch can pull a new version before the merge; the first build that
+    # passed the smoke test on both architectures is the one published. Fork
+    # pull requests get no write token and are skipped.
+    if: >-
+      github.event_name != 'pull_request' ||
+      github.event.pull_request.head.repo.full_name == github.repository
     needs: [tag, build]
     runs-on: ubuntu-latest
     permissions:
@@ -75,7 +80,7 @@ jobs:
       - id: exists
         run: |
           if docker buildx imagetools inspect "${IMAGE}:${REF}" >/dev/null 2>&1; then
-            echo "::notice::${IMAGE}:${REF} is already published; not overwritten"
+            echo "::warning::${IMAGE}:${REF} is already published and is not overwritten; bump TIMESCALEDB_VERSION if the image changed"
             echo "exists=true" >> "$GITHUB_OUTPUT"
           fi
       - if: steps.exists.outputs.exists != 'true'
