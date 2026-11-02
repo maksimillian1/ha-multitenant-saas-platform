@@ -1,36 +1,24 @@
 // Package store is the usage store of ADR-0006: the only way into the usage
-// tables. v1 keeps them in their own database on the main PostgreSQL cluster;
-// another store implements the same interface later. The read side follows
-// HAMSP-9.
+// tables. They live in a TimescaleDB hypertable on the usage cluster
+// (ADR-0008), which Usage Writer reaches only through write_usage_events.
 package store
 
 import (
 	"context"
-	"sync"
 	"time"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
-	"github.com/maksimillian1/ha-multitenant-saas-platform/apps/usage/internal/event"
+	"github.com/maksimillian1/ha-multitenant-saas-platform/apps/usage/internal/core"
 )
 
-// Writer stores usage events once (ADR-0007).
-type Writer interface {
-	// Write stores a batch in one transaction and returns the events that were
-	// new. Events stored before, in this batch or an earlier one, are skipped.
-	Write(ctx context.Context, events []event.Event) ([]event.Event, error)
-}
-
-// Postgres is the v1 store.
+// Postgres is the TimescaleDB store of ADR-0008.
 type Postgres struct {
 	pool *pgxpool.Pool
-
-	mu    sync.Mutex
-	parts map[string]bool // UTC days known to have a partition
 }
 
-var _ Writer = (*Postgres)(nil)
+var _ core.EventWriter = (*Postgres)(nil)
 
 // Open connects as Usage Writer's role. Statements use the extended protocol
 // with unnamed statements, which PgBouncer in transaction mode supports.
@@ -44,84 +32,41 @@ func Open(ctx context.Context, dsn string) (*Postgres, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &Postgres{pool: pool, parts: map[string]bool{}}, nil
+	return &Postgres{pool: pool}, nil
 }
 
 func (s *Postgres) Close() { s.pool.Close() }
 
 func (s *Postgres) Ping(ctx context.Context) error { return s.pool.Ping(ctx) }
 
-func day(t time.Time) string { return t.UTC().Format(time.DateOnly) }
-
-// EnsurePartitions creates the day partitions from..to (UTC) that are missing.
-// It runs in its own short transaction, so the lock that creating a partition
-// takes on the table is not held while a batch is inserted.
-func (s *Postgres) EnsurePartitions(ctx context.Context, from, to time.Time) error {
-	missing := false
-	s.mu.Lock()
-	for d := from.UTC().Truncate(24 * time.Hour); !d.After(to.UTC()); d = d.Add(24 * time.Hour) {
-		if !s.parts[day(d)] {
-			missing = true
-			break
-		}
-	}
-	s.mu.Unlock()
-	if !missing {
-		return nil
-	}
-	if _, err := s.pool.Exec(ctx, "SELECT ensure_usage_partitions($1::date, $2::date)", day(from), day(to)); err != nil {
-		return err
-	}
-	s.mu.Lock()
-	for d := from.UTC().Truncate(24 * time.Hour); !d.After(to.UTC()); d = d.Add(24 * time.Hour) {
-		s.parts[day(d)] = true
-	}
-	s.mu.Unlock()
-	return nil
-}
-
-const insertEvents = `
-INSERT INTO usage_events (event_id, event_time, tenant_id, metric, quantity, attributes)
-SELECT id, t, tenant, metric, quantity, attrs::jsonb
-FROM unnest($1::uuid[], $2::timestamptz[], $3::text[], $4::text[], $5::bigint[], $6::text[])
-     AS u(id, t, tenant, metric, quantity, attrs)
-ON CONFLICT (tenant_id, event_id, event_time) DO NOTHING
-RETURNING event_id::text, event_time`
+// writeEvents stores one tenant's events and returns the new ones. The function
+// checks every event against app.current_tenant_id (ADR-0008).
+const writeEvents = `
+SELECT event_id::text, event_time
+FROM write_usage_events($1::uuid[], $2::timestamptz[], $3::text[], $4::text[], $5::bigint[], $6::text[])`
 
 type key struct {
 	id string
 	t  int64
 }
 
-func (s *Postgres) Write(ctx context.Context, events []event.Event) ([]event.Event, error) {
+func (s *Postgres) Write(ctx context.Context, events []core.Event) ([]core.Event, error) {
 	if len(events) == 0 {
 		return nil, nil
 	}
-	from, to := events[0].Time, events[0].Time
-	byTenant := map[string][]event.Event{}
+	byTenant := map[string][]core.Event{}
 	var order []string
 	for _, e := range events {
-		if e.Time.Before(from) {
-			from = e.Time
-		}
-		if e.Time.After(to) {
-			to = e.Time
-		}
 		if _, ok := byTenant[e.TenantID]; !ok {
 			order = append(order, e.TenantID)
 		}
 		byTenant[e.TenantID] = append(byTenant[e.TenantID], e)
 	}
-	if err := s.EnsurePartitions(ctx, from, to); err != nil {
-		return nil, err
-	}
-
-	var fresh []event.Event
+	var fresh []core.Event
 	err := pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
-		fresh = fresh[:0]
 		for _, tenant := range order {
 			group := byTenant[tenant]
-			// set_config(..., true) is SET LOCAL: RLS admits only this tenant's rows.
+			// set_config(..., true) is SET LOCAL: write_usage_events accepts only this tenant's events.
 			if _, err := tx.Exec(ctx, "SELECT set_config('app.current_tenant_id', $1, true)", tenant); err != nil {
 				return err
 			}
@@ -138,7 +83,7 @@ func (s *Postgres) Write(ctx context.Context, events []event.Event) ([]event.Eve
 					attrs[i] = string(e.Attributes)
 				}
 			}
-			rows, err := tx.Query(ctx, insertEvents, ids, times, tenants, metrics, quantities, attrs)
+			rows, err := tx.Query(ctx, writeEvents, ids, times, tenants, metrics, quantities, attrs)
 			if err != nil {
 				return err
 			}

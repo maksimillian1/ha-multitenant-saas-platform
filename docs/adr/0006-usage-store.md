@@ -8,6 +8,8 @@ Accepted
 
 Decided in HAMSP-14. Amends [ADR-0001](0001-system-boundaries.md), item 5: in v1 the main PostgreSQL cluster also holds the usage events.
 
+Amended by [ADR-0008](0008-usage-store-on-timescaledb.md): the usage database runs on its own CNPG cluster with TimescaleDB, and the hot and warm tiers are one hypertable (uncompressed and columnstore chunks) instead of partitions moved between stores. The store interface and the cold tier in S3 (v2) stay as decided here.
+
 ## Context
 
 Usage Writer stores usage events per tenant, and Metering Query Service reads them back (FR-05, ADR-0001 item 4). At Sizing this is about 170 M events a day and 60–70 B rows over the 13-month retention.

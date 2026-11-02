@@ -41,3 +41,20 @@ jobs:
           fi
           cat fixture.log
           grep -q "License 'AGPL-3.0'.*'example.com/agpl'" fixture.log
+
+  npm:
+    # The same rule for the SPAs under /apps: every package that goes into the
+    # build must carry a license from the allow list.
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/admin/ui/app
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: apps/admin/ui/app/.nvmrc
+      - run: npm ci
+      - run: >-
+          npx -y license-checker-rseidelsohn@4.4.2 --production --excludePrivatePackages
+          --onlyAllow 'MIT;ISC;Apache-2.0;BSD-2-Clause;BSD-3-Clause;0BSD;OFL-1.1;MPL-2.0;BlueOak-1.0.0;Unlicense;CC-BY-4.0;CC0-1.0'

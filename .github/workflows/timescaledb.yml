@@ -1,0 +1,89 @@
+name: timescaledb
+
+on:
+  pull_request:
+    paths:
+      - "images/timescaledb/**"
+      - "prototype/k8s/apps/usage-db/cluster.yaml"
+      - ".github/workflows/timescaledb.yml"
+  push:
+    branches: [master, HAMSP-23-platform-skeleton]
+    paths:
+      - "images/timescaledb/**"
+      - "prototype/k8s/apps/usage-db/cluster.yaml"
+      - ".github/workflows/timescaledb.yml"
+
+env:
+  IMAGE: ghcr.io/${{ github.repository }}/timescaledb
+
+jobs:
+  tag:
+    # <timescaledb>-<pg major>-<debian release>, from the Dockerfile's ARGs.
+    # The usage cluster must reference exactly this tag.
+    runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.tag.outputs.tag }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: tag
+        run: |
+          arg() { sed -nE "s/^ARG $1=(.+)$/\1/p" images/timescaledb/Dockerfile; }
+          tag="$(arg TIMESCALEDB_VERSION)-$(arg PG_MAJOR)-$(arg DEBIAN_RELEASE)"
+          echo "tag=${tag}" >> "$GITHUB_OUTPUT"
+          want="${IMAGE}:${tag}"
+          got=$(sed -nE 's/^ *reference: (.*timescaledb.*)$/\1/p' prototype/k8s/apps/usage-db/cluster.yaml)
+          if [[ "${got}" != "${want}" ]]; then
+            echo "prototype/k8s/apps/usage-db/cluster.yaml references '${got}', the Dockerfile builds '${want}'"
+            exit 1
+          fi
+
+  build:
+    # Built natively on both architectures (C-06) and smoke-tested against the
+    # CNPG PostgreSQL image it is mounted into, including the update from the
+    # previous release.
+    strategy:
+      matrix:
+        runner: [ubuntu-24.04, ubuntu-24.04-arm]
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker build -t timescaledb:ci images/timescaledb
+      - run: images/timescaledb/smoke-test.sh timescaledb:ci
+
+  publish:
+    # A published tag is never overwritten: rolling back means referencing the
+    # previous tag (images/timescaledb/README.md). A changed image needs a new
+    # version in the Dockerfile.
+    #
+    # Also runs on pull requests from this repository, so the cluster of the
+    # branch can pull a new version before the merge; the first build that
+    # passed the smoke test on both architectures is the one published. Fork
+    # pull requests get no write token and are skipped.
+    if: >-
+      github.event_name != 'pull_request' ||
+      github.event.pull_request.head.repo.full_name == github.repository
+    needs: [tag, build]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    env:
+      REF: ${{ needs.tag.outputs.tag }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - id: exists
+        run: |
+          if docker buildx imagetools inspect "${IMAGE}:${REF}" >/dev/null 2>&1; then
+            echo "::warning::${IMAGE}:${REF} is already published and is not overwritten; bump TIMESCALEDB_VERSION if the image changed"
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          fi
+      - if: steps.exists.outputs.exists != 'true'
+        run: |
+          docker buildx build --platform linux/amd64,linux/arm64 \
+            --tag "${IMAGE}:${REF}" --push images/timescaledb

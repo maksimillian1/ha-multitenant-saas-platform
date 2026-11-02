@@ -5,7 +5,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
 CLUSTER_NAME="cngp-demo"
 # Go services built locally and loaded into kind: apps/<name> → hamsp/<name>:dev.
-APPS=(exampleapp gateway usage)
+APPS=(exampleapp gateway usage admin)
 GATEWAY_API_VERSION="v1.4.1"  # the version Cilium 1.19 supports
 # ArgoCD deploys prototype/k8s/apps from GitHub at this revision. It must be pushed.
 GITOPS_REVISION="${GITOPS_REVISION:-$(git -C "${REPO_DIR}" rev-parse --abbrev-ref HEAD)}"
@@ -106,12 +106,26 @@ helm upgrade --install argocd argo/argo-cd \
   --wait \
   --timeout 5m
 
-# ── 5. build the Go services and load them into kind ──────────────────────────
+# ── 5. build the Go services and load them into kind ─────────────────────────
+# The TimescaleDB extension image is pulled from GHCR by the usage cluster
+# (images/timescaledb/README.md).
 
+# An app with a docker-bake.hcl builds one image per binary (apps/usage:
+# hamsp/usage-writeapi, -writer, -migrate); the others build one image.
 for app in "${APPS[@]}"; do
-  echo "Building hamsp/${app}:dev..."
-  docker build -t "hamsp/${app}:dev" "${REPO_DIR}/apps/${app}"
-  kind load docker-image "hamsp/${app}:dev" --name "${CLUSTER_NAME}"
+  dir="${REPO_DIR}/apps/${app}"
+  if [[ -f "${dir}/docker-bake.hcl" ]]; then
+    echo "Building the images of ${app} (docker-bake.hcl)..."
+    images=$(cd "${dir}" && docker buildx bake --print 2>/dev/null | grep -Eo '"hamsp/[^"]+"' | tr -d '"')
+    (cd "${dir}" && docker buildx bake --load)
+  else
+    echo "Building hamsp/${app}:dev..."
+    docker build -t "hamsp/${app}:dev" "${dir}"
+    images="hamsp/${app}:dev"
+  fi
+  for image in ${images}; do
+    kind load docker-image "${image}" --name "${CLUSTER_NAME}"
+  done
 done
 
 # ── 6. apply GitOps ApplicationSet ────────────────────────────────────────────

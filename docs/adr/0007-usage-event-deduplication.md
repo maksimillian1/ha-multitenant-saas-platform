@@ -6,6 +6,8 @@ Date: 2026-10-24
 
 Accepted. Temporary: tied to the v1 usage store and revisited with the v2 storage ADR.
 
+Kept by [ADR-0008](0008-usage-store-on-timescaledb.md): the unique key lives on in the TimescaleDB hypertable and is enforced in compressed chunks too, so deduplication stays exact for the whole 13 months. The limit below (a duplicate that arrives after its original left the hot tier) now applies only to a future cold tier in S3.
+
 Decided in HAMSP-7. Details the duplicate handling of [ADR-0001](0001-system-boundaries.md), item 4.
 
 ## Context

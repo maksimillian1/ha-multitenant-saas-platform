@@ -17,16 +17,17 @@ import (
 	"github.com/twmb/franz-go/pkg/kfake"
 	"github.com/twmb/franz-go/pkg/kgo"
 
-	"github.com/maksimillian1/ha-multitenant-saas-platform/apps/usage/internal/event"
+	"github.com/maksimillian1/ha-multitenant-saas-platform/apps/usage/internal/core"
+	"github.com/maksimillian1/ha-multitenant-saas-platform/apps/usage/internal/kafka"
 )
 
 type fakeProducer struct {
 	err   error
 	calls int
-	got   []event.Event
+	got   []core.Event
 }
 
-func (f *fakeProducer) Produce(_ context.Context, events []event.Event) error {
+func (f *fakeProducer) Produce(_ context.Context, events []core.Event) error {
 	f.calls++
 	f.got = append(f.got, events...)
 	return f.err
@@ -44,7 +45,7 @@ func ev(tenant string) map[string]any {
 	}
 }
 
-func post(t *testing.T, h http.Handler, body any) *httptest.ResponseRecorder {
+func post(t *testing.T, s *Service, body any) *httptest.ResponseRecorder {
 	t.Helper()
 	var raw []byte
 	switch b := body.(type) {
@@ -57,14 +58,14 @@ func post(t *testing.T, h http.Handler, body any) *httptest.ResponseRecorder {
 		}
 	}
 	w := httptest.NewRecorder()
-	h.ServeHTTP(w, httptest.NewRequest(http.MethodPost, "/v1/events", bytes.NewReader(raw)))
+	s.EventsHandler(w, httptest.NewRequest(http.MethodPost, "/v1/events", bytes.NewReader(raw)))
 	return w
 }
 
 // AC-5: 202 only after the producer confirmed the whole batch.
 func TestAcceptsOnlyAfterKafkaConfirms(t *testing.T) {
 	p := &fakeProducer{}
-	w := post(t, New(p, quiet), map[string]any{"events": []any{ev("a"), ev("b")}})
+	w := post(t, NewService(p, quiet), map[string]any{"events": []any{ev("a"), ev("b")}})
 	if w.Code != http.StatusAccepted {
 		t.Fatalf("status %d: %s", w.Code, w.Body)
 	}
@@ -76,18 +77,18 @@ func TestAcceptsOnlyAfterKafkaConfirms(t *testing.T) {
 // AC-5: when Kafka does not confirm, the answer is 503.
 func TestKafkaFailureIs503(t *testing.T) {
 	p := &fakeProducer{err: errors.New("NOT_ENOUGH_REPLICAS")}
-	if w := post(t, New(p, quiet), map[string]any{"events": []any{ev("a")}}); w.Code != http.StatusServiceUnavailable {
+	if w := post(t, NewService(p, quiet), map[string]any{"events": []any{ev("a")}}); w.Code != http.StatusServiceUnavailable {
 		t.Fatalf("status %d, want 503", w.Code)
 	}
 
 	// The real producer against a broker that does not exist fails within its
 	// delivery timeout instead of hanging.
-	k, err := NewKafka([]string{"127.0.0.1:1"}, "usage-events", kgo.RecordDeliveryTimeout(time.Second))
+	k, err := kafka.NewProducer([]string{"127.0.0.1:1"}, "usage-events", kgo.RecordDeliveryTimeout(time.Second))
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer k.Close()
-	if w := post(t, New(k, quiet), map[string]any{"events": []any{ev("a")}}); w.Code != http.StatusServiceUnavailable {
+	if w := post(t, NewService(k, quiet), map[string]any{"events": []any{ev("a")}}); w.Code != http.StatusServiceUnavailable {
 		t.Fatalf("unreachable Kafka: status %d, want 503", w.Code)
 	}
 }
@@ -108,7 +109,7 @@ func TestInvalidBatchIsRejectedWhole(t *testing.T) {
 		"quantity missing": map[string]any{"events": []any{func() map[string]any { e := ev("a"); delete(e, "quantity"); return e }()}},
 	} {
 		p := &fakeProducer{}
-		w := post(t, New(p, quiet), body)
+		w := post(t, NewService(p, quiet), body)
 		if w.Code != http.StatusBadRequest {
 			t.Errorf("%s: status %d, want 400", name, w.Code)
 		}
@@ -117,23 +118,8 @@ func TestInvalidBatchIsRejectedWhole(t *testing.T) {
 		}
 	}
 	p := &fakeProducer{}
-	if w := post(t, New(p, quiet), `{"events":[`+strings.Repeat(" ", maxBody)+`]}`); w.Code != http.StatusRequestEntityTooLarge || p.calls != 0 {
+	if w := post(t, NewService(p, quiet), `{"events":[`+strings.Repeat(" ", maxBody)+`]}`); w.Code != http.StatusRequestEntityTooLarge || p.calls != 0 {
 		t.Errorf("oversized body: status %d, producer calls %d", w.Code, p.calls)
-	}
-}
-
-// AC-5 (integration): the producer waits for all in-sync replicas and is idempotent.
-func TestProducerRequiresAllISRAndIdempotence(t *testing.T) {
-	k, err := NewKafka([]string{"127.0.0.1:1"}, "usage-events")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer k.Close()
-	if got := k.client.OptValue(kgo.RequiredAcks); got != kgo.AllISRAcks() {
-		t.Fatalf("RequiredAcks = %v, want all ISR", got)
-	}
-	if got := k.client.OptValue(kgo.DisableIdempotentWrite); got != false {
-		t.Fatalf("DisableIdempotentWrite = %v, want false", got)
 	}
 }
 
@@ -144,14 +130,14 @@ func TestAcceptedEventsAreInKafka(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer cluster.Close()
-	k, err := NewKafka(cluster.ListenAddrs(), "usage-events")
+	k, err := kafka.NewProducer(cluster.ListenAddrs(), "usage-events")
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer k.Close()
 
 	a, b := ev("tenant-a"), ev("tenant-b")
-	if w := post(t, New(k, quiet), map[string]any{"events": []any{a, b}}); w.Code != http.StatusAccepted {
+	if w := post(t, NewService(k, quiet), map[string]any{"events": []any{a, b}}); w.Code != http.StatusAccepted {
 		t.Fatalf("status %d: %s", w.Code, w.Body)
 	}
 
@@ -166,7 +152,7 @@ func TestAcceptedEventsAreInKafka(t *testing.T) {
 	seen := map[string]string{}
 	for len(seen) < 2 && ctx.Err() == nil {
 		consumer.PollFetches(ctx).EachRecord(func(r *kgo.Record) {
-			var e event.Event
+			var e core.Event
 			if err := json.Unmarshal(r.Value, &e); err != nil {
 				t.Fatal(err)
 			}
