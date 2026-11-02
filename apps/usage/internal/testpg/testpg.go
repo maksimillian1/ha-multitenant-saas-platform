@@ -98,6 +98,7 @@ func New(t testing.TB) DB {
 	if err := migrations.Migrate(ctx, owner); err != nil {
 		t.Fatal(err)
 	}
+	pauseJobs(t, super)
 	return DB{Name: name, Super: super, Owner: owner, WriterDSN: dsnFor(t, base, WriterRole, name)}
 }
 
@@ -110,4 +111,34 @@ func (db DB) Count(t testing.TB, ids []string) int {
 		t.Fatal(err)
 	}
 	return n
+}
+
+// pauseJobs unschedules the policies the migrations created, so only the tests
+// run them (CALL run_job runs an unscheduled job too). Otherwise the background
+// scheduler may start a policy while a test runs the same one, and a second
+// refresh of a continuous aggregate fails with 55P03 (HAMSP-32). A run the
+// scheduler started before the jobs were paused is waited for.
+func pauseJobs(t testing.TB, super *pgx.Conn) {
+	t.Helper()
+	ctx := context.Background()
+	// Jobs below 1000 are TimescaleDB's own (telemetry, job history).
+	if _, err := super.Exec(ctx,
+		"SELECT alter_job(job_id, scheduled => false) FROM timescaledb_information.jobs WHERE job_id >= 1000"); err != nil {
+		t.Fatalf("pause jobs: %v", err)
+	}
+	deadline := time.Now().Add(30 * time.Second)
+	for {
+		var running int
+		if err := super.QueryRow(ctx,
+			"SELECT count(*) FROM timescaledb_information.job_stats WHERE job_id >= 1000 AND job_status = 'Running'").Scan(&running); err != nil {
+			t.Fatalf("job stats: %v", err)
+		}
+		if running == 0 {
+			return
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("%d jobs still running after 30s", running)
+		}
+		time.Sleep(100 * time.Millisecond)
+	}
 }
