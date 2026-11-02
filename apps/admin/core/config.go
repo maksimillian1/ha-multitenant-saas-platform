@@ -14,6 +14,11 @@ type Config struct {
 	PublicURL      string
 	SessionKey     string
 	AdminRole      string
+	// ZitadelURL is where the Zitadel APIs are; the issuer by default.
+	ZitadelURL string
+	// ZitadelToken is the personal access token of the admin app's service
+	// account in Zitadel (instance role IAM_ORG_MANAGER).
+	ZitadelToken string
 }
 
 func GetEnv(key, defaultVal string) string {
@@ -33,12 +38,15 @@ func LoadConfig() Config {
 		PublicURL:      GetEnv("PUBLIC_URL", "http://admin.localtest.me:30080"),
 		SessionKey:     GetEnv("SESSION_KEY", ""),
 		AdminRole:      GetEnv("ADMIN_ROLE", "super-admin"),
+		ZitadelURL:     GetEnv("ZITADEL_API_URL", GetEnv("ISSUER", "")),
+		ZitadelToken:   GetEnv("ZITADEL_TOKEN", ""),
 	}
 }
 
 func (c Config) Validate() error {
 	for _, setting := range [][2]string{
 		{"ISSUER", c.Issuer}, {"CLIENT_ID", c.ClientID}, {"CLIENT_SECRET", c.ClientSecret}, {"SESSION_KEY", c.SessionKey},
+		{"ZITADEL_TOKEN", c.ZitadelToken},
 	} {
 		if setting[1] == "" {
 			return fmt.Errorf("%s is required", setting[0])
