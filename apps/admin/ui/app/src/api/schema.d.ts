@@ -21,6 +21,417 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/overview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** How many organizations, users and projects Zitadel has */
+        get: operations["getOverview"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/orgs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Organizations (tenants), sorted by name */
+        get: operations["listOrgs"];
+        put?: never;
+        /** Create an organization without admin users */
+        post: operations["createOrg"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/orgs/{orgId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                orgId: components["parameters"]["OrgId"];
+            };
+            cookie?: never;
+        };
+        /** One organization */
+        get: operations["getOrg"];
+        put?: never;
+        post?: never;
+        /** Delete an organization with its users, projects and grants in Zitadel. The tenant's data in other stores stays (FR-01 and QS-18 are HAMSP-6). Refused (409) for the admin's own organization and the service account's organization. */
+        delete: operations["deleteOrg"];
+        options?: never;
+        head?: never;
+        /** Rename an organization */
+        patch: operations["updateOrg"];
+        trace?: never;
+    };
+    "/api/orgs/{orgId}/deactivate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                orgId: components["parameters"]["OrgId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Deactivate an organization: its users can no longer sign in. Refused (409) for the admin's own organization and the service account's organization. */
+        post: operations["deactivateOrg"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/orgs/{orgId}/activate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                orgId: components["parameters"]["OrgId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Activate a deactivated organization */
+        post: operations["activateOrg"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/users": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Users of every organization, sorted by username */
+        get: operations["listUsers"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/users/human": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Create a person who signs in */
+        post: operations["createHumanUser"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/users/machine": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Create a service account, such as a tenant's API client */
+        post: operations["createMachineUser"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/users/{userId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                userId: components["parameters"]["UserId"];
+            };
+            cookie?: never;
+        };
+        /** One user */
+        get: operations["getUser"];
+        put?: never;
+        post?: never;
+        /** Delete a user. Refused (409) for the admin and the service account. */
+        delete: operations["deleteUser"];
+        options?: never;
+        head?: never;
+        /** Change a user's username, profile or email */
+        patch: operations["updateUser"];
+        trace?: never;
+    };
+    "/api/users/{userId}/password": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                userId: components["parameters"]["UserId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Set a human user's password */
+        post: operations["setUserPassword"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/users/{userId}/deactivate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                userId: components["parameters"]["UserId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Deactivate a user. Refused (409) for the admin and the service account. */
+        post: operations["deactivateUser"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/users/{userId}/reactivate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                userId: components["parameters"]["UserId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Reactivate a deactivated user */
+        post: operations["reactivateUser"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/users/{userId}/lock": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                userId: components["parameters"]["UserId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Lock a user. Refused (409) for the admin and the service account. */
+        post: operations["lockUser"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/users/{userId}/unlock": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                userId: components["parameters"]["UserId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Unlock a locked user */
+        post: operations["unlockUser"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/users/{userId}/secret": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                userId: components["parameters"]["UserId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Generate a new client secret for a machine user, replacing the old one. The secret is shown only in this answer. */
+        post: operations["generateUserSecret"];
+        /** Remove a machine user's client secret */
+        delete: operations["removeUserSecret"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/users/{userId}/authorizations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                userId: components["parameters"]["UserId"];
+            };
+            cookie?: never;
+        };
+        /** The user's role assignments (Zitadel authorizations) */
+        get: operations["listUserAuthorizations"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/authorizations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Give a user roles in a project */
+        post: operations["createAuthorization"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/authorizations/{authorizationId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                authorizationId: components["parameters"]["AuthorizationId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Remove a role assignment. Refused (409) for the admin's own role assignments. */
+        delete: operations["deleteAuthorization"];
+        options?: never;
+        head?: never;
+        /** Replace the roles of a role assignment; roles left out are revoked. Refused (409) for the admin's own role assignments. */
+        patch: operations["updateAuthorization"];
+        trace?: never;
+    };
+    "/api/projects": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Projects of every organization, sorted by name (read only) */
+        get: operations["listProjects"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/projects/{projectId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                projectId: components["parameters"]["ProjectId"];
+            };
+            cookie?: never;
+        };
+        /** One project */
+        get: operations["getProject"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/projects/{projectId}/roles": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                projectId: components["parameters"]["ProjectId"];
+            };
+            cookie?: never;
+        };
+        /** The project's roles, sorted by key */
+        get: operations["listProjectRoles"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/projects/{projectId}/authorizations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                projectId: components["parameters"]["ProjectId"];
+            };
+            cookie?: never;
+        };
+        /** Who holds roles in the project */
+        get: operations["listProjectAuthorizations"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -43,9 +454,233 @@ export interface components {
         Error: {
             error: string;
         };
+        Created: {
+            id: string;
+        };
+        Overview: {
+            /** Format: int64 */
+            organizations: number;
+            /** Format: int64 */
+            human_users: number;
+            /** Format: int64 */
+            machine_users: number;
+            /** Format: int64 */
+            projects: number;
+        };
+        /** @enum {string} */
+        OrgState: "active" | "inactive" | "removed" | "unspecified";
+        Org: {
+            id: string;
+            name: string;
+            state: components["schemas"]["OrgState"];
+            primary_domain: string;
+            /** @description The instance's default organization, which Zitadel does not delete */
+            is_default: boolean;
+            /** Format: date-time */
+            created_at?: string;
+            /** Format: date-time */
+            changed_at?: string;
+        };
+        OrgList: {
+            items: components["schemas"]["Org"][];
+            /** Format: int64 */
+            total: number;
+        };
+        OrgCreate: {
+            name: string;
+        };
+        OrgUpdate: {
+            name: string;
+        };
+        /** @enum {string} */
+        UserType: "human" | "machine";
+        /** @enum {string} */
+        UserState: "active" | "inactive" | "locked" | "initial" | "deleted" | "unspecified";
+        /**
+         * @description Opaque bearer tokens, or JWTs that the API Gateway validates locally
+         * @enum {string}
+         */
+        AccessTokenType: "bearer" | "jwt";
+        User: {
+            id: string;
+            type: components["schemas"]["UserType"];
+            state: components["schemas"]["UserState"];
+            username: string;
+            /** @description The display name of a human, the name of a machine, or the username */
+            display_name: string;
+            login_names: string[];
+            preferred_login_name: string;
+            org_id: string;
+            /** @description Empty if the organization could not be read */
+            org_name: string;
+            /** Format: date-time */
+            created_at?: string;
+            /** Format: date-time */
+            changed_at?: string;
+            human?: components["schemas"]["HumanProfile"];
+            machine?: components["schemas"]["MachineProfile"];
+        };
+        HumanProfile: {
+            given_name: string;
+            family_name: string;
+            nick_name: string;
+            display_name: string;
+            email: string;
+            email_verified: boolean;
+            phone: string;
+            phone_verified: boolean;
+            password_change_required: boolean;
+            /** Format: date-time */
+            password_changed_at?: string;
+        };
+        MachineProfile: {
+            name: string;
+            description: string;
+            has_secret: boolean;
+            access_token_type: components["schemas"]["AccessTokenType"];
+        };
+        UserList: {
+            items: components["schemas"]["User"][];
+            /** Format: int64 */
+            total: number;
+        };
+        HumanUserCreate: {
+            org_id: string;
+            /** @description Zitadel uses the email if empty */
+            username?: string;
+            given_name: string;
+            family_name: string;
+            display_name?: string;
+            email: string;
+            /**
+             * @description Without it Zitadel sends a verification email, if it can send email
+             * @default false
+             */
+            email_verified: boolean;
+            /** @description Optional initial password; without it the user stays in the initial state */
+            password?: string;
+            /** @default false */
+            password_change_required: boolean;
+        };
+        MachineUserCreate: {
+            org_id: string;
+            /** @description Also the client ID for client credentials */
+            username: string;
+            name: string;
+            description?: string;
+            access_token_type?: components["schemas"]["AccessTokenType"];
+        };
+        /** @description Only the fields that are set change. human is for humans, machine for machines. */
+        UserUpdate: {
+            username?: string;
+            human?: components["schemas"]["HumanUserUpdate"];
+            machine?: components["schemas"]["MachineUserUpdate"];
+        };
+        HumanUserUpdate: {
+            given_name?: string;
+            family_name?: string;
+            nick_name?: string;
+            display_name?: string;
+            email?: string;
+            /** @description With email, mark the new address as verified */
+            email_verified?: boolean;
+        };
+        MachineUserUpdate: {
+            name?: string;
+            description?: string;
+        };
+        PasswordSet: {
+            password: string;
+            /**
+             * @description The user must choose a new password at the next sign-in
+             * @default false
+             */
+            change_required: boolean;
+        };
+        MachineSecret: {
+            client_id: string;
+            client_secret: string;
+        };
+        /** @enum {string} */
+        AuthorizationState: "active" | "inactive" | "unspecified";
+        Role: {
+            key: string;
+            display_name: string;
+            group: string;
+        };
+        Authorization: {
+            id: string;
+            state: components["schemas"]["AuthorizationState"];
+            project_id: string;
+            project_name: string;
+            project_org_id: string;
+            /** @description The organization the roles are given on behalf of */
+            org_id: string;
+            org_name: string;
+            user_id: string;
+            user_login_name: string;
+            user_display_name: string;
+            user_org_id: string;
+            roles: components["schemas"]["Role"][];
+            /** Format: date-time */
+            created_at?: string;
+            /** Format: date-time */
+            changed_at?: string;
+        };
+        AuthorizationList: {
+            items: components["schemas"]["Authorization"][];
+            /** Format: int64 */
+            total: number;
+        };
+        AuthorizationCreate: {
+            user_id: string;
+            project_id: string;
+            /** @description The organization that owns the project or has a grant for it; the project's owner if empty */
+            org_id?: string;
+            role_keys: string[];
+        };
+        AuthorizationUpdate: {
+            role_keys: string[];
+        };
+        /** @enum {string} */
+        ProjectState: "active" | "inactive" | "unspecified";
+        Project: {
+            id: string;
+            name: string;
+            /** @description The organization that owns the project */
+            org_id: string;
+            /** @description Empty if the organization could not be read */
+            org_name: string;
+            state: components["schemas"]["ProjectState"];
+            /** @description Roles go into the tokens */
+            role_assertion: boolean;
+            /** @description Only users with a role may sign in to its apps */
+            authorization_required: boolean;
+            /** @description Only users of organizations with access may sign in to its apps */
+            access_required: boolean;
+            granted_org_id?: string;
+            granted_org_name?: string;
+            /** Format: date-time */
+            created_at?: string;
+            /** Format: date-time */
+            changed_at?: string;
+        };
+        ProjectList: {
+            items: components["schemas"]["Project"][];
+            /** Format: int64 */
+            total: number;
+        };
+        ProjectRole: {
+            key: string;
+            display_name: string;
+            group: string;
+        };
+        ProjectRoleList: {
+            items: components["schemas"]["ProjectRole"][];
+        };
     };
     responses: {
-        /** @description No session (401) or no admin role (403) */
+        /** @description An error: invalid input (400), no session (401), no admin role or a cross-site request (403), not found in Zitadel (404), a conflict with Zitadel's state or a refused change to the admin's own access (409), Zitadel unavailable or refusing the service account (502), Zitadel too slow (504) */
         Error: {
             headers: {
                 [name: string]: unknown;
@@ -54,8 +689,28 @@ export interface components {
                 "application/json": components["schemas"]["Error"];
             };
         };
+        /** @description Created; the ID of the new resource */
+        Created: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": components["schemas"]["Created"];
+            };
+        };
     };
-    parameters: never;
+    parameters: {
+        /** @description Part of the name, in any case */
+        Search: string;
+        /** @description How many items to skip */
+        Offset: number;
+        /** @description Page size */
+        Limit: number;
+        OrgId: string;
+        UserId: string;
+        ProjectId: string;
+        AuthorizationId: string;
+    };
     requestBodies: never;
     headers: never;
     pathItems: never;
@@ -82,6 +737,798 @@ export interface operations {
             };
             401: components["responses"]["Error"];
             403: components["responses"]["Error"];
+        };
+    };
+    getOverview: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The counts */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Overview"];
+                };
+            };
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+            502: components["responses"]["Error"];
+            504: components["responses"]["Error"];
+        };
+    };
+    listOrgs: {
+        parameters: {
+            query?: {
+                /** @description Part of the name, in any case */
+                search?: components["parameters"]["Search"];
+                /** @description Only organizations in this state (active or inactive) */
+                state?: components["schemas"]["OrgState"];
+                /** @description How many items to skip */
+                offset?: components["parameters"]["Offset"];
+                /** @description Page size */
+                limit?: components["parameters"]["Limit"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description One page of organizations */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OrgList"];
+                };
+            };
+            400: components["responses"]["Error"];
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+            502: components["responses"]["Error"];
+            504: components["responses"]["Error"];
+        };
+    };
+    createOrg: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["OrgCreate"];
+            };
+        };
+        responses: {
+            201: components["responses"]["Created"];
+            400: components["responses"]["Error"];
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+            409: components["responses"]["Error"];
+            502: components["responses"]["Error"];
+            504: components["responses"]["Error"];
+        };
+    };
+    getOrg: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                orgId: components["parameters"]["OrgId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The organization */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Org"];
+                };
+            };
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+            404: components["responses"]["Error"];
+            502: components["responses"]["Error"];
+            504: components["responses"]["Error"];
+        };
+    };
+    deleteOrg: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                orgId: components["parameters"]["OrgId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Deleted */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+            404: components["responses"]["Error"];
+            409: components["responses"]["Error"];
+            502: components["responses"]["Error"];
+            504: components["responses"]["Error"];
+        };
+    };
+    updateOrg: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                orgId: components["parameters"]["OrgId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["OrgUpdate"];
+            };
+        };
+        responses: {
+            /** @description Renamed */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            400: components["responses"]["Error"];
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+            404: components["responses"]["Error"];
+            409: components["responses"]["Error"];
+            502: components["responses"]["Error"];
+            504: components["responses"]["Error"];
+        };
+    };
+    deactivateOrg: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                orgId: components["parameters"]["OrgId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Deactivated */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+            404: components["responses"]["Error"];
+            409: components["responses"]["Error"];
+            502: components["responses"]["Error"];
+            504: components["responses"]["Error"];
+        };
+    };
+    activateOrg: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                orgId: components["parameters"]["OrgId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Activated */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+            404: components["responses"]["Error"];
+            409: components["responses"]["Error"];
+            502: components["responses"]["Error"];
+            504: components["responses"]["Error"];
+        };
+    };
+    listUsers: {
+        parameters: {
+            query?: {
+                /** @description Part of the username, display name or email, in any case */
+                search?: string;
+                /** @description Only users of this organization */
+                org_id?: string;
+                type?: components["schemas"]["UserType"];
+                /** @description Only users in this state (active, inactive, locked or initial) */
+                state?: components["schemas"]["UserState"];
+                /** @description How many items to skip */
+                offset?: components["parameters"]["Offset"];
+                /** @description Page size */
+                limit?: components["parameters"]["Limit"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description One page of users */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UserList"];
+                };
+            };
+            400: components["responses"]["Error"];
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+            502: components["responses"]["Error"];
+            504: components["responses"]["Error"];
+        };
+    };
+    createHumanUser: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["HumanUserCreate"];
+            };
+        };
+        responses: {
+            201: components["responses"]["Created"];
+            400: components["responses"]["Error"];
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+            404: components["responses"]["Error"];
+            409: components["responses"]["Error"];
+            502: components["responses"]["Error"];
+            504: components["responses"]["Error"];
+        };
+    };
+    createMachineUser: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MachineUserCreate"];
+            };
+        };
+        responses: {
+            201: components["responses"]["Created"];
+            400: components["responses"]["Error"];
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+            404: components["responses"]["Error"];
+            409: components["responses"]["Error"];
+            502: components["responses"]["Error"];
+            504: components["responses"]["Error"];
+        };
+    };
+    getUser: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                userId: components["parameters"]["UserId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The user */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["User"];
+                };
+            };
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+            404: components["responses"]["Error"];
+            502: components["responses"]["Error"];
+            504: components["responses"]["Error"];
+        };
+    };
+    deleteUser: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                userId: components["parameters"]["UserId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Deleted */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+            404: components["responses"]["Error"];
+            409: components["responses"]["Error"];
+            502: components["responses"]["Error"];
+            504: components["responses"]["Error"];
+        };
+    };
+    updateUser: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                userId: components["parameters"]["UserId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UserUpdate"];
+            };
+        };
+        responses: {
+            /** @description Changed */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            400: components["responses"]["Error"];
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+            404: components["responses"]["Error"];
+            409: components["responses"]["Error"];
+            502: components["responses"]["Error"];
+            504: components["responses"]["Error"];
+        };
+    };
+    setUserPassword: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                userId: components["parameters"]["UserId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PasswordSet"];
+            };
+        };
+        responses: {
+            /** @description Set */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            400: components["responses"]["Error"];
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+            404: components["responses"]["Error"];
+            409: components["responses"]["Error"];
+            502: components["responses"]["Error"];
+            504: components["responses"]["Error"];
+        };
+    };
+    deactivateUser: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                userId: components["parameters"]["UserId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Deactivated */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+            404: components["responses"]["Error"];
+            409: components["responses"]["Error"];
+            502: components["responses"]["Error"];
+            504: components["responses"]["Error"];
+        };
+    };
+    reactivateUser: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                userId: components["parameters"]["UserId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Reactivated */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+            404: components["responses"]["Error"];
+            409: components["responses"]["Error"];
+            502: components["responses"]["Error"];
+            504: components["responses"]["Error"];
+        };
+    };
+    lockUser: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                userId: components["parameters"]["UserId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Locked */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+            404: components["responses"]["Error"];
+            409: components["responses"]["Error"];
+            502: components["responses"]["Error"];
+            504: components["responses"]["Error"];
+        };
+    };
+    unlockUser: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                userId: components["parameters"]["UserId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Unlocked */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+            404: components["responses"]["Error"];
+            409: components["responses"]["Error"];
+            502: components["responses"]["Error"];
+            504: components["responses"]["Error"];
+        };
+    };
+    generateUserSecret: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                userId: components["parameters"]["UserId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The client credentials */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MachineSecret"];
+                };
+            };
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+            404: components["responses"]["Error"];
+            409: components["responses"]["Error"];
+            502: components["responses"]["Error"];
+            504: components["responses"]["Error"];
+        };
+    };
+    removeUserSecret: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                userId: components["parameters"]["UserId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Removed */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+            404: components["responses"]["Error"];
+            409: components["responses"]["Error"];
+            502: components["responses"]["Error"];
+            504: components["responses"]["Error"];
+        };
+    };
+    listUserAuthorizations: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                userId: components["parameters"]["UserId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Up to 100 role assignments, oldest first */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuthorizationList"];
+                };
+            };
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+            502: components["responses"]["Error"];
+            504: components["responses"]["Error"];
+        };
+    };
+    createAuthorization: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AuthorizationCreate"];
+            };
+        };
+        responses: {
+            201: components["responses"]["Created"];
+            400: components["responses"]["Error"];
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+            404: components["responses"]["Error"];
+            409: components["responses"]["Error"];
+            502: components["responses"]["Error"];
+            504: components["responses"]["Error"];
+        };
+    };
+    deleteAuthorization: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                authorizationId: components["parameters"]["AuthorizationId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Removed */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+            404: components["responses"]["Error"];
+            409: components["responses"]["Error"];
+            502: components["responses"]["Error"];
+            504: components["responses"]["Error"];
+        };
+    };
+    updateAuthorization: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                authorizationId: components["parameters"]["AuthorizationId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AuthorizationUpdate"];
+            };
+        };
+        responses: {
+            /** @description Changed */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            400: components["responses"]["Error"];
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+            404: components["responses"]["Error"];
+            409: components["responses"]["Error"];
+            502: components["responses"]["Error"];
+            504: components["responses"]["Error"];
+        };
+    };
+    listProjects: {
+        parameters: {
+            query?: {
+                /** @description Part of the name, in any case */
+                search?: components["parameters"]["Search"];
+                /** @description Only projects owned by this organization */
+                org_id?: string;
+                /** @description How many items to skip */
+                offset?: components["parameters"]["Offset"];
+                /** @description Page size */
+                limit?: components["parameters"]["Limit"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description One page of projects */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProjectList"];
+                };
+            };
+            400: components["responses"]["Error"];
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+            502: components["responses"]["Error"];
+            504: components["responses"]["Error"];
+        };
+    };
+    getProject: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                projectId: components["parameters"]["ProjectId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The project */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Project"];
+                };
+            };
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+            404: components["responses"]["Error"];
+            502: components["responses"]["Error"];
+            504: components["responses"]["Error"];
+        };
+    };
+    listProjectRoles: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                projectId: components["parameters"]["ProjectId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Up to 100 roles */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProjectRoleList"];
+                };
+            };
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+            404: components["responses"]["Error"];
+            502: components["responses"]["Error"];
+            504: components["responses"]["Error"];
+        };
+    };
+    listProjectAuthorizations: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                projectId: components["parameters"]["ProjectId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Up to 100 role assignments, oldest first */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuthorizationList"];
+                };
+            };
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+            502: components["responses"]["Error"];
+            504: components["responses"]["Error"];
         };
     };
 }
