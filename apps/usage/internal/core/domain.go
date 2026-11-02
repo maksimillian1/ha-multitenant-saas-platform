@@ -1,6 +1,8 @@
 // Package core holds the usage event as UsageWriteAPI accepts it and as it
 // travels through Kafka (docs/contracts/usage-events.md), the interfaces
-// between the pipeline's parts, and the configuration.
+// between the pipeline's parts, and the configuration. It is linked into every
+// binary, so it imports nothing but the standard library and uuid
+// (.golangci.yml).
 package core
 
 import (
@@ -37,6 +39,19 @@ type Event struct {
 	Metric     string          `json:"metric"`
 	Quantity   int64           `json:"quantity"`
 	Attributes json.RawMessage `json:"attributes,omitempty"`
+}
+
+// SchemaVersion is the version of the Kafka record
+// (docs/contracts/usage-event/kafka). UsageWriteAPI sets it; Usage Writer reads
+// every version up to it, so writer rolls out before writeapi. The HTTP
+// contract is versioned by its path, /v1/events, on its own.
+const SchemaVersion = 1
+
+// Record is the value of one Kafka record. A record without schema_version was
+// produced before versions existed and is version 1.
+type Record struct {
+	SchemaVersion int `json:"schema_version"`
+	Event
 }
 
 // Validate checks one event against the contract at time now.

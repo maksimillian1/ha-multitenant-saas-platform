@@ -17,8 +17,8 @@ import (
 	"github.com/twmb/franz-go/pkg/kfake"
 	"github.com/twmb/franz-go/pkg/kgo"
 
-	"github.com/maksimillian1/ha-multitenant-saas-platform/apps/usage/core"
-	"github.com/maksimillian1/ha-multitenant-saas-platform/apps/usage/kafka"
+	"github.com/maksimillian1/ha-multitenant-saas-platform/apps/usage/internal/core"
+	"github.com/maksimillian1/ha-multitenant-saas-platform/apps/usage/internal/kafka"
 )
 
 type fakeProducer struct {

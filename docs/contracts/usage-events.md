@@ -1,6 +1,6 @@
 # Usage events → UsageWriteAPI
 
-The contract between senders of usage events and UsageWriteAPI (`apps/usage`, command `writeapi`). Introduced by HAMSP-26. Storage and deduplication are in [ADR-0006](../adr/0006-usage-store.md) and [ADR-0007](../adr/0007-usage-event-deduplication.md).
+The contract between senders of usage events and UsageWriteAPI (`apps/usage/cmd/writeapi`). The machine-readable contract is [usage-event/openapi.yaml](usage-event/openapi.yaml) and the JSON Schemas next to it ([ADR-0010](../adr/0010-usage-event-contracts.md)); the fixtures, which the sender and both usage binaries test against, are in the same folder. When this page and the schemas disagree, the schemas win. Introduced by HAMSP-26. Storage and deduplication are in [ADR-0006](../adr/0006-usage-store.md) and [ADR-0007](../adr/0007-usage-event-deduplication.md).
 
 ## Senders
 
@@ -49,4 +49,4 @@ At most 1 000 events and 1 MB per request.
 
 ## Kafka
 
-Topic `usage-events`, key `tenant_id`, value: one event as JSON in the shape above. Only UsageWriteAPI produces and only Usage Writer consumes; other pods cannot reach the brokers.
+Topic `usage-events`, key `tenant_id`, value: one event as JSON in the shape above plus `schema_version` (now `1`), which UsageWriteAPI sets. Usage Writer reads every version up to its own; a record without `schema_version` is version 1, and a newer one is logged, counted as malformed and skipped. So a new version rolls out Usage Writer before UsageWriteAPI. Only UsageWriteAPI produces and only Usage Writer consumes; other pods cannot reach the brokers.

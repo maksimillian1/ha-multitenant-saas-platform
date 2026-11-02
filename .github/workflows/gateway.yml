@@ -4,11 +4,13 @@ on:
   pull_request:
     paths:
       - "apps/gateway/**"
+      - "docs/contracts/usage-event/**"
       - ".github/workflows/gateway.yml"
   push:
     branches: [master]
     paths:
       - "apps/gateway/**"
+      - "docs/contracts/usage-event/**"
       - ".github/workflows/gateway.yml"
 
 jobs:

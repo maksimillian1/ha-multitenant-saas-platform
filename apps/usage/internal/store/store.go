@@ -5,13 +5,12 @@ package store
 
 import (
 	"context"
-	"log/slog"
 	"time"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
-	"github.com/maksimillian1/ha-multitenant-saas-platform/apps/usage/core"
+	"github.com/maksimillian1/ha-multitenant-saas-platform/apps/usage/internal/core"
 )
 
 // Postgres is the TimescaleDB store of ADR-0008.
@@ -115,21 +114,4 @@ func (s *Postgres) Write(ctx context.Context, events []core.Event) ([]core.Event
 		return nil, err
 	}
 	return fresh, nil
-}
-
-// Connect retries until ctx is done, because on a fresh cluster the database
-// may still be starting when the migration job runs.
-func Connect(ctx context.Context, log *slog.Logger, dsn string) (*pgx.Conn, error) {
-	for {
-		conn, err := pgx.Connect(ctx, dsn)
-		if err == nil {
-			return conn, nil
-		}
-		log.Warn("database not reachable, retrying", "err", err)
-		select {
-		case <-ctx.Done():
-			return nil, err
-		case <-time.After(5 * time.Second):
-		}
-	}
 }

@@ -15,7 +15,7 @@ import (
 
 	"github.com/jackc/pgx/v5"
 
-	"github.com/maksimillian1/ha-multitenant-saas-platform/apps/usage/store"
+	"github.com/maksimillian1/ha-multitenant-saas-platform/apps/usage/internal/migrations"
 )
 
 const (
@@ -95,7 +95,7 @@ func New(t testing.TB) DB {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { owner.Close(ctx) })
-	if err := store.Migrate(ctx, owner); err != nil {
+	if err := migrations.Migrate(ctx, owner); err != nil {
 		t.Fatal(err)
 	}
 	return DB{Name: name, Super: super, Owner: owner, WriterDSN: dsnFor(t, base, WriterRole, name)}

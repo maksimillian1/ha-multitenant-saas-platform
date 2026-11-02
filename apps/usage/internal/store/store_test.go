@@ -13,9 +13,10 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 
-	"github.com/maksimillian1/ha-multitenant-saas-platform/apps/usage/core"
-	"github.com/maksimillian1/ha-multitenant-saas-platform/apps/usage/store"
-	"github.com/maksimillian1/ha-multitenant-saas-platform/apps/usage/testpg"
+	"github.com/maksimillian1/ha-multitenant-saas-platform/apps/usage/internal/core"
+	"github.com/maksimillian1/ha-multitenant-saas-platform/apps/usage/internal/migrations"
+	"github.com/maksimillian1/ha-multitenant-saas-platform/apps/usage/internal/store"
+	"github.com/maksimillian1/ha-multitenant-saas-platform/apps/usage/internal/testpg"
 )
 
 const day = 24 * time.Hour
@@ -126,7 +127,7 @@ func TestMigrationsLeaveNoUnprotectedTables(t *testing.T) {
 	if !compressed(t, db, now.Add(-10*day)) {
 		t.Fatal("the 10-day-old chunk is not compressed, so the check covers no compressed chunk")
 	}
-	got, err := store.UnprotectedTables(context.Background(), db.Owner)
+	got, err := migrations.UnprotectedTables(context.Background(), db.Owner)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -146,7 +147,7 @@ func TestUnprotectedTablesFlagsGrantedTableWithoutRLS(t *testing.T) {
 	if _, err := db.Owner.Exec(context.Background(), string(fixture)); err != nil {
 		t.Fatal(err)
 	}
-	got, err := store.UnprotectedTables(context.Background(), db.Owner)
+	got, err := migrations.UnprotectedTables(context.Background(), db.Owner)
 	if err != nil {
 		t.Fatal(err)
 	}

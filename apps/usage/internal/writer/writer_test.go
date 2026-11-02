@@ -17,11 +17,11 @@ import (
 	"github.com/google/uuid"
 	"github.com/twmb/franz-go/pkg/kfake"
 
-	"github.com/maksimillian1/ha-multitenant-saas-platform/apps/usage/core"
-	"github.com/maksimillian1/ha-multitenant-saas-platform/apps/usage/kafka"
-	"github.com/maksimillian1/ha-multitenant-saas-platform/apps/usage/store"
-	"github.com/maksimillian1/ha-multitenant-saas-platform/apps/usage/testpg"
-	"github.com/maksimillian1/ha-multitenant-saas-platform/apps/usage/writeapi"
+	"github.com/maksimillian1/ha-multitenant-saas-platform/apps/usage/internal/core"
+	"github.com/maksimillian1/ha-multitenant-saas-platform/apps/usage/internal/kafka"
+	"github.com/maksimillian1/ha-multitenant-saas-platform/apps/usage/internal/store"
+	"github.com/maksimillian1/ha-multitenant-saas-platform/apps/usage/internal/testpg"
+	"github.com/maksimillian1/ha-multitenant-saas-platform/apps/usage/internal/writeapi"
 )
 
 // These tests run the pipeline in one process: UsageWriteAPI → Kafka (kfake,

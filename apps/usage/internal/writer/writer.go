@@ -7,14 +7,14 @@ package writer
 
 import (
 	"context"
-	"encoding/json"
 	"log/slog"
 	"sync/atomic"
 	"time"
 
 	"github.com/twmb/franz-go/pkg/kgo"
 
-	"github.com/maksimillian1/ha-multitenant-saas-platform/apps/usage/core"
+	"github.com/maksimillian1/ha-multitenant-saas-platform/apps/usage/internal/core"
+	"github.com/maksimillian1/ha-multitenant-saas-platform/apps/usage/internal/kafka"
 )
 
 const (
@@ -76,11 +76,11 @@ func (w *Service) Run(ctx context.Context) error {
 func (w *Service) decode(ctx context.Context, records []*kgo.Record) []core.Event {
 	events := make([]core.Event, 0, len(records))
 	for _, r := range records {
-		var e core.Event
-		// UsageWriteAPI validated the event before it reached Kafka. A record
-		// that still does not parse would block the partition forever, so it is
-		// logged and skipped.
-		if err := json.Unmarshal(r.Value, &e); err != nil || e.ID == "" || e.TenantID == "" || e.Time.IsZero() {
+		// A record that does not decode would block the partition forever, so
+		// it is logged and skipped. That includes a schema version newer than
+		// this writer, which the rollout order (writer before writeapi) avoids.
+		e, err := kafka.Decode(r.Value)
+		if err != nil {
 			w.Malformed.Add(1)
 			w.Log.ErrorContext(ctx, "malformed usage record skipped",
 				"partition", r.Partition, "offset", r.Offset, "err", err)

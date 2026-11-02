@@ -4,11 +4,13 @@ on:
   pull_request:
     paths:
       - "apps/usage/**"
+      - "docs/contracts/usage-event/**"
       - ".github/workflows/usage.yml"
   push:
     branches: [master]
     paths:
       - "apps/usage/**"
+      - "docs/contracts/usage-event/**"
       - ".github/workflows/usage.yml"
 
 jobs:
@@ -43,8 +45,64 @@ jobs:
           cache-dependency-path: apps/usage/go.sum
       - run: go vet ./...
       - name: Build for arm64 (C-06)
-        run: CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -o /dev/null .
+        run: CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -o /dev/null ./cmd/...
       # -count=1 disables the test cache; a skipped DB test must not pass silently.
       - run: go test -count=1 -v ./... 2>&1 | tee test.log
       - name: Fail if database tests were skipped
         run: "! grep -q -- '--- SKIP' test.log"
+
+  boundaries:
+    # The import rules between writeapi, writer and migrate (apps/usage/README.md):
+    # depguard for direct imports, check-linked-deps.sh for what each binary links.
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: bash
+        working-directory: apps/usage
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: apps/usage/go.mod
+          cache-dependency-path: apps/usage/go.sum
+      - uses: golangci/golangci-lint-action@v8
+        with:
+          version: v2.5.0
+          working-directory: apps/usage
+      - run: scripts/check-linked-deps.sh
+
+  images:
+    # Builds the three images and checks the artifact itself: go version -m
+    # lists the modules linked into the binary.
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: bash
+        working-directory: apps/usage
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: apps/usage/go.mod
+          cache-dependency-path: apps/usage/go.sum
+      - uses: docker/setup-buildx-action@v3
+      - run: docker buildx bake --load
+        env:
+          TAG: ci
+      - name: Default target fails
+        run: "! docker build -q ."
+      - name: Each image holds only its binary's modules
+        run: |
+          linked() {
+            local id; id=$(docker create "hamsp/usage-$1:ci")
+            docker cp "$id:/app" "/tmp/$1" >/dev/null
+            docker rm "$id" >/dev/null
+            # Captured first, so a missing or unreadable binary fails the step.
+            go version -m "/tmp/$1"
+          }
+          w=$(linked writeapi); m=$(linked migrate); r=$(linked writer)
+          # Not `! grep`: set -e ignores a negated command that is not the last one.
+          if grep -q 'jackc/pgx' <<<"$w"; then echo "writeapi links pgx"; exit 1; fi
+          if grep -q 'twmb/franz-go' <<<"$m"; then echo "migrate links franz-go"; exit 1; fi
+          # Control: the check sees the modules at all.
+          if ! grep -q 'jackc/pgx' <<<"$r"; then echo "writer does not show pgx"; exit 1; fi

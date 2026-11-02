@@ -5,11 +5,13 @@ package kafka
 import (
 	"context"
 	"encoding/json"
+	"errors"
+	"fmt"
 	"time"
 
 	"github.com/twmb/franz-go/pkg/kgo"
 
-	"github.com/maksimillian1/ha-multitenant-saas-platform/apps/usage/core"
+	"github.com/maksimillian1/ha-multitenant-saas-platform/apps/usage/internal/core"
 )
 
 // Producer produces every event to the topic with tenant_id as the key, so one
@@ -45,7 +47,7 @@ func (p *Producer) Ping(ctx context.Context) error { return p.client.Ping(ctx) }
 func (p *Producer) Produce(ctx context.Context, events []core.Event) error {
 	records := make([]*kgo.Record, len(events))
 	for i, e := range events {
-		value, err := json.Marshal(e)
+		value, err := Encode(e)
 		if err != nil {
 			return err
 		}
@@ -66,4 +68,26 @@ func NewConsumer(brokers []string, topic, group string, extra ...kgo.Opt) (*kgo.
 		kgo.ConsumeResetOffset(kgo.NewOffset().AtStart()),
 	}, extra...)
 	return kgo.NewClient(opts...)
+}
+
+// Encode is the value of e's Kafka record in the current schema version.
+func Encode(e core.Event) ([]byte, error) {
+	return json.Marshal(core.Record{SchemaVersion: core.SchemaVersion, Event: e})
+}
+
+// Decode reads a record value of any schema version up to core.SchemaVersion.
+// UsageWriteAPI validated the event before it reached Kafka; Decode checks
+// only what the store needs to deduplicate it.
+func Decode(value []byte) (core.Event, error) {
+	var r core.Record
+	if err := json.Unmarshal(value, &r); err != nil {
+		return core.Event{}, err
+	}
+	if r.SchemaVersion < 0 || r.SchemaVersion > core.SchemaVersion {
+		return core.Event{}, fmt.Errorf("schema_version %d is not supported, want 1 to %d", r.SchemaVersion, core.SchemaVersion)
+	}
+	if r.ID == "" || r.TenantID == "" || r.Time.IsZero() {
+		return core.Event{}, errors.New("event_id, tenant_id and event_time are required")
+	}
+	return r.Event, nil
 }

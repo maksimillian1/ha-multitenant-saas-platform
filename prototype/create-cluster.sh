@@ -111,10 +111,22 @@ helm upgrade --install argocd argo/argo-cd \
 
 # ── 5. build the Go services and the TimescaleDB image, load them into kind ───
 
+# An app with a docker-bake.hcl builds one image per binary (apps/usage:
+# hamsp/usage-writeapi, -writer, -migrate); the others build one image.
 for app in "${APPS[@]}"; do
-  echo "Building hamsp/${app}:dev..."
-  docker build -t "hamsp/${app}:dev" "${REPO_DIR}/apps/${app}"
-  kind load docker-image "hamsp/${app}:dev" --name "${CLUSTER_NAME}"
+  dir="${REPO_DIR}/apps/${app}"
+  if [[ -f "${dir}/docker-bake.hcl" ]]; then
+    echo "Building the images of ${app} (docker-bake.hcl)..."
+    images=$(cd "${dir}" && docker buildx bake --print 2>/dev/null | grep -Eo '"hamsp/[^"]+"' | tr -d '"')
+    (cd "${dir}" && docker buildx bake --load)
+  else
+    echo "Building hamsp/${app}:dev..."
+    docker build -t "hamsp/${app}:dev" "${dir}"
+    images="hamsp/${app}:dev"
+  fi
+  for image in ${images}; do
+    kind load docker-image "${image}" --name "${CLUSTER_NAME}"
+  done
 done
 
 echo "Building ${TIMESCALEDB_IMAGE}..."

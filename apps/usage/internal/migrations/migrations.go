@@ -1,4 +1,7 @@
-package store
+// Package migrations is the schema of the usage database (ADR-0008): the SQL
+// files and the runner that applies them as the owner role. Only cmd/migrate
+// links it, so neither writeapi nor writer can change the schema.
+package migrations
 
 import (
 	"context"
@@ -6,13 +9,15 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
+	"log/slog"
 	"sort"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 )
 
-//go:embed migrations/*.sql
-var migrations embed.FS
+//go:embed *.sql
+var files embed.FS
 
 // migrationLockID serialises concurrent migration runs (pg_advisory_xact_lock).
 const migrationLockID = 5_000_011
@@ -51,18 +56,18 @@ func Migrate(ctx context.Context, conn *pgx.Conn) error {
 		return fmt.Errorf("create schema_migrations: %w", err)
 	}
 
-	names, err := fs.Glob(migrations, "migrations/*.sql")
+	names, err := fs.Glob(files, "*.sql")
 	if err != nil {
 		return err
 	}
 	sort.Strings(names)
 
 	for _, name := range names {
-		body, err := migrations.ReadFile(name)
+		body, err := files.ReadFile(name)
 		if err != nil {
 			return err
 		}
-		version := name[len("migrations/"):]
+		version := name
 		err = pgx.BeginFunc(ctx, conn, func(tx pgx.Tx) error {
 			if _, err := tx.Exec(ctx, "SELECT pg_advisory_xact_lock($1)", migrationLockID); err != nil {
 				return err
@@ -115,4 +120,21 @@ func UnprotectedTables(ctx context.Context, conn *pgx.Conn) ([]string, error) {
 		return nil, err
 	}
 	return pgx.CollectRows(rows, pgx.RowTo[string])
+}
+
+// Connect retries until ctx is done, because on a fresh cluster the database
+// may still be starting when the migration job runs.
+func Connect(ctx context.Context, log *slog.Logger, dsn string) (*pgx.Conn, error) {
+	for {
+		conn, err := pgx.Connect(ctx, dsn)
+		if err == nil {
+			return conn, nil
+		}
+		log.Warn("database not reachable, retrying", "err", err)
+		select {
+		case <-ctx.Done():
+			return nil, err
+		case <-time.After(5 * time.Second):
+		}
+	}
 }

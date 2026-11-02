@@ -1,4 +1,5 @@
-package core
+// Package httpx serves the HTTP endpoints of writeapi and writer.
+package httpx
 
 import (
 	"context"
