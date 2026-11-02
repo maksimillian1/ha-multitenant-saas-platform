@@ -1,7 +1,9 @@
-# Super admin app (apps/admin): one page, shown only after a Zitadel sign-in
-# by a user with the super-admin role of the platform-admin project.
+# Super admin app (apps/admin): pages for Zitadel's organizations, users,
+# role assignments and projects, shown only after a Zitadel sign-in by a user
+# with the super-admin role of the platform-admin project (HAMSP-34).
 # prototype/bootstrap-tenants.sh creates the OIDC app and the Secret
-# admin-oidc; until then the pods wait in CreateContainerConfigError.
+# admin-oidc, and the service account admin-app with its token in the Secret
+# admin-zitadel; until then the pods wait in CreateContainerConfigError.
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -37,6 +39,10 @@ spec:
           envFrom:
             - secretRef:
                 name: admin-oidc
+            # ZITADEL_TOKEN: the admin app calls the Zitadel APIs at ISSUER
+            # (through ISSUER_DIAL_ADDR) as the service account admin-app.
+            - secretRef:
+                name: admin-zitadel
           readinessProbe:
             httpGet: {path: /healthz, port: http}
             periodSeconds: 5

@@ -27,7 +27,7 @@ Zitadel issues the tokens. Everything except Cilium and ArgoCD is deployed by Ar
 | `k8s/apps/gateway` | Public Gateway (Cilium Gateway API, host network port 30080) and the API Gateway service |
 | `k8s/apps/kafka` | Strimzi operator, a Kafka cluster of 3 dual-role KRaft nodes and the `usage-events` topic |
 | `k8s/apps/usage` | UsageWriteAPI, Usage Writer and the job that migrates the `usage` database |
-| `k8s/apps/admin` | Super admin app (Go BFF with a React SPA, ADR-0009) behind a Zitadel browser sign-in, on `admin.localtest.me` |
+| `k8s/apps/admin` | Super admin app (Go BFF with a React SPA, ADR-0009) behind a Zitadel browser sign-in, on `admin.localtest.me`; it manages Zitadel's organizations, users and role assignments |
 
 Secrets in these manifests are for this local cluster only.
 
@@ -85,11 +85,24 @@ curl -s --connect-to api.localtest.me:30080:127.0.0.1:30080 -H "Authorization: B
 
 The same in a browser: `go run -C prototype/authdemo .` and open http://127.0.0.1:8090. The page gets tokens for both tenants, shows their claims, calls the API with a valid, missing or tampered token and runs the auth and isolation checks in one click. It reads the client secrets from `.tenants.json` and proxies to port 30080, so it is for this local cluster only.
 
-## Super admin page
+## Super admin app
 
-`apps/admin` serves a one-page React SPA at http://admin.localtest.me:30080 (ADR-0009). Without a session it redirects to Zitadel's login. Zitadel lets in only users with a role in the project `platform-admin` (`projectRoleCheck`). The API requires the `super-admin` role, taken from the ID token: the SPA reads the session from `GET /api/me` and shows the dashboard with the role, or its access denied page on 403. The session is an encrypted cookie that lasts an hour; the tokens stay on the server.
+`apps/admin` serves a React SPA at http://admin.localtest.me:30080 (ADR-0009). Without a session it redirects to Zitadel's login. Zitadel lets in only users with a role in the project `platform-admin` (`projectRoleCheck`). The API requires the `super-admin` role, taken from the ID token; a user without it gets the access denied page. The session is an encrypted cookie that lasts an hour; the tokens stay on the server.
 
-`bootstrap-tenants.sh` sets it up. It switches the instance to Zitadel's built-in login (the instance requires Login V2, which this cluster does not deploy), creates the project, the role and an OIDC web app, writes the app's client and a session key to the Secret `admin/admin-oidc`, and creates three human users in the IAM admin's organization: `super-admin` with the role (dashboard), `viewer` with the role `viewer` only (access denied page) and `regular-user` with no role (Zitadel refuses the sign-in). Their passwords are new on every run:
+The pages manage what lives in Zitadel (HAMSP-34):
+
+| Page | What |
+|---|---|
+| Overview | Counts of organizations, human and machine users and projects; the admin's session and roles |
+| Organizations | Search, filter by state; create, rename, deactivate, activate and delete an organization; its users and projects |
+| Users | Users of every organization: search, filter by organization, type and state; create humans and machine users; edit, set a password, lock, deactivate, delete; generate a machine user's client secret; add, change and remove role assignments |
+| Projects | Read only: projects, their roles and who holds them |
+
+Deleting an organization deletes it in Zitadel only: the tenant's rows in PostgreSQL and its usage events stay (tenant lifecycle, HAMSP-6). The app does not let the admin lock, deactivate or delete their own user or the service account, deactivate or delete their organizations, or change their own role assignments.
+
+The app calls Zitadel's v2 APIs (Connect with JSON) as its own service account `admin-app`, a machine user with the instance role `IAM_ORG_MANAGER`, never with the admin's token. Zitadel's audit trail therefore shows `admin-app` as the editor; the app's log has a line `admin change` with the admin's user ID, the route, the target and the status for every change. State-changing requests need the header `X-Requested-With: XMLHttpRequest` and must come from the app's origin (CSRF).
+
+`bootstrap-tenants.sh` sets it up. It switches the instance to Zitadel's built-in login (the instance requires Login V2, which this cluster does not deploy), creates the project, the role and an OIDC web app, writes the app's client and a session key to the Secret `admin/admin-oidc`, creates the service account with a personal access token (new on every run, valid for a year) in the Secret `admin/admin-zitadel`, and creates three human users in the IAM admin's organization: `super-admin` with the role (all pages), `viewer` with the role `viewer` only (access denied page) and `regular-user` with no role (Zitadel refuses the sign-in). Their passwords are new on every run:
 
 ```bash
 jq -r '.admin.users[] | "\(.username)  \(.password)  roles: \(.roles)"' prototype/.tenants.json
@@ -97,7 +110,15 @@ jq -r '.admin.users[] | "\(.username)  \(.password)  roles: \(.roles)"' prototyp
 
 Zitadel may offer to set up a second factor after the password; skip it.
 
-The SPA lives in `apps/admin/ui/app` (Node 22, `.nvmrc`). `npm run dev` proxies `/api` and `/auth` to a Go server on `localhost:8080`; signing in through it needs `PUBLIC_URL=http://localhost:5173` and that callback URL added to the Zitadel app, which the bootstrap does not do. The API is described in `apps/admin/openapi.yaml`: after changing it, run `go generate ./...` in `apps/admin` and `npm run gen:api` in `apps/admin/ui/app`. CI fails when the generated types are out of date.
+The Zitadel client has an integration test that runs against this cluster with the service account's token. It creates and deletes an organization with a human and a machine user, and assigns and revokes a role in `platform-admin`:
+
+```bash
+ZITADEL_TEST_URL=http://zitadel.localtest.me:30080 \
+ZITADEL_TEST_TOKEN=$(kubectl -n admin get secret admin-zitadel -o jsonpath='{.data.ZITADEL_TOKEN}' | base64 -d) \
+go test -C apps/admin -count=1 -run TestIntegration -v ./zitadel/
+```
+
+The SPA lives in `apps/admin/ui/app` (Node 22, `.nvmrc`); `npm test` runs its tests (Vitest, jsdom), which render the real pages against a stubbed API. `npm run dev` proxies `/api` and `/auth` to a Go server on `localhost:8080`; signing in through it needs `PUBLIC_URL=http://localhost:5173` and that callback URL added to the Zitadel app, which the bootstrap does not do. The API is described in `apps/admin/openapi.yaml`: after changing it, run `go generate ./...` in `apps/admin` and `npm run gen:api` in `apps/admin/ui/app`. CI fails when the generated types are out of date, and a Go test fails when a route and the spec disagree.
 
 ## ExampleApp API
 
