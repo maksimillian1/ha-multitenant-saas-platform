@@ -67,7 +67,7 @@ jobs:
           cache-dependency-path: apps/usage/go.sum
       - uses: golangci/golangci-lint-action@v8
         with:
-          version: v2.5.0
+          version: v2.15.0
           working-directory: apps/usage
       - run: scripts/check-linked-deps.sh
 
