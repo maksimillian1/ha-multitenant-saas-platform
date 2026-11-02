@@ -6,10 +6,14 @@
 # Gateway. For the super admin app (apps/admin) it creates the platform-admin
 # project with the super-admin and viewer roles, an OIDC web app and three
 # human test users, super-admin, viewer and regular-user (no role), and writes
-# the app's client to the Secret admin/admin-oidc. Writes the credentials to
-# prototype/.tenants.json (git-ignored) for the e2e tests and for signing in.
-# Safe to run again: existing organizations, users and projects are reused;
-# client secrets and the admin test users' passwords are regenerated.
+# the app's client to the Secret admin/admin-oidc. It also creates the app's
+# service account admin-app with the instance role IAM_ORG_MANAGER, which the
+# app uses to manage organizations, users and role assignments (HAMSP-34), and
+# writes its personal access token to the Secret admin/admin-zitadel. Writes
+# the credentials to prototype/.tenants.json (git-ignored) for the e2e tests
+# and for signing in. Safe to run again: existing organizations, users and
+# projects are reused; client secrets, the service account's token and the
+# admin test users' passwords are regenerated.
 #
 # Tenant lifecycle as a feature is HAMSP-6; this script only seeds test data.
 set -euo pipefail
@@ -30,6 +34,11 @@ ADMIN_ROLE="super-admin"
 VIEWER_ROLE="viewer"
 ADMIN_URL="http://admin.localtest.me:30080"
 ADMIN_EMAIL_DOMAIN="admin.localtest.me"
+# The admin app calls the Zitadel APIs as this machine user. IAM_ORG_MANAGER
+# covers the organizations, users, role assignments and projects of every
+# organization, without the instance's settings.
+ADMIN_SA="admin-app"
+ADMIN_SA_ROLE="IAM_ORG_MANAGER"
 
 # Access tokens live 60 s, so the e2e tests can prove that an expired token is
 # rejected (HAMSP-5 AC-5) without waiting hours.
@@ -245,12 +254,48 @@ fi
 grant "${super_admin_id}" super-admin "${ADMIN_ROLE}"
 grant "${viewer_id}" viewer "${VIEWER_ROLE}"
 
-# The admin app reads its client and session key from this Secret (k8s/apps/admin).
-# A new session key signs everyone out, which is fine for test users.
+# ── 6. the admin app's service account: it calls the Zitadel APIs ───────────
+
+# A machine user in the IAM admin's organization with an instance role; the
+# admin app checks the super-admin role of the signed-in user itself.
+sa_id=$(zitadel POST /management/v1/users/_search "$(jq -nc --arg u "${ADMIN_SA}" \
+  '{queries: [{userNameQuery: {userName: $u, method: "TEXT_QUERY_METHOD_EQUALS"}}]}')" \
+  | jq -r '.result[0].id // empty')
+if [[ -z "${sa_id}" ]]; then
+  sa_id=$(zitadel POST /management/v1/users/machine "$(jq -nc --arg u "${ADMIN_SA}" \
+    '{userName: $u, name: "Admin app", description: "apps/admin manages organizations, users and role assignments as this user"}')" \
+    | jq -r '.userId')
+  echo "Created machine user ${ADMIN_SA} (${sa_id})"
+else
+  echo "Reusing machine user ${ADMIN_SA} (${sa_id})"
+fi
+member_count=$(zitadel POST /admin/v1/members/_search "$(jq -nc --arg u "${sa_id}" \
+  '{queries: [{userIdQuery: {userId: $u}}]}')" | jq '.result // [] | length')
+if [[ "${member_count}" == "0" ]]; then
+  zitadel POST /admin/v1/members "$(jq -nc --arg u "${sa_id}" --arg r "${ADMIN_SA_ROLE}" \
+    '{userId: $u, roles: [$r]}')" >/dev/null
+  echo "  gave ${ADMIN_SA} the instance role ${ADMIN_SA_ROLE}"
+fi
+# One personal access token, new on every run; the old ones are removed.
+for token_id in $(zitadel POST "/management/v1/users/${sa_id}/pats/_search" '{}' | jq -r '.result[]?.id'); do
+  zitadel DELETE "/management/v1/users/${sa_id}/pats/${token_id}" >/dev/null
+done
+sa_token=$(zitadel POST "/management/v1/users/${sa_id}/pats" "$(jq -nc \
+  '{expirationDate: (now + 365 * 24 * 3600 | todate)}')" | jq -r '.token')
+if [[ -z "${sa_token}" || "${sa_token}" == "null" ]]; then
+  echo "ERROR: creating the token of ${ADMIN_SA} failed."
+  exit 1
+fi
+
+# The admin app reads its client and session key from admin-oidc and the
+# service account's token from admin-zitadel (k8s/apps/admin). A new session
+# key signs everyone out, which is fine for test users.
 kubectl create namespace admin --dry-run=client -o yaml | kubectl apply -f - >/dev/null
 kubectl -n admin create secret generic admin-oidc \
   --from-literal=CLIENT_ID="${admin_client_id}" --from-literal=CLIENT_SECRET="${admin_client_secret}" \
   --from-literal=SESSION_KEY="$(openssl rand -hex 32)" \
+  --dry-run=client -o yaml | kubectl apply -f - >/dev/null
+kubectl -n admin create secret generic admin-zitadel --from-literal=ZITADEL_TOKEN="${sa_token}" \
   --dry-run=client -o yaml | kubectl apply -f - >/dev/null
 if kubectl -n admin get deployment admin &>/dev/null; then
   kubectl -n admin rollout restart deployment/admin >/dev/null

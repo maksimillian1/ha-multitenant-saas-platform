@@ -7,9 +7,270 @@ import (
 	"time"
 )
 
+// Defines values for AccessTokenType.
+const (
+	AccessTokenTypeBearer AccessTokenType = "bearer"
+	AccessTokenTypeJwt    AccessTokenType = "jwt"
+)
+
+// Valid indicates whether the value is a known member of the AccessTokenType enum.
+func (e AccessTokenType) Valid() bool {
+	switch e {
+	case AccessTokenTypeBearer:
+		return true
+	case AccessTokenTypeJwt:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for AuthorizationState.
+const (
+	AuthorizationStateActive      AuthorizationState = "active"
+	AuthorizationStateInactive    AuthorizationState = "inactive"
+	AuthorizationStateUnspecified AuthorizationState = "unspecified"
+)
+
+// Valid indicates whether the value is a known member of the AuthorizationState enum.
+func (e AuthorizationState) Valid() bool {
+	switch e {
+	case AuthorizationStateActive:
+		return true
+	case AuthorizationStateInactive:
+		return true
+	case AuthorizationStateUnspecified:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for OrgState.
+const (
+	OrgStateActive      OrgState = "active"
+	OrgStateInactive    OrgState = "inactive"
+	OrgStateRemoved     OrgState = "removed"
+	OrgStateUnspecified OrgState = "unspecified"
+)
+
+// Valid indicates whether the value is a known member of the OrgState enum.
+func (e OrgState) Valid() bool {
+	switch e {
+	case OrgStateActive:
+		return true
+	case OrgStateInactive:
+		return true
+	case OrgStateRemoved:
+		return true
+	case OrgStateUnspecified:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ProjectState.
+const (
+	ProjectStateActive      ProjectState = "active"
+	ProjectStateInactive    ProjectState = "inactive"
+	ProjectStateUnspecified ProjectState = "unspecified"
+)
+
+// Valid indicates whether the value is a known member of the ProjectState enum.
+func (e ProjectState) Valid() bool {
+	switch e {
+	case ProjectStateActive:
+		return true
+	case ProjectStateInactive:
+		return true
+	case ProjectStateUnspecified:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for UserState.
+const (
+	UserStateActive      UserState = "active"
+	UserStateDeleted     UserState = "deleted"
+	UserStateInactive    UserState = "inactive"
+	UserStateInitial     UserState = "initial"
+	UserStateLocked      UserState = "locked"
+	UserStateUnspecified UserState = "unspecified"
+)
+
+// Valid indicates whether the value is a known member of the UserState enum.
+func (e UserState) Valid() bool {
+	switch e {
+	case UserStateActive:
+		return true
+	case UserStateDeleted:
+		return true
+	case UserStateInactive:
+		return true
+	case UserStateInitial:
+		return true
+	case UserStateLocked:
+		return true
+	case UserStateUnspecified:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for UserType.
+const (
+	UserTypeHuman   UserType = "human"
+	UserTypeMachine UserType = "machine"
+)
+
+// Valid indicates whether the value is a known member of the UserType enum.
+func (e UserType) Valid() bool {
+	switch e {
+	case UserTypeHuman:
+		return true
+	case UserTypeMachine:
+		return true
+	default:
+		return false
+	}
+}
+
+// AccessTokenType Opaque bearer tokens, or JWTs that the API Gateway validates locally
+type AccessTokenType string
+
+// Authorization defines model for Authorization.
+type Authorization struct {
+	ChangedAt *time.Time `json:"changed_at,omitempty"`
+	CreatedAt *time.Time `json:"created_at,omitempty"`
+	Id        string     `json:"id"`
+
+	// OrgId The organization the roles are given on behalf of
+	OrgId           string             `json:"org_id"`
+	OrgName         string             `json:"org_name"`
+	ProjectId       string             `json:"project_id"`
+	ProjectName     string             `json:"project_name"`
+	ProjectOrgId    string             `json:"project_org_id"`
+	Roles           []Role             `json:"roles"`
+	State           AuthorizationState `json:"state"`
+	UserDisplayName string             `json:"user_display_name"`
+	UserId          string             `json:"user_id"`
+	UserLoginName   string             `json:"user_login_name"`
+	UserOrgId       string             `json:"user_org_id"`
+}
+
+// AuthorizationCreate defines model for AuthorizationCreate.
+type AuthorizationCreate struct {
+	// OrgId The organization that owns the project or has a grant for it; the project's owner if empty
+	OrgId     *string  `json:"org_id,omitempty"`
+	ProjectId string   `json:"project_id"`
+	RoleKeys  []string `json:"role_keys"`
+	UserId    string   `json:"user_id"`
+}
+
+// AuthorizationList defines model for AuthorizationList.
+type AuthorizationList struct {
+	Items []Authorization `json:"items"`
+	Total int64           `json:"total"`
+}
+
+// AuthorizationState defines model for AuthorizationState.
+type AuthorizationState string
+
+// AuthorizationUpdate defines model for AuthorizationUpdate.
+type AuthorizationUpdate struct {
+	RoleKeys []string `json:"role_keys"`
+}
+
+// Created defines model for Created.
+type Created struct {
+	Id string `json:"id"`
+}
+
 // Error defines model for Error.
 type Error struct {
 	Error string `json:"error"`
+}
+
+// HumanProfile defines model for HumanProfile.
+type HumanProfile struct {
+	DisplayName            string     `json:"display_name"`
+	Email                  string     `json:"email"`
+	EmailVerified          bool       `json:"email_verified"`
+	FamilyName             string     `json:"family_name"`
+	GivenName              string     `json:"given_name"`
+	NickName               string     `json:"nick_name"`
+	PasswordChangeRequired bool       `json:"password_change_required"`
+	PasswordChangedAt      *time.Time `json:"password_changed_at,omitempty"`
+	Phone                  string     `json:"phone"`
+	PhoneVerified          bool       `json:"phone_verified"`
+}
+
+// HumanUserCreate defines model for HumanUserCreate.
+type HumanUserCreate struct {
+	DisplayName *string `json:"display_name,omitempty"`
+	Email       string  `json:"email"`
+
+	// EmailVerified Without it Zitadel sends a verification email, if it can send email
+	EmailVerified *bool  `json:"email_verified,omitempty"`
+	FamilyName    string `json:"family_name"`
+	GivenName     string `json:"given_name"`
+	OrgId         string `json:"org_id"`
+
+	// Password Optional initial password; without it the user stays in the initial state
+	Password               *string `json:"password,omitempty"`
+	PasswordChangeRequired *bool   `json:"password_change_required,omitempty"`
+
+	// Username Zitadel uses the email if empty
+	Username *string `json:"username,omitempty"`
+}
+
+// HumanUserUpdate defines model for HumanUserUpdate.
+type HumanUserUpdate struct {
+	DisplayName *string `json:"display_name,omitempty"`
+	Email       *string `json:"email,omitempty"`
+
+	// EmailVerified With email, mark the new address as verified
+	EmailVerified *bool   `json:"email_verified,omitempty"`
+	FamilyName    *string `json:"family_name,omitempty"`
+	GivenName     *string `json:"given_name,omitempty"`
+	NickName      *string `json:"nick_name,omitempty"`
+}
+
+// MachineProfile defines model for MachineProfile.
+type MachineProfile struct {
+	// AccessTokenType Opaque bearer tokens, or JWTs that the API Gateway validates locally
+	AccessTokenType AccessTokenType `json:"access_token_type"`
+	Description     string          `json:"description"`
+	HasSecret       bool            `json:"has_secret"`
+	Name            string          `json:"name"`
+}
+
+// MachineSecret defines model for MachineSecret.
+type MachineSecret struct {
+	ClientId     string `json:"client_id"`
+	ClientSecret string `json:"client_secret"`
+}
+
+// MachineUserCreate defines model for MachineUserCreate.
+type MachineUserCreate struct {
+	// AccessTokenType Opaque bearer tokens, or JWTs that the API Gateway validates locally
+	AccessTokenType *AccessTokenType `json:"access_token_type,omitempty"`
+	Description     *string          `json:"description,omitempty"`
+	Name            string           `json:"name"`
+	OrgId           string           `json:"org_id"`
+
+	// Username Also the client ID for client credentials
+	Username string `json:"username"`
+}
+
+// MachineUserUpdate defines model for MachineUserUpdate.
+type MachineUserUpdate struct {
+	Description *string `json:"description,omitempty"`
+	Name        *string `json:"name,omitempty"`
 }
 
 // Me defines model for Me.
@@ -28,3 +289,237 @@ type Me struct {
 	// Subject Zitadel user ID
 	Subject string `json:"subject"`
 }
+
+// Org defines model for Org.
+type Org struct {
+	ChangedAt *time.Time `json:"changed_at,omitempty"`
+	CreatedAt *time.Time `json:"created_at,omitempty"`
+	Id        string     `json:"id"`
+
+	// IsDefault The instance's default organization, which Zitadel does not delete
+	IsDefault     bool     `json:"is_default"`
+	Name          string   `json:"name"`
+	PrimaryDomain string   `json:"primary_domain"`
+	State         OrgState `json:"state"`
+}
+
+// OrgCreate defines model for OrgCreate.
+type OrgCreate struct {
+	Name string `json:"name"`
+}
+
+// OrgList defines model for OrgList.
+type OrgList struct {
+	Items []Org `json:"items"`
+	Total int64 `json:"total"`
+}
+
+// OrgState defines model for OrgState.
+type OrgState string
+
+// OrgUpdate defines model for OrgUpdate.
+type OrgUpdate struct {
+	Name string `json:"name"`
+}
+
+// Overview defines model for Overview.
+type Overview struct {
+	HumanUsers    int64 `json:"human_users"`
+	MachineUsers  int64 `json:"machine_users"`
+	Organizations int64 `json:"organizations"`
+	Projects      int64 `json:"projects"`
+}
+
+// PasswordSet defines model for PasswordSet.
+type PasswordSet struct {
+	// ChangeRequired The user must choose a new password at the next sign-in
+	ChangeRequired *bool  `json:"change_required,omitempty"`
+	Password       string `json:"password"`
+}
+
+// Project defines model for Project.
+type Project struct {
+	// AccessRequired Only users of organizations with access may sign in to its apps
+	AccessRequired bool `json:"access_required"`
+
+	// AuthorizationRequired Only users with a role may sign in to its apps
+	AuthorizationRequired bool       `json:"authorization_required"`
+	ChangedAt             *time.Time `json:"changed_at,omitempty"`
+	CreatedAt             *time.Time `json:"created_at,omitempty"`
+	GrantedOrgId          *string    `json:"granted_org_id,omitempty"`
+	GrantedOrgName        *string    `json:"granted_org_name,omitempty"`
+	Id                    string     `json:"id"`
+	Name                  string     `json:"name"`
+
+	// OrgId The organization that owns the project
+	OrgId string `json:"org_id"`
+
+	// OrgName Empty if the organization could not be read
+	OrgName string `json:"org_name"`
+
+	// RoleAssertion Roles go into the tokens
+	RoleAssertion bool         `json:"role_assertion"`
+	State         ProjectState `json:"state"`
+}
+
+// ProjectList defines model for ProjectList.
+type ProjectList struct {
+	Items []Project `json:"items"`
+	Total int64     `json:"total"`
+}
+
+// ProjectRole defines model for ProjectRole.
+type ProjectRole struct {
+	DisplayName string `json:"display_name"`
+	Group       string `json:"group"`
+	Key         string `json:"key"`
+}
+
+// ProjectRoleList defines model for ProjectRoleList.
+type ProjectRoleList struct {
+	Items []ProjectRole `json:"items"`
+}
+
+// ProjectState defines model for ProjectState.
+type ProjectState string
+
+// Role defines model for Role.
+type Role struct {
+	DisplayName string `json:"display_name"`
+	Group       string `json:"group"`
+	Key         string `json:"key"`
+}
+
+// User defines model for User.
+type User struct {
+	ChangedAt *time.Time `json:"changed_at,omitempty"`
+	CreatedAt *time.Time `json:"created_at,omitempty"`
+
+	// DisplayName The display name of a human, the name of a machine, or the username
+	DisplayName string          `json:"display_name"`
+	Human       *HumanProfile   `json:"human,omitempty"`
+	Id          string          `json:"id"`
+	LoginNames  []string        `json:"login_names"`
+	Machine     *MachineProfile `json:"machine,omitempty"`
+	OrgId       string          `json:"org_id"`
+
+	// OrgName Empty if the organization could not be read
+	OrgName            string    `json:"org_name"`
+	PreferredLoginName string    `json:"preferred_login_name"`
+	State              UserState `json:"state"`
+	Type               UserType  `json:"type"`
+	Username           string    `json:"username"`
+}
+
+// UserList defines model for UserList.
+type UserList struct {
+	Items []User `json:"items"`
+	Total int64  `json:"total"`
+}
+
+// UserState defines model for UserState.
+type UserState string
+
+// UserType defines model for UserType.
+type UserType string
+
+// UserUpdate Only the fields that are set change. human is for humans, machine for machines.
+type UserUpdate struct {
+	Human    *HumanUserUpdate   `json:"human,omitempty"`
+	Machine  *MachineUserUpdate `json:"machine,omitempty"`
+	Username *string            `json:"username,omitempty"`
+}
+
+// AuthorizationId defines model for AuthorizationId.
+type AuthorizationId = string
+
+// Limit defines model for Limit.
+type Limit = int
+
+// Offset defines model for Offset.
+type Offset = int
+
+// OrgId defines model for OrgId.
+type OrgId = string
+
+// ProjectId defines model for ProjectId.
+type ProjectId = string
+
+// Search defines model for Search.
+type Search = string
+
+// UserId defines model for UserId.
+type UserId = string
+
+// ListOrgsParams defines parameters for ListOrgs.
+type ListOrgsParams struct {
+	// Search Part of the name, in any case
+	Search *Search `form:"search,omitempty" json:"search,omitempty"`
+
+	// State Only organizations in this state (active or inactive)
+	State *OrgState `form:"state,omitempty" json:"state,omitempty"`
+
+	// Offset How many items to skip
+	Offset *Offset `form:"offset,omitempty" json:"offset,omitempty"`
+
+	// Limit Page size
+	Limit *Limit `form:"limit,omitempty" json:"limit,omitempty"`
+}
+
+// ListProjectsParams defines parameters for ListProjects.
+type ListProjectsParams struct {
+	// Search Part of the name, in any case
+	Search *Search `form:"search,omitempty" json:"search,omitempty"`
+
+	// OrgId Only projects owned by this organization
+	OrgId *string `form:"org_id,omitempty" json:"org_id,omitempty"`
+
+	// Offset How many items to skip
+	Offset *Offset `form:"offset,omitempty" json:"offset,omitempty"`
+
+	// Limit Page size
+	Limit *Limit `form:"limit,omitempty" json:"limit,omitempty"`
+}
+
+// ListUsersParams defines parameters for ListUsers.
+type ListUsersParams struct {
+	// Search Part of the username, display name or email, in any case
+	Search *string `form:"search,omitempty" json:"search,omitempty"`
+
+	// OrgId Only users of this organization
+	OrgId *string   `form:"org_id,omitempty" json:"org_id,omitempty"`
+	Type  *UserType `form:"type,omitempty" json:"type,omitempty"`
+
+	// State Only users in this state (active, inactive, locked or initial)
+	State *UserState `form:"state,omitempty" json:"state,omitempty"`
+
+	// Offset How many items to skip
+	Offset *Offset `form:"offset,omitempty" json:"offset,omitempty"`
+
+	// Limit Page size
+	Limit *Limit `form:"limit,omitempty" json:"limit,omitempty"`
+}
+
+// CreateAuthorizationJSONRequestBody defines body for CreateAuthorization for application/json ContentType.
+type CreateAuthorizationJSONRequestBody = AuthorizationCreate
+
+// UpdateAuthorizationJSONRequestBody defines body for UpdateAuthorization for application/json ContentType.
+type UpdateAuthorizationJSONRequestBody = AuthorizationUpdate
+
+// CreateOrgJSONRequestBody defines body for CreateOrg for application/json ContentType.
+type CreateOrgJSONRequestBody = OrgCreate
+
+// UpdateOrgJSONRequestBody defines body for UpdateOrg for application/json ContentType.
+type UpdateOrgJSONRequestBody = OrgUpdate
+
+// CreateHumanUserJSONRequestBody defines body for CreateHumanUser for application/json ContentType.
+type CreateHumanUserJSONRequestBody = HumanUserCreate
+
+// CreateMachineUserJSONRequestBody defines body for CreateMachineUser for application/json ContentType.
+type CreateMachineUserJSONRequestBody = MachineUserCreate
+
+// UpdateUserJSONRequestBody defines body for UpdateUser for application/json ContentType.
+type UpdateUserJSONRequestBody = UserUpdate
+
+// SetUserPasswordJSONRequestBody defines body for SetUserPassword for application/json ContentType.
+type SetUserPasswordJSONRequestBody = PasswordSet

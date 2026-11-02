@@ -6,7 +6,7 @@ Date: 2026-10-29
 
 Proposed
 
-Raised in HAMSP-25, where the first super admin page was built. Keeps [ADR-0003](0003-auth-service-implementation.md) (Zitadel signs users in) and [ADR-0004](0004-api-gateway-go-service.md) (the API Gateway accepts only bearer tokens, so the admin app has its own public route).
+Raised in HAMSP-25, where the first super admin page was built. Keeps [ADR-0003](0003-auth-service-implementation.md) (Zitadel signs users in) and [ADR-0004](0004-api-gateway-go-service.md) (the API Gateway accepts only bearer tokens, so the admin app has its own public route). Item 4 and the CSRF protection were added in HAMSP-34, with the first pages that change data in Zitadel.
 
 ## Context
 
@@ -24,8 +24,9 @@ What we want:
 `apps/admin` stays **one Go service and one image**. It is a backend for frontend (BFF):
 
 1. **Sign-in on the server.** Go does the OIDC authorization code flow with PKCE against Zitadel (`zitadel/oidc`) and keeps only an encrypted, HttpOnly session cookie in the browser. The role comes from the ID token's project roles claim. The Zitadel project `platform-admin` checks roles on sign-in (`projectRoleCheck`), so a user without any role in it, such as a tenant's user, gets no session at all.
-2. **JSON API under `/api/`.** It is described in `apps/admin/openapi.yaml`. Every handler requires a session with the admin role (401 without a session, 403 without the role). Go types are generated with `oapi-codegen` (models only; handlers are written by hand in the style of the other services).
+2. **JSON API under `/api/`.** It is described in `apps/admin/openapi.yaml`. Every handler requires a session with the admin role (401 without a session, 403 without the role). State-changing requests (POST, PATCH, DELETE) also need the header `X-Requested-With: XMLHttpRequest`, which a cross-site page cannot send without a CORS preflight that the server never allows, and pass Go's `http.CrossOriginProtection` (`Sec-Fetch-Site`, `Origin`); otherwise 403. Go types are generated with `oapi-codegen` (models only; handlers are written by hand in the style of the other services), and a test checks that every route in the spec has a handler.
 3. **The SPA is embedded.** It lives in `apps/admin/ui/app` and is built by Vite into `ui/app/dist`, which the `ui` package embeds with `go:embed`, as simple-rag's `ui` package embeds its templates. Go serves `index.html` for any route of the SPA to a signed-in user and redirects to the login without a session. The role is checked by the API alone: on 403 the SPA shows its access denied page with a sign-out button.
+4. **Zitadel is managed by the app's own service account.** The API reads and changes Zitadel's organizations, users, role assignments (authorizations) and projects through Zitadel's v2 services, called over Connect with JSON by a small hand-written client (`apps/admin/zitadel`; no SDK and nothing from `github.com/zitadel/zitadel`, ADR-0003). It calls them as the machine user `admin-app` with the instance role `IAM_ORG_MANAGER` and a personal access token (`ZITADEL_TOKEN`), not with the signed-in admin's token: the admin app keeps one role system (`super-admin` in `platform-admin`) and the session cookie stays small. Every change is logged with the admin's user ID, the route, the target and the status. The API refuses (409) to lock, deactivate or delete the signed-in admin or the service account, to deactivate or delete their organizations, and to change the admin's own role assignments, so an admin cannot lock out themselves or the app.
 
 The SPA stack:
 
@@ -35,7 +36,8 @@ The SPA stack:
 | Server state | TanStack Query |
 | Tables | TanStack Table, rendered with the shadcn/ui table (`components/data-table.tsx`) |
 | Routing | TanStack Router |
-| Forms | react-hook-form with zod schemas, through the shadcn/ui field components; added with the first form |
+| Forms | react-hook-form with zod schemas, through the shadcn/ui field components |
+| Tests | Vitest with Testing Library in jsdom, rendering the real router against a stubbed `fetch` |
 | API client | `openapi-fetch` with types from `openapi-typescript`, generated from the same `openapi.yaml` |
 | Build | Vite, TypeScript, oxlint |
 
@@ -58,6 +60,7 @@ The SPA stack:
 * The API types on both sides come from `openapi.yaml`; CI fails when either generated file is out of date.
 * shadcn/ui code is ours: no UI library upgrade can break the pages.
 * The SPA's files are served only to users with a role in `platform-admin`, so the admin UI is not public.
+* Platform admins manage tenants' organizations, users and role assignments without Zitadel's console and without a Zitadel role of their own.
 
 **Bad / risks:**
 
@@ -65,5 +68,8 @@ The SPA stack:
 * Platform staff with a role other than `super-admin` can download the SPA, which shows them every screen the app has. The data stays behind the API.
 * Hand-written handlers can still drift from `openapi.yaml`; only the types are generated. If it starts to happen, generate the server interface (`std-http-server`) too.
 * The CSP allows inline styles, because Radix UI injects `<style>` elements. Scripts are limited to `'self'`.
-* Session cookies are not `Secure` while the prototype runs on plain HTTP. In EKS (TLS) they must be `Secure`, and state-changing API calls need CSRF protection beyond `SameSite=Lax` (for example a required custom header) before the first mutation is added.
+* Session cookies are not `Secure` while the prototype runs on plain HTTP. In EKS (TLS) they must be `Secure`. State-changing API calls have CSRF protection beyond `SameSite=Lax` since HAMSP-34 (item 2).
+* Zitadel's audit trail shows the service account, not the admin, as the editor of every change; only the admin app's log says which admin it was.
+* The service account can change every organization's users and role assignments. Its token is a long-lived personal access token in a Kubernetes Secret on the prototype; anyone who reads the Secret has that power until the token expires.
+* Deleting an organization deletes it in Zitadel only; the tenant's data in other stores stays until the tenant lifecycle (FR-01, QS-18) exists.
 * A role revoked in Zitadel takes effect only at the next sign-in (the session lasts an hour).

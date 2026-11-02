@@ -1,11 +1,16 @@
 # The JSON API of the admin app. The Go types (api/types.gen.go, oapi-codegen)
-# and the SPA's client types (web/src/api/schema.d.ts, openapi-typescript) are
-# generated from this file; change it first, then run `go generate ./...` and
-# `npm run gen:api` in web.
+# and the SPA's client types (ui/app/src/api/schema.d.ts, openapi-typescript)
+# are generated from this file; change it first, then run `go generate ./...`
+# and `npm run gen:api` in ui/app.
+#
+# Every route needs a session with the admin role. State-changing requests
+# (POST, PATCH, DELETE) also need the header `X-Requested-With: XMLHttpRequest`
+# and must come from the app's own origin (CSRF). The data comes from Zitadel,
+# which the app calls with its own service account (HAMSP-34).
 openapi: 3.0.3
 info:
   title: Admin API
-  version: 0.1.0
+  version: 0.2.0
 paths:
   /api/me:
     get:
@@ -22,14 +27,805 @@ paths:
           $ref: "#/components/responses/Error"
         "403":
           $ref: "#/components/responses/Error"
+
+  /api/overview:
+    get:
+      operationId: getOverview
+      summary: How many organizations, users and projects Zitadel has
+      responses:
+        "200":
+          description: The counts
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Overview"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "502":
+          $ref: "#/components/responses/Error"
+        "504":
+          $ref: "#/components/responses/Error"
+
+  /api/orgs:
+    get:
+      operationId: listOrgs
+      summary: Organizations (tenants), sorted by name
+      parameters:
+        - $ref: "#/components/parameters/Search"
+        - name: state
+          in: query
+          description: Only organizations in this state (active or inactive)
+          schema:
+            $ref: "#/components/schemas/OrgState"
+        - $ref: "#/components/parameters/Offset"
+        - $ref: "#/components/parameters/Limit"
+      responses:
+        "200":
+          description: One page of organizations
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OrgList"
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "502":
+          $ref: "#/components/responses/Error"
+        "504":
+          $ref: "#/components/responses/Error"
+    post:
+      operationId: createOrg
+      summary: Create an organization without admin users
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/OrgCreate"
+      responses:
+        "201":
+          $ref: "#/components/responses/Created"
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
+        "502":
+          $ref: "#/components/responses/Error"
+        "504":
+          $ref: "#/components/responses/Error"
+
+  /api/orgs/{orgId}:
+    parameters:
+      - $ref: "#/components/parameters/OrgId"
+    get:
+      operationId: getOrg
+      summary: One organization
+      responses:
+        "200":
+          description: The organization
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Org"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "502":
+          $ref: "#/components/responses/Error"
+        "504":
+          $ref: "#/components/responses/Error"
+    patch:
+      operationId: updateOrg
+      summary: Rename an organization
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/OrgUpdate"
+      responses:
+        "204":
+          description: Renamed
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
+        "502":
+          $ref: "#/components/responses/Error"
+        "504":
+          $ref: "#/components/responses/Error"
+    delete:
+      operationId: deleteOrg
+      summary: >-
+        Delete an organization with its users, projects and grants in Zitadel.
+        The tenant's data in other stores stays (FR-01 and QS-18 are HAMSP-6).
+        Refused (409) for the admin's own organization and the service
+        account's organization.
+      responses:
+        "204":
+          description: Deleted
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
+        "502":
+          $ref: "#/components/responses/Error"
+        "504":
+          $ref: "#/components/responses/Error"
+
+  /api/orgs/{orgId}/deactivate:
+    parameters:
+      - $ref: "#/components/parameters/OrgId"
+    post:
+      operationId: deactivateOrg
+      summary: >-
+        Deactivate an organization: its users can no longer sign in. Refused
+        (409) for the admin's own organization and the service account's
+        organization.
+      responses:
+        "204":
+          description: Deactivated
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
+        "502":
+          $ref: "#/components/responses/Error"
+        "504":
+          $ref: "#/components/responses/Error"
+
+  /api/orgs/{orgId}/activate:
+    parameters:
+      - $ref: "#/components/parameters/OrgId"
+    post:
+      operationId: activateOrg
+      summary: Activate a deactivated organization
+      responses:
+        "204":
+          description: Activated
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
+        "502":
+          $ref: "#/components/responses/Error"
+        "504":
+          $ref: "#/components/responses/Error"
+
+  /api/users:
+    get:
+      operationId: listUsers
+      summary: Users of every organization, sorted by username
+      parameters:
+        - name: search
+          in: query
+          description: Part of the username, display name or email, in any case
+          schema:
+            type: string
+            maxLength: 200
+        - name: org_id
+          in: query
+          description: Only users of this organization
+          schema:
+            type: string
+        - name: type
+          in: query
+          schema:
+            $ref: "#/components/schemas/UserType"
+        - name: state
+          in: query
+          description: Only users in this state (active, inactive, locked or initial)
+          schema:
+            $ref: "#/components/schemas/UserState"
+        - $ref: "#/components/parameters/Offset"
+        - $ref: "#/components/parameters/Limit"
+      responses:
+        "200":
+          description: One page of users
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserList"
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "502":
+          $ref: "#/components/responses/Error"
+        "504":
+          $ref: "#/components/responses/Error"
+
+  /api/users/human:
+    post:
+      operationId: createHumanUser
+      summary: Create a person who signs in
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/HumanUserCreate"
+      responses:
+        "201":
+          $ref: "#/components/responses/Created"
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
+        "502":
+          $ref: "#/components/responses/Error"
+        "504":
+          $ref: "#/components/responses/Error"
+
+  /api/users/machine:
+    post:
+      operationId: createMachineUser
+      summary: Create a service account, such as a tenant's API client
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MachineUserCreate"
+      responses:
+        "201":
+          $ref: "#/components/responses/Created"
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
+        "502":
+          $ref: "#/components/responses/Error"
+        "504":
+          $ref: "#/components/responses/Error"
+
+  /api/users/{userId}:
+    parameters:
+      - $ref: "#/components/parameters/UserId"
+    get:
+      operationId: getUser
+      summary: One user
+      responses:
+        "200":
+          description: The user
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "502":
+          $ref: "#/components/responses/Error"
+        "504":
+          $ref: "#/components/responses/Error"
+    patch:
+      operationId: updateUser
+      summary: Change a user's username, profile or email
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UserUpdate"
+      responses:
+        "204":
+          description: Changed
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
+        "502":
+          $ref: "#/components/responses/Error"
+        "504":
+          $ref: "#/components/responses/Error"
+    delete:
+      operationId: deleteUser
+      summary: Delete a user. Refused (409) for the admin and the service account.
+      responses:
+        "204":
+          description: Deleted
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
+        "502":
+          $ref: "#/components/responses/Error"
+        "504":
+          $ref: "#/components/responses/Error"
+
+  /api/users/{userId}/password:
+    parameters:
+      - $ref: "#/components/parameters/UserId"
+    post:
+      operationId: setUserPassword
+      summary: Set a human user's password
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PasswordSet"
+      responses:
+        "204":
+          description: Set
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
+        "502":
+          $ref: "#/components/responses/Error"
+        "504":
+          $ref: "#/components/responses/Error"
+
+  /api/users/{userId}/deactivate:
+    parameters:
+      - $ref: "#/components/parameters/UserId"
+    post:
+      operationId: deactivateUser
+      summary: Deactivate a user. Refused (409) for the admin and the service account.
+      responses:
+        "204":
+          description: Deactivated
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
+        "502":
+          $ref: "#/components/responses/Error"
+        "504":
+          $ref: "#/components/responses/Error"
+
+  /api/users/{userId}/reactivate:
+    parameters:
+      - $ref: "#/components/parameters/UserId"
+    post:
+      operationId: reactivateUser
+      summary: Reactivate a deactivated user
+      responses:
+        "204":
+          description: Reactivated
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
+        "502":
+          $ref: "#/components/responses/Error"
+        "504":
+          $ref: "#/components/responses/Error"
+
+  /api/users/{userId}/lock:
+    parameters:
+      - $ref: "#/components/parameters/UserId"
+    post:
+      operationId: lockUser
+      summary: Lock a user. Refused (409) for the admin and the service account.
+      responses:
+        "204":
+          description: Locked
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
+        "502":
+          $ref: "#/components/responses/Error"
+        "504":
+          $ref: "#/components/responses/Error"
+
+  /api/users/{userId}/unlock:
+    parameters:
+      - $ref: "#/components/parameters/UserId"
+    post:
+      operationId: unlockUser
+      summary: Unlock a locked user
+      responses:
+        "204":
+          description: Unlocked
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
+        "502":
+          $ref: "#/components/responses/Error"
+        "504":
+          $ref: "#/components/responses/Error"
+
+  /api/users/{userId}/secret:
+    parameters:
+      - $ref: "#/components/parameters/UserId"
+    post:
+      operationId: generateUserSecret
+      summary: >-
+        Generate a new client secret for a machine user, replacing the old one.
+        The secret is shown only in this answer.
+      responses:
+        "200":
+          description: The client credentials
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MachineSecret"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
+        "502":
+          $ref: "#/components/responses/Error"
+        "504":
+          $ref: "#/components/responses/Error"
+    delete:
+      operationId: removeUserSecret
+      summary: Remove a machine user's client secret
+      responses:
+        "204":
+          description: Removed
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
+        "502":
+          $ref: "#/components/responses/Error"
+        "504":
+          $ref: "#/components/responses/Error"
+
+  /api/users/{userId}/authorizations:
+    parameters:
+      - $ref: "#/components/parameters/UserId"
+    get:
+      operationId: listUserAuthorizations
+      summary: The user's role assignments (Zitadel authorizations)
+      responses:
+        "200":
+          description: Up to 100 role assignments, oldest first
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthorizationList"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "502":
+          $ref: "#/components/responses/Error"
+        "504":
+          $ref: "#/components/responses/Error"
+
+  /api/authorizations:
+    post:
+      operationId: createAuthorization
+      summary: Give a user roles in a project
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AuthorizationCreate"
+      responses:
+        "201":
+          $ref: "#/components/responses/Created"
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
+        "502":
+          $ref: "#/components/responses/Error"
+        "504":
+          $ref: "#/components/responses/Error"
+
+  /api/authorizations/{authorizationId}:
+    parameters:
+      - $ref: "#/components/parameters/AuthorizationId"
+    patch:
+      operationId: updateAuthorization
+      summary: >-
+        Replace the roles of a role assignment; roles left out are revoked.
+        Refused (409) for the admin's own role assignments.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AuthorizationUpdate"
+      responses:
+        "204":
+          description: Changed
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
+        "502":
+          $ref: "#/components/responses/Error"
+        "504":
+          $ref: "#/components/responses/Error"
+    delete:
+      operationId: deleteAuthorization
+      summary: Remove a role assignment. Refused (409) for the admin's own role assignments.
+      responses:
+        "204":
+          description: Removed
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
+        "502":
+          $ref: "#/components/responses/Error"
+        "504":
+          $ref: "#/components/responses/Error"
+
+  /api/projects:
+    get:
+      operationId: listProjects
+      summary: Projects of every organization, sorted by name (read only)
+      parameters:
+        - $ref: "#/components/parameters/Search"
+        - name: org_id
+          in: query
+          description: Only projects owned by this organization
+          schema:
+            type: string
+        - $ref: "#/components/parameters/Offset"
+        - $ref: "#/components/parameters/Limit"
+      responses:
+        "200":
+          description: One page of projects
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectList"
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "502":
+          $ref: "#/components/responses/Error"
+        "504":
+          $ref: "#/components/responses/Error"
+
+  /api/projects/{projectId}:
+    parameters:
+      - $ref: "#/components/parameters/ProjectId"
+    get:
+      operationId: getProject
+      summary: One project
+      responses:
+        "200":
+          description: The project
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Project"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "502":
+          $ref: "#/components/responses/Error"
+        "504":
+          $ref: "#/components/responses/Error"
+
+  /api/projects/{projectId}/roles:
+    parameters:
+      - $ref: "#/components/parameters/ProjectId"
+    get:
+      operationId: listProjectRoles
+      summary: The project's roles, sorted by key
+      responses:
+        "200":
+          description: Up to 100 roles
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectRoleList"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "502":
+          $ref: "#/components/responses/Error"
+        "504":
+          $ref: "#/components/responses/Error"
+
+  /api/projects/{projectId}/authorizations:
+    parameters:
+      - $ref: "#/components/parameters/ProjectId"
+    get:
+      operationId: listProjectAuthorizations
+      summary: Who holds roles in the project
+      responses:
+        "200":
+          description: Up to 100 role assignments, oldest first
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthorizationList"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "502":
+          $ref: "#/components/responses/Error"
+        "504":
+          $ref: "#/components/responses/Error"
+
 components:
+  parameters:
+    Search:
+      name: search
+      in: query
+      description: Part of the name, in any case
+      schema:
+        type: string
+        maxLength: 200
+    Offset:
+      name: offset
+      in: query
+      description: How many items to skip
+      schema:
+        type: integer
+        minimum: 0
+        default: 0
+    Limit:
+      name: limit
+      in: query
+      description: Page size
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 20
+    OrgId:
+      name: orgId
+      in: path
+      required: true
+      schema:
+        type: string
+    UserId:
+      name: userId
+      in: path
+      required: true
+      schema:
+        type: string
+    ProjectId:
+      name: projectId
+      in: path
+      required: true
+      schema:
+        type: string
+    AuthorizationId:
+      name: authorizationId
+      in: path
+      required: true
+      schema:
+        type: string
+
   responses:
     Error:
-      description: No session (401) or no admin role (403)
+      description: >-
+        An error: invalid input (400), no session (401), no admin role or a
+        cross-site request (403), not found in Zitadel (404), a conflict with
+        Zitadel's state or a refused change to the admin's own access (409),
+        Zitadel unavailable or refusing the service account (502), Zitadel
+        too slow (504)
       content:
         application/json:
           schema:
             $ref: "#/components/schemas/Error"
+    Created:
+      description: Created; the ID of the new resource
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Created"
+
   schemas:
     Me:
       type: object
@@ -54,9 +850,492 @@ components:
           type: string
           format: date-time
           description: When the session ends and the user must sign in again
+
     Error:
       type: object
       required: [error]
       properties:
         error:
           type: string
+
+    Created:
+      type: object
+      required: [id]
+      properties:
+        id:
+          type: string
+
+    Overview:
+      type: object
+      required: [organizations, human_users, machine_users, projects]
+      properties:
+        organizations:
+          type: integer
+          format: int64
+        human_users:
+          type: integer
+          format: int64
+        machine_users:
+          type: integer
+          format: int64
+        projects:
+          type: integer
+          format: int64
+
+    OrgState:
+      type: string
+      enum: [active, inactive, removed, unspecified]
+
+    Org:
+      type: object
+      required: [id, name, state, primary_domain, is_default]
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        state:
+          $ref: "#/components/schemas/OrgState"
+        primary_domain:
+          type: string
+        is_default:
+          type: boolean
+          description: The instance's default organization, which Zitadel does not delete
+        created_at:
+          type: string
+          format: date-time
+        changed_at:
+          type: string
+          format: date-time
+
+    OrgList:
+      type: object
+      required: [items, total]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/Org"
+        total:
+          type: integer
+          format: int64
+
+    OrgCreate:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 200
+
+    OrgUpdate:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 200
+
+    UserType:
+      type: string
+      enum: [human, machine]
+
+    UserState:
+      type: string
+      enum: [active, inactive, locked, initial, deleted, unspecified]
+
+    AccessTokenType:
+      type: string
+      enum: [bearer, jwt]
+      description: Opaque bearer tokens, or JWTs that the API Gateway validates locally
+
+    User:
+      type: object
+      required: [id, type, state, username, display_name, login_names, preferred_login_name, org_id, org_name]
+      properties:
+        id:
+          type: string
+        type:
+          $ref: "#/components/schemas/UserType"
+        state:
+          $ref: "#/components/schemas/UserState"
+        username:
+          type: string
+        display_name:
+          type: string
+          description: The display name of a human, the name of a machine, or the username
+        login_names:
+          type: array
+          items:
+            type: string
+        preferred_login_name:
+          type: string
+        org_id:
+          type: string
+        org_name:
+          type: string
+          description: Empty if the organization could not be read
+        created_at:
+          type: string
+          format: date-time
+        changed_at:
+          type: string
+          format: date-time
+        human:
+          $ref: "#/components/schemas/HumanProfile"
+        machine:
+          $ref: "#/components/schemas/MachineProfile"
+
+    HumanProfile:
+      type: object
+      required: [given_name, family_name, nick_name, display_name, email, email_verified, phone, phone_verified, password_change_required]
+      properties:
+        given_name:
+          type: string
+        family_name:
+          type: string
+        nick_name:
+          type: string
+        display_name:
+          type: string
+        email:
+          type: string
+        email_verified:
+          type: boolean
+        phone:
+          type: string
+        phone_verified:
+          type: boolean
+        password_change_required:
+          type: boolean
+        password_changed_at:
+          type: string
+          format: date-time
+
+    MachineProfile:
+      type: object
+      required: [name, description, has_secret, access_token_type]
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        has_secret:
+          type: boolean
+        access_token_type:
+          $ref: "#/components/schemas/AccessTokenType"
+
+    UserList:
+      type: object
+      required: [items, total]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/User"
+        total:
+          type: integer
+          format: int64
+
+    HumanUserCreate:
+      type: object
+      required: [org_id, given_name, family_name, email]
+      properties:
+        org_id:
+          type: string
+          minLength: 1
+        username:
+          type: string
+          maxLength: 200
+          description: Zitadel uses the email if empty
+        given_name:
+          type: string
+          minLength: 1
+          maxLength: 200
+        family_name:
+          type: string
+          minLength: 1
+          maxLength: 200
+        display_name:
+          type: string
+          maxLength: 200
+        email:
+          type: string
+          minLength: 1
+          maxLength: 200
+        email_verified:
+          type: boolean
+          default: false
+          description: Without it Zitadel sends a verification email, if it can send email
+        password:
+          type: string
+          maxLength: 200
+          description: Optional initial password; without it the user stays in the initial state
+        password_change_required:
+          type: boolean
+          default: false
+
+    MachineUserCreate:
+      type: object
+      required: [org_id, username, name]
+      properties:
+        org_id:
+          type: string
+          minLength: 1
+        username:
+          type: string
+          minLength: 1
+          maxLength: 200
+          description: Also the client ID for client credentials
+        name:
+          type: string
+          minLength: 1
+          maxLength: 200
+        description:
+          type: string
+          maxLength: 500
+        access_token_type:
+          $ref: "#/components/schemas/AccessTokenType"
+
+    UserUpdate:
+      type: object
+      description: Only the fields that are set change. human is for humans, machine for machines.
+      properties:
+        username:
+          type: string
+          minLength: 1
+          maxLength: 200
+        human:
+          $ref: "#/components/schemas/HumanUserUpdate"
+        machine:
+          $ref: "#/components/schemas/MachineUserUpdate"
+
+    HumanUserUpdate:
+      type: object
+      properties:
+        given_name:
+          type: string
+          minLength: 1
+          maxLength: 200
+        family_name:
+          type: string
+          minLength: 1
+          maxLength: 200
+        nick_name:
+          type: string
+          minLength: 1
+          maxLength: 200
+        display_name:
+          type: string
+          minLength: 1
+          maxLength: 200
+        email:
+          type: string
+          minLength: 1
+          maxLength: 200
+        email_verified:
+          type: boolean
+          description: With email, mark the new address as verified
+
+    MachineUserUpdate:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 200
+        description:
+          type: string
+          maxLength: 500
+
+    PasswordSet:
+      type: object
+      required: [password]
+      properties:
+        password:
+          type: string
+          minLength: 1
+          maxLength: 200
+        change_required:
+          type: boolean
+          default: false
+          description: The user must choose a new password at the next sign-in
+
+    MachineSecret:
+      type: object
+      required: [client_id, client_secret]
+      properties:
+        client_id:
+          type: string
+        client_secret:
+          type: string
+
+    AuthorizationState:
+      type: string
+      enum: [active, inactive, unspecified]
+
+    Role:
+      type: object
+      required: [key, display_name, group]
+      properties:
+        key:
+          type: string
+        display_name:
+          type: string
+        group:
+          type: string
+
+    Authorization:
+      type: object
+      required: [id, state, project_id, project_name, project_org_id, org_id, org_name, user_id, user_login_name, user_display_name, user_org_id, roles]
+      properties:
+        id:
+          type: string
+        state:
+          $ref: "#/components/schemas/AuthorizationState"
+        project_id:
+          type: string
+        project_name:
+          type: string
+        project_org_id:
+          type: string
+        org_id:
+          type: string
+          description: The organization the roles are given on behalf of
+        org_name:
+          type: string
+        user_id:
+          type: string
+        user_login_name:
+          type: string
+        user_display_name:
+          type: string
+        user_org_id:
+          type: string
+        roles:
+          type: array
+          items:
+            $ref: "#/components/schemas/Role"
+        created_at:
+          type: string
+          format: date-time
+        changed_at:
+          type: string
+          format: date-time
+
+    AuthorizationList:
+      type: object
+      required: [items, total]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/Authorization"
+        total:
+          type: integer
+          format: int64
+
+    AuthorizationCreate:
+      type: object
+      required: [user_id, project_id, role_keys]
+      properties:
+        user_id:
+          type: string
+          minLength: 1
+        project_id:
+          type: string
+          minLength: 1
+        org_id:
+          type: string
+          description: The organization that owns the project or has a grant for it; the project's owner if empty
+        role_keys:
+          type: array
+          minItems: 1
+          items:
+            type: string
+            minLength: 1
+
+    AuthorizationUpdate:
+      type: object
+      required: [role_keys]
+      properties:
+        role_keys:
+          type: array
+          minItems: 1
+          items:
+            type: string
+            minLength: 1
+
+    ProjectState:
+      type: string
+      enum: [active, inactive, unspecified]
+
+    Project:
+      type: object
+      required: [id, name, org_id, org_name, state, role_assertion, authorization_required, access_required]
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        org_id:
+          type: string
+          description: The organization that owns the project
+        org_name:
+          type: string
+          description: Empty if the organization could not be read
+        state:
+          $ref: "#/components/schemas/ProjectState"
+        role_assertion:
+          type: boolean
+          description: Roles go into the tokens
+        authorization_required:
+          type: boolean
+          description: Only users with a role may sign in to its apps
+        access_required:
+          type: boolean
+          description: Only users of organizations with access may sign in to its apps
+        granted_org_id:
+          type: string
+        granted_org_name:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+        changed_at:
+          type: string
+          format: date-time
+
+    ProjectList:
+      type: object
+      required: [items, total]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/Project"
+        total:
+          type: integer
+          format: int64
+
+    ProjectRole:
+      type: object
+      required: [key, display_name, group]
+      properties:
+        key:
+          type: string
+        display_name:
+          type: string
+        group:
+          type: string
+
+    ProjectRoleList:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/ProjectRole"
