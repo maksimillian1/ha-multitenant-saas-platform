@@ -1,0 +1,62 @@
+# The JSON API of the admin app. The Go types (api/types.gen.go, oapi-codegen)
+# and the SPA's client types (web/src/api/schema.d.ts, openapi-typescript) are
+# generated from this file; change it first, then run `go generate ./...` and
+# `npm run gen:api` in web.
+openapi: 3.0.3
+info:
+  title: Admin API
+  version: 0.1.0
+paths:
+  /api/me:
+    get:
+      operationId: getMe
+      summary: The signed-in super admin
+      responses:
+        "200":
+          description: The session of the request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Me"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+components:
+  responses:
+    Error:
+      description: No session (401) or no admin role (403)
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+  schemas:
+    Me:
+      type: object
+      required: [subject, name, email, roles, admin_role, expires_at]
+      properties:
+        subject:
+          type: string
+          description: Zitadel user ID
+        name:
+          type: string
+        email:
+          type: string
+        roles:
+          type: array
+          items:
+            type: string
+          description: Roles in the platform-admin project, copied at sign-in
+        admin_role:
+          type: string
+          description: The role the admin app requires (ADMIN_ROLE)
+        expires_at:
+          type: string
+          format: date-time
+          description: When the session ends and the user must sign in again
+    Error:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: string

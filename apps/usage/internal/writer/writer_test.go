@@ -17,7 +17,8 @@ import (
 	"github.com/google/uuid"
 	"github.com/twmb/franz-go/pkg/kfake"
 
-	"github.com/maksimillian1/ha-multitenant-saas-platform/apps/usage/internal/event"
+	"github.com/maksimillian1/ha-multitenant-saas-platform/apps/usage/internal/core"
+	"github.com/maksimillian1/ha-multitenant-saas-platform/apps/usage/internal/kafka"
 	"github.com/maksimillian1/ha-multitenant-saas-platform/apps/usage/internal/store"
 	"github.com/maksimillian1/ha-multitenant-saas-platform/apps/usage/internal/testpg"
 	"github.com/maksimillian1/ha-multitenant-saas-platform/apps/usage/internal/writeapi"
@@ -35,7 +36,7 @@ type pipeline struct {
 	db      testpg.DB
 	st      *store.Postgres
 	brokers []string
-	api     http.Handler
+	api     *writeapi.Service
 	group   string
 }
 
@@ -47,7 +48,7 @@ func newPipeline(t *testing.T) *pipeline {
 		t.Fatal(err)
 	}
 	t.Cleanup(cluster.Close)
-	k, err := writeapi.NewKafka(cluster.ListenAddrs(), topic)
+	k, err := kafka.NewProducer(cluster.ListenAddrs(), topic)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -57,37 +58,37 @@ func newPipeline(t *testing.T) *pipeline {
 		t.Fatal(err)
 	}
 	t.Cleanup(st.Close)
-	return &pipeline{t: t, db: db, st: st, brokers: cluster.ListenAddrs(), api: writeapi.New(k, quiet), group: "usage-writer"}
+	return &pipeline{t: t, db: db, st: st, brokers: cluster.ListenAddrs(), api: writeapi.NewService(k, quiet), group: "usage-writer"}
 }
 
-func newEvent(tenant string) event.Event {
-	return event.Event{
+func newEvent(tenant string) core.Event {
+	return core.Event{
 		ID: uuid.Must(uuid.NewV7()).String(), Time: time.Now().UTC(), TenantID: tenant,
 		Metric: "api_calls", Quantity: 1, Attributes: json.RawMessage(`{"method":"GET","path":"/items","status":200}`),
 	}
 }
 
 // send posts events to UsageWriteAPI and returns the status code.
-func (p *pipeline) send(events ...event.Event) int {
+func (p *pipeline) send(events ...core.Event) int {
 	p.t.Helper()
 	raw, err := json.Marshal(map[string]any{"events": events})
 	if err != nil {
 		p.t.Fatal(err)
 	}
 	w := httptest.NewRecorder()
-	p.api.ServeHTTP(w, httptest.NewRequest(http.MethodPost, "/v1/events", bytes.NewReader(raw)))
+	p.api.EventsHandler(w, httptest.NewRequest(http.MethodPost, "/v1/events", bytes.NewReader(raw)))
 	return w.Code
 }
 
 // startWriter runs a Usage Writer on st until the returned stop is called or
 // the writer returns on its own.
-func (p *pipeline) startWriter(st store.Writer, afterStore func() error) (w *Writer, stop func(), done <-chan error) {
+func (p *pipeline) startWriter(st core.EventWriter, afterStore func() error) (w *Service, stop func(), done <-chan error) {
 	p.t.Helper()
-	client, err := NewClient(p.brokers, topic, p.group)
+	client, err := kafka.NewConsumer(p.brokers, topic, p.group)
 	if err != nil {
 		p.t.Fatal(err)
 	}
-	w = New(client, st, quiet)
+	w = NewService(client, st, quiet)
 	w.afterStore = afterStore
 	ctx, cancel := context.WithCancel(context.Background())
 	ch := make(chan error, 1)
@@ -103,7 +104,7 @@ func (p *pipeline) startWriter(st store.Writer, afterStore func() error) (w *Wri
 	return w, stop, ch
 }
 
-func ids(events []event.Event) []string {
+func ids(events []core.Event) []string {
 	out := make([]string, len(events))
 	for i, e := range events {
 		out[i] = e.ID
@@ -113,7 +114,7 @@ func ids(events []event.Event) []string {
 
 // waitForCount waits until exactly want rows of these events are stored, then
 // checks that the count stays there.
-func (p *pipeline) waitForCount(events []event.Event, want int, within time.Duration) {
+func (p *pipeline) waitForCount(events []core.Event, want int, within time.Duration) {
 	p.t.Helper()
 	deadline := time.Now().Add(within)
 	for {
@@ -142,7 +143,7 @@ func TestSameEventThreeTimesIsStoredOnce(t *testing.T) {
 			t.Fatalf("send %d: status %d", i, code)
 		}
 	}
-	p.waitForCount([]event.Event{e}, 1, 10*time.Second)
+	p.waitForCount([]core.Event{e}, 1, 10*time.Second)
 	deadline := time.Now().Add(5 * time.Second)
 	for w.Skipped.Load() < 2 && time.Now().Before(deadline) {
 		time.Sleep(20 * time.Millisecond)
@@ -157,7 +158,7 @@ func TestSameEventThreeTimesIsStoredOnce(t *testing.T) {
 // and the dedup key keeps one row per event.
 func TestCrashBeforeOffsetCommitStoresOnce(t *testing.T) {
 	p := newPipeline(t)
-	var events []event.Event
+	var events []core.Event
 	for i := 0; i < 50; i++ {
 		e := newEvent([]string{"tenant-a", "tenant-b"}[i%2])
 		events = append(events, e)
@@ -194,12 +195,12 @@ func TestCrashBeforeOffsetCommitStoresOnce(t *testing.T) {
 // failingStore fails every write until the outage ends, like a database that
 // cannot be reached.
 type failingStore struct {
-	next     store.Writer
+	next     core.EventWriter
 	down     atomic.Bool
 	failures atomic.Int64
 }
 
-func (f *failingStore) Write(ctx context.Context, events []event.Event) ([]event.Event, error) {
+func (f *failingStore) Write(ctx context.Context, events []core.Event) ([]core.Event, error) {
 	if f.down.Load() {
 		f.failures.Add(1)
 		return nil, errors.New("connection refused")
@@ -215,7 +216,7 @@ func TestDatabaseOutageLosesNothing(t *testing.T) {
 	fs.down.Store(true)
 	p.startWriter(fs, nil)
 
-	var accepted []event.Event
+	var accepted []core.Event
 	for i := 0; i < 40; i++ {
 		e := newEvent([]string{"tenant-a", "tenant-b"}[i%2])
 		if code := p.send(e); code != http.StatusAccepted {

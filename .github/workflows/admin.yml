@@ -1,0 +1,49 @@
+name: admin
+
+on:
+  pull_request:
+    paths:
+      - "apps/admin/**"
+      - ".github/workflows/admin.yml"
+  push:
+    branches: [master]
+    paths:
+      - "apps/admin/**"
+      - ".github/workflows/admin.yml"
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/admin
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: apps/admin/go.mod
+          cache-dependency-path: apps/admin/go.sum
+      - name: Go types match openapi.yaml
+        run: go generate ./... && git diff --exit-code
+      - run: go vet ./...
+      - name: Build for arm64 (C-06)
+        run: CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -o /dev/null .
+      - run: go test -count=1 ./...
+
+  spa:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/admin/ui/app
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: apps/admin/ui/app/.nvmrc
+          cache: npm
+          cache-dependency-path: apps/admin/ui/app/package-lock.json
+      - run: npm ci
+      - name: TypeScript types match openapi.yaml
+        run: npm run gen:api && git diff --exit-code
+      - run: npm run lint
+      - run: npm run build

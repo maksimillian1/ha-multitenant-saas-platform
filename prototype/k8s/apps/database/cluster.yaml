@@ -42,28 +42,6 @@ stringData:
   username: exampleapp
   password: dev-exampleapp
 ---
-# Owner of the usage database (ADR-0006). Only the usage migrate job uses it.
-apiVersion: v1
-kind: Secret
-metadata:
-  name: usage-owner
-  namespace: database
-type: kubernetes.io/basic-auth
-stringData:
-  username: usage_owner
-  password: dev-usage-owner
----
-# Runtime role of Usage Writer: not the owner, NOSUPERUSER, NOBYPASSRLS (HAMSP-26 AC-11).
-apiVersion: v1
-kind: Secret
-metadata:
-  name: usage-writer
-  namespace: database
-type: kubernetes.io/basic-auth
-stringData:
-  username: usage_writer
-  password: dev-usage-writer
----
 apiVersion: postgresql.cnpg.io/v1
 kind: Cluster
 metadata:
@@ -71,6 +49,9 @@ metadata:
   namespace: database
 spec:
   instances: 3
+  # Pinned: without imageName every operator upgrade moves the cluster to the
+  # operator's default image, which for CNPG 1.30 is PostgreSQL 18.
+  imageName: ghcr.io/cloudnative-pg/postgresql:16.3
   storage:
     size: 5Gi
   enableSuperuserAccess: true
@@ -94,26 +75,12 @@ spec:
         inherit: false
         passwordSecret:
           name: exampleapp-db
-      # The usage database is created by the usage migrate job; CNPG 1.23 has
-      # no Database resource (ADR-0006).
-      - name: usage_owner
-        ensure: present
-        login: true
-        superuser: false
-        createdb: false
-        createrole: false
-        passwordSecret:
-          name: usage-owner
+      # The usage database moved to its own cluster (ADR-0008, usage-db). These
+      # drop what HAMSP-26 left here on clusters created before the move.
       - name: usage_writer
-        ensure: present
-        login: true
-        superuser: false
-        bypassrls: false
-        createdb: false
-        createrole: false
-        inherit: false
-        passwordSecret:
-          name: usage-writer
+        ensure: absent
+      - name: usage_owner
+        ensure: absent
   postgresql:
     parameters:
       shared_buffers: "256MB"
@@ -121,10 +88,14 @@ spec:
       log_autovacuum_min_duration: "0"
       log_lock_waits: "on"
       log_checkpoints: "on"
-  # Quorum synchronous replication: a commit waits for ANY 1 standby.
-  # spec.postgresql.synchronous needs CNPG 1.24+; the operator here is 1.23.
-  minSyncReplicas: 1
-  maxSyncReplicas: 1
+    # Quorum synchronous replication: a commit waits for ANY 1 standby.
+    synchronous:
+      method: any
+      number: 1
+  # A rolling update (new image, new operator) moves the primary to an updated
+  # standby first instead of restarting it in place, so writes stop only for
+  # the switchover.
+  primaryUpdateMethod: switchover
   backup:
     barmanObjectStore:
       destinationPath: s3://postgres-backups/
@@ -156,6 +127,22 @@ spec:
       # Smaller than ExampleApp's own pool, so server connections are reused
       # across tenants and requests (HAMSP-5 AC-9).
       default_pool_size: "2"
+---
+# The usage database of HAMSP-26 lived here until it moved to its own cluster
+# (ADR-0008). This drops it on clusters created before the move; on new ones
+# it does nothing.
+apiVersion: postgresql.cnpg.io/v1
+kind: Database
+metadata:
+  name: legacy-usage
+  namespace: database
+spec:
+  name: usage
+  owner: usage_owner
+  cluster:
+    name: main-pg-cluster
+  ensure: absent
+  databaseReclaimPolicy: delete
 ---
 apiVersion: postgresql.cnpg.io/v1
 kind: Backup

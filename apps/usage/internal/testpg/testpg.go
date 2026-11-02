@@ -1,7 +1,8 @@
 // Package testpg gives tests a fresh, migrated usage database. It needs a
-// PostgreSQL superuser DSN in TEST_DATABASE_URL, e.g.
-// postgres://postgres:postgres@localhost:5432/postgres?sslmode=disable.
-// CI sets it (.github/workflows/usage.yml); locally the tests are skipped without it.
+// superuser DSN of a PostgreSQL server with TimescaleDB (TSL) in
+// TEST_DATABASE_URL, e.g. postgres://postgres:postgres@localhost:5432/postgres?sslmode=disable
+// against timescale/timescaledb:2.27.2-pg18. CI sets it
+// (.github/workflows/usage.yml); locally the tests are skipped without it.
 package testpg
 
 import (
@@ -14,12 +15,13 @@ import (
 
 	"github.com/jackc/pgx/v5"
 
-	"github.com/maksimillian1/ha-multitenant-saas-platform/apps/usage/internal/store"
+	"github.com/maksimillian1/ha-multitenant-saas-platform/apps/usage/internal/migrations"
 )
 
 const (
 	OwnerRole  = "usage_owner"
 	WriterRole = "usage_writer"
+	ReaderRole = "usage_reader" // NOLOGIN here; tests use SET ROLE
 	password   = "test-only-password"
 )
 
@@ -43,8 +45,9 @@ func dsnFor(t testing.TB, base, user, db string) string {
 	return u.String()
 }
 
-// New creates the two roles like the CNPG cluster does, then a fresh database
-// through store.CreateDatabase, and applies the migrations as the owner.
+// New creates the roles and a fresh database with the timescaledb extension,
+// like the usage cluster's managed roles and Database resource do, and applies
+// the migrations as the owner.
 func New(t testing.TB) DB {
 	t.Helper()
 	base := os.Getenv("TEST_DATABASE_URL")
@@ -62,7 +65,8 @@ func New(t testing.TB) DB {
 		fmt.Sprintf(`DO $$ BEGIN
 			IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = '%[1]s') THEN CREATE ROLE %[1]s LOGIN; END IF;
 			IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = '%[2]s') THEN CREATE ROLE %[2]s LOGIN; END IF;
-		END $$`, OwnerRole, WriterRole),
+			IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = '%[3]s') THEN CREATE ROLE %[3]s NOLOGIN; END IF;
+		END $$`, OwnerRole, WriterRole, ReaderRole),
 		fmt.Sprintf("ALTER ROLE %s PASSWORD '%s'", OwnerRole, password),
 		fmt.Sprintf("ALTER ROLE %s PASSWORD '%s' NOSUPERUSER NOBYPASSRLS", WriterRole, password),
 	} {
@@ -72,24 +76,29 @@ func New(t testing.TB) DB {
 	}
 
 	name := fmt.Sprintf("usage_test_%d", time.Now().UnixNano())
-	if _, err := store.CreateDatabase(ctx, admin, name, OwnerRole); err != nil {
+	if _, err := admin.Exec(ctx, fmt.Sprintf("CREATE DATABASE %s OWNER %s", name, OwnerRole)); err != nil {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _, _ = admin.Exec(ctx, fmt.Sprintf("DROP DATABASE %s WITH (FORCE)", name)) })
+
+	super, err := pgx.Connect(ctx, dsnFor(t, base, "", name))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { super.Close(ctx) })
+	if _, err := super.Exec(ctx, "CREATE EXTENSION IF NOT EXISTS timescaledb"); err != nil {
+		t.Fatal(err)
+	}
 
 	owner, err := pgx.Connect(ctx, dsnFor(t, base, OwnerRole, name))
 	if err != nil {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { owner.Close(ctx) })
-	if err := store.Migrate(ctx, owner); err != nil {
+	if err := migrations.Migrate(ctx, owner); err != nil {
 		t.Fatal(err)
 	}
-	super, err := pgx.Connect(ctx, dsnFor(t, base, "", name))
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { super.Close(ctx) })
+	pauseJobs(t, super)
 	return DB{Name: name, Super: super, Owner: owner, WriterDSN: dsnFor(t, base, WriterRole, name)}
 }
 
@@ -102,4 +111,34 @@ func (db DB) Count(t testing.TB, ids []string) int {
 		t.Fatal(err)
 	}
 	return n
+}
+
+// pauseJobs unschedules the policies the migrations created, so only the tests
+// run them (CALL run_job runs an unscheduled job too). Otherwise the background
+// scheduler may start a policy while a test runs the same one, and a second
+// refresh of a continuous aggregate fails with 55P03 (HAMSP-32). A run the
+// scheduler started before the jobs were paused is waited for.
+func pauseJobs(t testing.TB, super *pgx.Conn) {
+	t.Helper()
+	ctx := context.Background()
+	// Jobs below 1000 are TimescaleDB's own (telemetry, job history).
+	if _, err := super.Exec(ctx,
+		"SELECT alter_job(job_id, scheduled => false) FROM timescaledb_information.jobs WHERE job_id >= 1000"); err != nil {
+		t.Fatalf("pause jobs: %v", err)
+	}
+	deadline := time.Now().Add(30 * time.Second)
+	for {
+		var running int
+		if err := super.QueryRow(ctx,
+			"SELECT count(*) FROM timescaledb_information.job_stats WHERE job_id >= 1000 AND job_status = 'Running'").Scan(&running); err != nil {
+			t.Fatalf("job stats: %v", err)
+		}
+		if running == 0 {
+			return
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("%d jobs still running after 30s", running)
+		}
+		time.Sleep(100 * time.Millisecond)
+	}
 }

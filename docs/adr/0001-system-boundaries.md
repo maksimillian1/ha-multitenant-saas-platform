@@ -43,7 +43,7 @@ We establish the following system boundaries, architectural rules, and multi-ten
     * **Event-Driven Scaling:** Usage Writer is scaled by **KEDA** on Kafka consumer lag. If a specific tenant floods the system, lag grows and KEDA adds consumers; UsageWriteAPI latency for other tenants is unaffected (QS-08). If the usage store is down, events wait in Kafka (QS-09).
 
 5. **Isolated Data Tier Boundary (CloudNativePG & PgBouncer):**
-   All relational data is consolidated into a PostgreSQL cluster managed by the CloudNativePG (CNPG) operator. In v1 it also holds the usage events, in their own database ([ADR-0006](0006-usage-store.md)).
+   All relational data is consolidated into a PostgreSQL cluster managed by the CloudNativePG (CNPG) operator. In v1 it also held the usage events, in their own database ([ADR-0006](0006-usage-store.md)); since [ADR-0008](0008-usage-store-on-timescaledb.md) the usage database runs on its own CNPG cluster.
     * **Data Isolation Model:** We implement a **Shared Database with Row-Level Security (RLS)** model (ADR-0002). A shared instance maximizes connection pooling efficiency via built-in PgBouncer, allowing us to hit 5000+ RPS without database backend worker exhaustion.
     * **Database Guardrails:** Every multi-tenant table must enforce `ALTER TABLE ... ENABLE ROW LEVEL SECURITY`. The application middleware must execute a session-level tenant configuration (e.g., `SET LOCAL app.current_tenant_id = '...'`) immediately upon acquiring a connection from the pool.
     * **Auth Data:** Zitadel uses its own database in the same CNPG cluster, separate from application data (ADR-0003).
