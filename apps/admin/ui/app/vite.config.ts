@@ -1,4 +1,3 @@
-import path from 'node:path'
 import tailwindcss from '@tailwindcss/vite'
 import react from '@vitejs/plugin-react'
 import { defineConfig } from 'vite'
@@ -8,7 +7,21 @@ import { defineConfig } from 'vite'
 export default defineConfig({
   plugins: [react(), tailwindcss()],
   resolve: {
-    alias: { '@': path.resolve(__dirname, './src') },
+    alias: { '@': `${import.meta.dirname}/src` },
+  },
+  build: {
+    rolldownOptions: {
+      output: {
+        // Libraries change less often than the pages, so they get their own
+        // long-cached chunks (ui.go serves assets/ as immutable).
+        codeSplitting: {
+          groups: [
+            { name: 'react', test: /node_modules[\\/](react|react-dom|scheduler)[\\/]/, priority: 2 },
+            { name: 'vendor', test: /node_modules[\\/]/, priority: 1 },
+          ],
+        },
+      },
+    },
   },
   server: {
     proxy: {

@@ -1,6 +1,6 @@
 import { LogOut } from 'lucide-react'
 import { useRef } from 'react'
-import type { components } from '@/api/schema'
+import type { Me } from '@/api/queries'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
 import {
@@ -11,16 +11,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-
-type Me = components['schemas']['Me']
-
-function initials(name: string) {
-  const letters = name
-    .split(/\s+/)
-    .filter(Boolean)
-    .map((part) => part[0])
-  return (letters.length ? letters.slice(0, 2).join('') : '?').toUpperCase()
-}
+import { initials } from '@/lib/format'
 
 export function UserMenu({ me }: { me: Me }) {
   // Sign-out is a POST form: the Go server drops the session cookie and sends
