@@ -11,6 +11,7 @@ import (
 	"github.com/maksimillian1/ha-multitenant-saas-platform/apps/admin/auth"
 	"github.com/maksimillian1/ha-multitenant-saas-platform/apps/admin/health"
 	"github.com/maksimillian1/ha-multitenant-saas-platform/apps/admin/ui"
+	"github.com/maksimillian1/ha-multitenant-saas-platform/apps/admin/zitadel"
 )
 
 // TestRoutes checks that the patterns register without a conflict and that
@@ -19,7 +20,7 @@ func TestRoutes(t *testing.T) {
 	log := slog.New(slog.NewTextHandler(io.Discard, nil))
 	authService := auth.NewService(nil, auth.NewCookies("0123456789abcdef0123456789abcdef"), "http://admin.test", "client", log)
 	mux := routes(authService,
-		api.NewService(authService, "super-admin", log),
+		api.NewService(authService, zitadel.NewClient("http://zitadel.test", "token", http.DefaultClient), "super-admin", "http://admin.test", log),
 		ui.NewService(authService, log),
 		health.NewService())
 
@@ -30,10 +31,14 @@ func TestRoutes(t *testing.T) {
 	}{
 		{http.MethodGet, "/healthz", http.StatusOK, ""},
 		{http.MethodGet, "/api/me", http.StatusUnauthorized, "application/json"},
+		{http.MethodGet, "/api/orgs", http.StatusUnauthorized, "application/json"},
+		{http.MethodPost, "/api/users/42/lock", http.StatusUnauthorized, "application/json"},
+		{http.MethodGet, "/api/projects/7/roles", http.StatusUnauthorized, "application/json"},
 		{http.MethodGet, "/api/unknown", http.StatusNotFound, "application/json"},
 		{http.MethodGet, "/", http.StatusFound, ""},
 		{http.MethodGet, "/tenants/42", http.StatusFound, ""},
 		{http.MethodPost, "/api/me", http.StatusMethodNotAllowed, ""},
+		{http.MethodPut, "/api/orgs/1", http.StatusMethodNotAllowed, ""},
 	} {
 		rec := httptest.NewRecorder()
 		mux.ServeHTTP(rec, httptest.NewRequest(tc.method, tc.target, nil))
