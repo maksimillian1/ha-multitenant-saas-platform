@@ -4,7 +4,7 @@ info:
   version: "1"
   description: |
     Accepts usage events from senders and writes them to Kafka
-    (docs/contracts/usage-events.md, ADR-0010). Only the API Gateway may call it
+    (docs/contracts/usage-event/README.md, ADR-0010). Only the API Gateway may call it
     (CiliumNetworkPolicy); it trusts tenant_id in the events because of that.
 servers:
   - url: http://usage-writeapi.usage.svc:8080

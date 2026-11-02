@@ -12,7 +12,7 @@ import (
 const TenantHeader = "x-tenant-id"
 
 // UsageEvent is one usage event as UsageWriteAPI accepts it
-// (docs/contracts/usage-events.md).
+// (docs/contracts/usage-event).
 type UsageEvent struct {
 	ID         string         `json:"event_id"`
 	Time       time.Time      `json:"event_time"`

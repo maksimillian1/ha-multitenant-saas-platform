@@ -1,4 +1,4 @@
-# UsageWriteAPI (docs/contracts/usage-events.md): 202 only after Kafka confirmed the events.
+# UsageWriteAPI (docs/contracts/usage-event): 202 only after Kafka confirmed the events.
 # Wave 2, after writer: a new event format reaches Kafka only once the writer
 # that reads it runs. It has no database credentials.
 apiVersion: apps/v1

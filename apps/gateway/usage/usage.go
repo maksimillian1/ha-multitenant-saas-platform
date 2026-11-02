@@ -1,5 +1,5 @@
 // Package usage reports every API call as a usage event to UsageWriteAPI
-// (docs/contracts/usage-events.md). Each event is one asynchronous
+// (docs/contracts/usage-event). Each event is one asynchronous
 // request with retries, so the client's response never waits for usage. At
 // most Limit events may be unsent at a time; beyond that new events are
 // dropped and counted, so an outage of UsageWriteAPI cannot exhaust the

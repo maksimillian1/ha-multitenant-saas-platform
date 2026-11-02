@@ -10,7 +10,7 @@ client → Cilium Gateway API (Envoy, routes by host)
 API Gateway → UsageWriteAPI → Kafka (Strimzi) → Usage Writer → PgBouncer → usage cluster (PostgreSQL 18 + TimescaleDB)
 ```
 
-Every API call through the API Gateway becomes one usage event ([contract](../docs/contracts/usage-events.md), [ADR-0005](../docs/adr/0005-kafka-on-strimzi.md), [ADR-0006](../docs/adr/0006-usage-store.md), [ADR-0007](../docs/adr/0007-usage-event-deduplication.md)). The usage database runs on its own CNPG cluster with TimescaleDB under the Timescale License ([ADR-0008](../docs/adr/0008-usage-store-on-timescaledb.md)).
+Every API call through the API Gateway becomes one usage event ([contract](../docs/contracts/usage-event/README.md), [ADR-0005](../docs/adr/0005-kafka-on-strimzi.md), [ADR-0006](../docs/adr/0006-usage-store.md), [ADR-0007](../docs/adr/0007-usage-event-deduplication.md)). The usage database runs on its own CNPG cluster with TimescaleDB under the Timescale License ([ADR-0008](../docs/adr/0008-usage-store-on-timescaledb.md)).
 
 The two gateway layers are described in [ADR-0004](../docs/adr/0004-api-gateway-go-service.md).
 

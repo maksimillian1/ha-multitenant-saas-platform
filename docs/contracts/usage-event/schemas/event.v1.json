@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "Usage event v1",
-  "description": "One usage event, as the API Gateway sends it and as it travels through Kafka (docs/contracts/usage-events.md). Not expressible here, checked by core.Validate: event_time within [now - 7 days, now + 5 min] and attributes at most 4 KB. Unknown properties are allowed, so a reader of v1 accepts a later version that adds one.",
+  "description": "One usage event, as the API Gateway sends it and as it travels through Kafka (docs/contracts/usage-event/README.md). Not expressible here, checked by core.Validate: event_time within [now - 7 days, now + 5 min] and attributes at most 4 KB. Unknown properties are allowed, so a reader of v1 accepts a later version that adds one.",
   "type": "object",
   "required": ["event_id", "event_time", "tenant_id", "metric", "quantity"],
   "properties": {

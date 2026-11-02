@@ -30,7 +30,7 @@ An imported package runs its `init()` and stays in the binary even if nothing ca
 
 ## Contract
 
-The HTTP and Kafka contracts are in [docs/contracts/usage-events.md](../../docs/contracts/usage-events.md); their fixtures, which gateway, writeapi and writer test against, are in [docs/contracts/usage-event](../../docs/contracts/usage-event/README.md).
+The HTTP and Kafka contracts are the schemas in [docs/contracts/usage-event](../../docs/contracts/usage-event/README.md) (ADR-0010). `participants.json` there declares which versions writeapi and writer read and write; the tests in `internal/writeapi`, `internal/kafka` and `internal/writer` run against the examples of every declared version (`internal/contracttest`).
 
 ## Local checks
 

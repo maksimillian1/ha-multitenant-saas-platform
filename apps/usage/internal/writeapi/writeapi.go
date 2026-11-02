@@ -1,4 +1,4 @@
-// Package writeapi is UsageWriteAPI (docs/contracts/usage-events.md): it
+// Package writeapi is UsageWriteAPI (docs/contracts/usage-event): it
 // validates a batch of usage events and answers 202 only after Kafka confirmed
 // every event (ADR-0005).
 package writeapi
