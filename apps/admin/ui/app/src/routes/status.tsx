@@ -1,11 +1,12 @@
 import { Link, useRouter, type ErrorComponentProps } from '@tanstack/react-router'
-import { CircleAlert, ShieldX } from 'lucide-react'
+import { CircleAlert, SearchX, ShieldX } from 'lucide-react'
 import { ApiError } from '@/api/client'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import { Card, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
 
+// RoutePending is the whole screen before the signed-in admin is known.
 export function RoutePending() {
   return (
     <div className="mx-auto flex max-w-5xl flex-col gap-6 px-4 py-8">
@@ -18,25 +19,63 @@ export function RoutePending() {
   )
 }
 
-export function RouteError({ error }: ErrorComponentProps) {
-  const router = useRouter()
+// PagePending fills the content area while a page loads.
+export function PagePending() {
+  return (
+    <div className="flex flex-col gap-6" aria-busy="true">
+      <Skeleton className="h-8 w-64" />
+      <Skeleton className="h-40" />
+      <Skeleton className="h-64" />
+    </div>
+  )
+}
 
+// RouteError is the whole screen when the signed-in admin cannot be loaded.
+export function RouteError({ error }: ErrorComponentProps) {
   if (error instanceof ApiError && error.status === 403) {
     return <AccessDenied />
   }
   return (
     <div className="mx-auto max-w-xl px-4 py-16">
-      <Alert variant="destructive">
-        <CircleAlert />
-        <AlertTitle>Something went wrong</AlertTitle>
-        <AlertDescription>
-          <p>{error instanceof Error ? error.message : String(error)}</p>
-          <Button variant="outline" size="sm" className="mt-3" onClick={() => router.invalidate()}>
-            Try again
-          </Button>
-        </AlertDescription>
-      </Alert>
+      <ErrorAlert error={error} />
     </div>
+  )
+}
+
+// PageError replaces a page whose data cannot be loaded; the layout stays.
+export function PageError({ error }: ErrorComponentProps) {
+  if (error instanceof ApiError && error.status === 404) {
+    return (
+      <Card className="max-w-xl">
+        <CardHeader>
+          <SearchX className="mb-2 size-8 text-muted-foreground" />
+          <CardTitle>Not found</CardTitle>
+          <CardDescription>{error.message}. It may have been deleted.</CardDescription>
+        </CardHeader>
+        <CardFooter>
+          <Button variant="outline" asChild>
+            <Link to="/">Back to the overview</Link>
+          </Button>
+        </CardFooter>
+      </Card>
+    )
+  }
+  return <ErrorAlert error={error} />
+}
+
+function ErrorAlert({ error }: { error: unknown }) {
+  const router = useRouter()
+  return (
+    <Alert variant="destructive" className="max-w-xl">
+      <CircleAlert />
+      <AlertTitle>Something went wrong</AlertTitle>
+      <AlertDescription>
+        <p>{error instanceof Error ? error.message : String(error)}</p>
+        <Button variant="outline" size="sm" className="mt-3" onClick={() => router.invalidate()}>
+          Try again
+        </Button>
+      </AlertDescription>
+    </Alert>
   )
 }
 
@@ -69,7 +108,7 @@ export function NotFound() {
     <div className="flex flex-col items-start gap-3">
       <h1 className="text-2xl font-semibold tracking-tight">Page not found</h1>
       <Button variant="outline" asChild>
-        <Link to="/">Back to the dashboard</Link>
+        <Link to="/">Back to the overview</Link>
       </Button>
     </div>
   )
