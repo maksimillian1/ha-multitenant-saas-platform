@@ -7,6 +7,7 @@ import {
 } from '@tanstack/react-router'
 import { ApiError } from '@/api/client'
 import { meQuery, orgQuery, projectQuery, userQuery } from '@/api/queries'
+import { PlatformBrandingPage } from '@/routes/branding'
 import { OrgPage } from '@/routes/org'
 import { OrgsPage } from '@/routes/orgs'
 import { OverviewPage } from '@/routes/overview'
@@ -58,6 +59,9 @@ export type UsersSearch = {
   offset?: number
 }
 export type ProjectsSearch = { q?: string; org?: string; offset?: number }
+export const orgTabs = ['overview', 'branding'] as const
+export type OrgSearch = { tab?: (typeof orgTabs)[number] }
+const orgTab = oneOf(...orgTabs)
 
 // Every page needs the signed-in admin (the header shows it), so the root
 // route loads it before rendering.
@@ -89,6 +93,7 @@ const orgsRoute = createRoute({
 const orgRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/orgs/$orgId',
+  validateSearch: (search: Record<string, unknown>): OrgSearch => ({ tab: orgTab(search.tab) }),
   loader: ({ context, params }) => context.queryClient.ensureQueryData(orgQuery(params.orgId)),
   component: OrgPage,
 })
@@ -131,6 +136,12 @@ const projectRoute = createRoute({
   component: ProjectPage,
 })
 
+const platformBrandingRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/branding',
+  component: PlatformBrandingPage,
+})
+
 export const routeTree = rootRoute.addChildren([
   overviewRoute,
   orgsRoute,
@@ -139,6 +150,7 @@ export const routeTree = rootRoute.addChildren([
   userRoute,
   projectsRoute,
   projectRoute,
+  platformBrandingRoute,
 ])
 
 // createAppRouter builds the router; tests pass their own query client and

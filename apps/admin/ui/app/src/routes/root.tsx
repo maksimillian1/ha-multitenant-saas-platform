@@ -1,6 +1,6 @@
 import { useSuspenseQuery } from '@tanstack/react-query'
 import { Link, Outlet } from '@tanstack/react-router'
-import { Building2, FolderKanban, LayoutDashboard, PanelLeftClose, PanelLeftOpen, Users } from 'lucide-react'
+import { Building2, FolderKanban, LayoutDashboard, PanelLeftClose, PanelLeftOpen, Palette, Users } from 'lucide-react'
 import { useState } from 'react'
 import { meQuery } from '@/api/queries'
 import { ThemeMenu } from '@/components/theme-menu'
@@ -13,6 +13,7 @@ const nav = [
   { to: '/orgs', label: 'Organizations', icon: Building2, exact: false },
   { to: '/users', label: 'Users', icon: Users, exact: false },
   { to: '/projects', label: 'Projects', icon: FolderKanban, exact: false },
+  { to: '/branding', label: 'Branding', icon: Palette, exact: false },
 ] as const
 
 const linkStyle =

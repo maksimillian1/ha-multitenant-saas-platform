@@ -1,4 +1,4 @@
-import type { Authorization, Me, Org, Project, User } from '@/api/queries'
+import type { Authorization, BrandingSettings, BrandingState, Me, Org, Project, User } from '@/api/queries'
 
 // The instance after bootstrap-tenants.sh, as the API returns it.
 
@@ -142,4 +142,36 @@ export const list = <T>(items: T[], total = items.length) => ({ items, total })
 // signedIn are the answers every page needs.
 export const signedIn = {
   'GET /api/me': me,
+}
+
+// Branding as the API returns it: the platform's, with a logo, and
+// tenant-b's own, published green with a red draft.
+export const platformSettings: BrandingSettings = {
+  primary_color: '#5469d4',
+  background_color: '#fafafa',
+  warn_color: '#cd3d56',
+  font_color: '#000000',
+  primary_color_dark: '#a5b4fc',
+  background_color_dark: '#111827',
+  warn_color_dark: '#ff3b5b',
+  font_color_dark: '#ffffff',
+  hide_login_name_suffix: false,
+  disable_watermark: false,
+  theme_mode: 'auto',
+}
+
+const noAssets = { logo: false, 'logo-dark': false, icon: false, 'icon-dark': false, font: false }
+
+export const platformBranding: BrandingState = {
+  inherited: false,
+  active: { settings: platformSettings, assets: { ...noAssets, logo: true }, changed_at: created },
+  draft: { settings: platformSettings, assets: { ...noAssets, logo: true }, changed_at: created },
+}
+
+export const inheritedBranding: BrandingState = { ...platformBranding, inherited: true }
+
+export const tenantBBranding: BrandingState = {
+  inherited: false,
+  active: { settings: { ...platformSettings, primary_color: '#16a34a' }, assets: noAssets, changed_at: created },
+  draft: { settings: { ...platformSettings, primary_color: '#dc2626' }, assets: noAssets, changed_at: created },
 }
