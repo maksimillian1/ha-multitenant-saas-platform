@@ -39,6 +39,12 @@ func OrgScope(orgID string) Scope { return Scope{orgID: orgID} }
 // (IAM_OWNER).
 func InstanceScope() Scope { return Scope{instance: true} }
 
+// OrgID is the organization of an OrgScope, "" for the instance.
+func (s Scope) OrgID() string { return s.orgID }
+
+// IsInstance reports whether the scope is the instance's branding.
+func (s Scope) IsInstance() bool { return s.instance }
+
 var errNoScope = errors.New("zitadel: branding call without an organization or the instance")
 
 func (s Scope) check() error {

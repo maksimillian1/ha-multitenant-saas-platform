@@ -46,6 +46,33 @@ func (e AuthorizationState) Valid() bool {
 	}
 }
 
+// Defines values for BrandingAssetName.
+const (
+	BrandingAssetNameFont     BrandingAssetName = "font"
+	BrandingAssetNameIcon     BrandingAssetName = "icon"
+	BrandingAssetNameIconDark BrandingAssetName = "icon-dark"
+	BrandingAssetNameLogo     BrandingAssetName = "logo"
+	BrandingAssetNameLogoDark BrandingAssetName = "logo-dark"
+)
+
+// Valid indicates whether the value is a known member of the BrandingAssetName enum.
+func (e BrandingAssetName) Valid() bool {
+	switch e {
+	case BrandingAssetNameFont:
+		return true
+	case BrandingAssetNameIcon:
+		return true
+	case BrandingAssetNameIconDark:
+		return true
+	case BrandingAssetNameLogo:
+		return true
+	case BrandingAssetNameLogoDark:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for OrgState.
 const (
 	OrgStateActive      OrgState = "active"
@@ -85,6 +112,27 @@ func (e ProjectState) Valid() bool {
 	case ProjectStateInactive:
 		return true
 	case ProjectStateUnspecified:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ThemeMode.
+const (
+	ThemeModeAuto  ThemeMode = "auto"
+	ThemeModeDark  ThemeMode = "dark"
+	ThemeModeLight ThemeMode = "light"
+)
+
+// Valid indicates whether the value is a known member of the ThemeMode enum.
+func (e ThemeMode) Valid() bool {
+	switch e {
+	case ThemeModeAuto:
+		return true
+	case ThemeModeDark:
+		return true
+	case ThemeModeLight:
 		return true
 	default:
 		return false
@@ -139,6 +187,60 @@ func (e UserType) Valid() bool {
 	}
 }
 
+// Defines values for BrandingVersion.
+const (
+	BrandingVersionActive BrandingVersion = "active"
+	BrandingVersionDraft  BrandingVersion = "draft"
+)
+
+// Valid indicates whether the value is a known member of the BrandingVersion enum.
+func (e BrandingVersion) Valid() bool {
+	switch e {
+	case BrandingVersionActive:
+		return true
+	case BrandingVersionDraft:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetOrgBrandingAssetParamsVersion.
+const (
+	GetOrgBrandingAssetParamsVersionActive GetOrgBrandingAssetParamsVersion = "active"
+	GetOrgBrandingAssetParamsVersionDraft  GetOrgBrandingAssetParamsVersion = "draft"
+)
+
+// Valid indicates whether the value is a known member of the GetOrgBrandingAssetParamsVersion enum.
+func (e GetOrgBrandingAssetParamsVersion) Valid() bool {
+	switch e {
+	case GetOrgBrandingAssetParamsVersionActive:
+		return true
+	case GetOrgBrandingAssetParamsVersionDraft:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetPlatformBrandingAssetParamsVersion.
+const (
+	GetPlatformBrandingAssetParamsVersionActive GetPlatformBrandingAssetParamsVersion = "active"
+	GetPlatformBrandingAssetParamsVersionDraft  GetPlatformBrandingAssetParamsVersion = "draft"
+)
+
+// Valid indicates whether the value is a known member of the GetPlatformBrandingAssetParamsVersion enum.
+func (e GetPlatformBrandingAssetParamsVersion) Valid() bool {
+	switch e {
+	case GetPlatformBrandingAssetParamsVersionActive:
+		return true
+	case GetPlatformBrandingAssetParamsVersionDraft:
+		return true
+	default:
+		return false
+	}
+}
+
 // AccessTokenType Opaque bearer tokens, or JWTs that the API Gateway validates locally
 type AccessTokenType string
 
@@ -183,6 +285,56 @@ type AuthorizationState string
 // AuthorizationUpdate defines model for AuthorizationUpdate.
 type AuthorizationUpdate struct {
 	RoleKeys []string `json:"role_keys"`
+}
+
+// Branding defines model for Branding.
+type Branding struct {
+	// Assets Which assets the version has
+	Assets    BrandingAssets `json:"assets"`
+	ChangedAt *time.Time     `json:"changed_at,omitempty"`
+
+	// Settings What the draft sets. Colors are #rrggbb; an empty color leaves Zitadel's built-in one.
+	Settings BrandingSettings `json:"settings"`
+}
+
+// BrandingAssetName defines model for BrandingAssetName.
+type BrandingAssetName string
+
+// BrandingAssets Which assets the version has
+type BrandingAssets struct {
+	Font     bool `json:"font"`
+	Icon     bool `json:"icon"`
+	IconDark bool `json:"icon-dark"`
+	Logo     bool `json:"logo"`
+	LogoDark bool `json:"logo-dark"`
+}
+
+// BrandingSettings What the draft sets. Colors are #rrggbb; an empty color leaves Zitadel's built-in one.
+type BrandingSettings struct {
+	BackgroundColor     string `json:"background_color"`
+	BackgroundColorDark string `json:"background_color_dark"`
+
+	// DisableWatermark The login hides "Powered by ZITADEL"
+	DisableWatermark bool   `json:"disable_watermark"`
+	FontColor        string `json:"font_color"`
+	FontColorDark    string `json:"font_color_dark"`
+
+	// HideLoginNameSuffix The login hides the organization's domain after the user name
+	HideLoginNameSuffix bool      `json:"hide_login_name_suffix"`
+	PrimaryColor        string    `json:"primary_color"`
+	PrimaryColorDark    string    `json:"primary_color_dark"`
+	ThemeMode           ThemeMode `json:"theme_mode"`
+	WarnColor           string    `json:"warn_color"`
+	WarnColorDark       string    `json:"warn_color_dark"`
+}
+
+// BrandingState defines model for BrandingState.
+type BrandingState struct {
+	Active Branding `json:"active"`
+	Draft  Branding `json:"draft"`
+
+	// Inherited The organization has no branding of its own and shows the platform's (always false for the platform)
+	Inherited bool `json:"inherited"`
 }
 
 // Created defines model for Created.
@@ -390,6 +542,9 @@ type Role struct {
 	Key         string `json:"key"`
 }
 
+// ThemeMode defines model for ThemeMode.
+type ThemeMode string
+
 // User defines model for User.
 type User struct {
 	ChangedAt *time.Time `json:"changed_at,omitempty"`
@@ -433,6 +588,12 @@ type UserUpdate struct {
 // AuthorizationId defines model for AuthorizationId.
 type AuthorizationId = string
 
+// BrandingAsset defines model for BrandingAsset.
+type BrandingAsset = BrandingAssetName
+
+// BrandingVersion defines model for BrandingVersion.
+type BrandingVersion string
+
 // Limit defines model for Limit.
 type Limit = int
 
@@ -464,6 +625,34 @@ type ListOrgsParams struct {
 
 	// Limit Page size
 	Limit *Limit `form:"limit,omitempty" json:"limit,omitempty"`
+}
+
+// GetOrgBrandingAssetParams defines parameters for GetOrgBrandingAsset.
+type GetOrgBrandingAssetParams struct {
+	// Version The active version (the default) or the draft
+	Version *GetOrgBrandingAssetParamsVersion `form:"version,omitempty" json:"version,omitempty"`
+}
+
+// GetOrgBrandingAssetParamsVersion defines parameters for GetOrgBrandingAsset.
+type GetOrgBrandingAssetParamsVersion string
+
+// UploadOrgBrandingAssetMultipartBody defines parameters for UploadOrgBrandingAsset.
+type UploadOrgBrandingAssetMultipartBody struct {
+	File string `json:"file"`
+}
+
+// GetPlatformBrandingAssetParams defines parameters for GetPlatformBrandingAsset.
+type GetPlatformBrandingAssetParams struct {
+	// Version The active version (the default) or the draft
+	Version *GetPlatformBrandingAssetParamsVersion `form:"version,omitempty" json:"version,omitempty"`
+}
+
+// GetPlatformBrandingAssetParamsVersion defines parameters for GetPlatformBrandingAsset.
+type GetPlatformBrandingAssetParamsVersion string
+
+// UploadPlatformBrandingAssetMultipartBody defines parameters for UploadPlatformBrandingAsset.
+type UploadPlatformBrandingAssetMultipartBody struct {
+	File string `json:"file"`
 }
 
 // ListProjectsParams defines parameters for ListProjects.
@@ -511,6 +700,18 @@ type CreateOrgJSONRequestBody = OrgCreate
 
 // UpdateOrgJSONRequestBody defines body for UpdateOrg for application/json ContentType.
 type UpdateOrgJSONRequestBody = OrgUpdate
+
+// SaveOrgBrandingDraftJSONRequestBody defines body for SaveOrgBrandingDraft for application/json ContentType.
+type SaveOrgBrandingDraftJSONRequestBody = BrandingSettings
+
+// UploadOrgBrandingAssetMultipartRequestBody defines body for UploadOrgBrandingAsset for multipart/form-data ContentType.
+type UploadOrgBrandingAssetMultipartRequestBody UploadOrgBrandingAssetMultipartBody
+
+// SavePlatformBrandingDraftJSONRequestBody defines body for SavePlatformBrandingDraft for application/json ContentType.
+type SavePlatformBrandingDraftJSONRequestBody = BrandingSettings
+
+// UploadPlatformBrandingAssetMultipartRequestBody defines body for UploadPlatformBrandingAsset for multipart/form-data ContentType.
+type UploadPlatformBrandingAssetMultipartRequestBody UploadPlatformBrandingAssetMultipartBody
 
 // CreateHumanUserJSONRequestBody defines body for CreateHumanUser for application/json ContentType.
 type CreateHumanUserJSONRequestBody = HumanUserCreate

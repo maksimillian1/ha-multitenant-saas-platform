@@ -20,7 +20,7 @@ type fakeSessions struct {
 func (f fakeSessions) Session(*http.Request) (core.Session, bool) { return f.session, f.ok }
 
 func me(sessions fakeSessions) *httptest.ResponseRecorder {
-	svc := NewService(sessions, newFakeZitadel(), "super-admin", "http://admin.test", slog.New(slog.NewTextHandler(io.Discard, nil)))
+	svc := NewService(sessions, newFakeZitadel(), nil, "super-admin", "http://admin.test", slog.New(slog.NewTextHandler(io.Discard, nil)))
 	rec := httptest.NewRecorder()
 	svc.MeHandler(rec, httptest.NewRequest(http.MethodGet, "/api/me", nil))
 	return rec

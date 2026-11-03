@@ -11,6 +11,7 @@ import (
 	"log/slog"
 	"net/http"
 	"net/url"
+	"strings"
 
 	"github.com/maksimillian1/ha-multitenant-saas-platform/apps/admin/core"
 	"github.com/maksimillian1/ha-multitenant-saas-platform/apps/admin/zitadel"
@@ -52,6 +53,11 @@ type Zitadel interface {
 	ListProjects(ctx context.Context, f zitadel.ProjectFilter, p zitadel.Page) (zitadel.ProjectList, error)
 	GetProject(ctx context.Context, id string) (zitadel.Project, error)
 	ListProjectRoles(ctx context.Context, projectID string, p zitadel.Page) ([]zitadel.ProjectRole, error)
+
+	// Organization branding (HAMSP-37); the instance's goes through Platform.
+	BrandingClient
+	CreateOrgBranding(ctx context.Context, orgID string, settings zitadel.BrandingSettings) error
+	ResetOrgBranding(ctx context.Context, orgID string) error
 }
 
 var _ Zitadel = (*zitadel.Client)(nil)
@@ -59,21 +65,23 @@ var _ Zitadel = (*zitadel.Client)(nil)
 type Service struct {
 	Sessions  core.SessionReader
 	Zitadel   Zitadel
+	Platform  PlatformZitadel
 	AdminRole string
 	Log       *slog.Logger
 	csrf      *http.CrossOriginProtection
 }
 
-// NewService returns the API. publicURL is the app's own origin, which
-// state-changing requests must come from.
-func NewService(sessions core.SessionReader, zitadel Zitadel, adminRole, publicURL string, log *slog.Logger) *Service {
+// NewService returns the API. platform is the Zitadel client with the
+// instance token, used only for the platform branding. publicURL is the
+// app's own origin, which state-changing requests must come from.
+func NewService(sessions core.SessionReader, zitadel Zitadel, platform PlatformZitadel, adminRole, publicURL string, log *slog.Logger) *Service {
 	csrf := http.NewCrossOriginProtection()
 	if u, err := url.Parse(publicURL); err == nil && u.Scheme != "" && u.Host != "" {
 		if err := csrf.AddTrustedOrigin(u.Scheme + "://" + u.Host); err != nil {
 			log.Warn("PUBLIC_URL is not a trusted origin", "url", publicURL, "err", err)
 		}
 	}
-	return &Service{Sessions: sessions, Zitadel: zitadel, AdminRole: adminRole, Log: log, csrf: csrf}
+	return &Service{Sessions: sessions, Zitadel: zitadel, Platform: platform, AdminRole: adminRole, Log: log, csrf: csrf}
 }
 
 // Register adds the API's routes to mux.
@@ -112,6 +120,8 @@ func (s *Service) Register(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/projects/{projectId}", s.read(s.getProject))
 	mux.HandleFunc("GET /api/projects/{projectId}/roles", s.read(s.listProjectRoles))
 	mux.HandleFunc("GET /api/projects/{projectId}/authorizations", s.read(s.listProjectAuthorizations))
+
+	s.registerBranding(mux)
 
 	mux.HandleFunc("GET /api/", s.NotFoundHandler)
 }
@@ -198,12 +208,16 @@ func (a *auditWriter) WriteHeader(code int) {
 	a.ResponseWriter.WriteHeader(code)
 }
 
-// pathTarget is the ID of the resource a route changes.
+// pathTarget is the ID of the resource a route changes; "instance" for the
+// platform branding.
 func pathTarget(r *http.Request) string {
 	for _, name := range []string{"authorizationId", "userId", "orgId"} {
 		if id := r.PathValue(name); id != "" {
 			return id
 		}
+	}
+	if strings.HasPrefix(r.URL.Path, "/api/platform/") {
+		return "instance"
 	}
 	return ""
 }
