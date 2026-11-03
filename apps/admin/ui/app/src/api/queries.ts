@@ -124,3 +124,87 @@ export function useChange<TVars, TData>(
     },
   })
 }
+
+export type BrandingState = Schemas['BrandingState']
+export type Branding = Schemas['Branding']
+export type BrandingSettings = Schemas['BrandingSettings']
+export type BrandingAssetName = Schemas['BrandingAssetName']
+export type ThemeMode = Schemas['ThemeMode']
+
+export const brandingAssets: BrandingAssetName[] = ['logo', 'logo-dark', 'icon', 'icon-dark', 'font']
+
+// MAX_ASSET_SIZE is Zitadel's limit for a logo, icon or font; the API
+// refuses larger files too (413).
+export const MAX_ASSET_SIZE = 512 * 1024
+
+// BrandingScope is whose branding a page edits: an organization's, or the
+// platform's (the instance's), which every organization without its own
+// inherits.
+export type BrandingScope = { orgId: string } | 'platform'
+
+const scopeKey = (scope: BrandingScope) => (scope === 'platform' ? 'platform' : scope.orgId)
+
+export const brandingQuery = (scope: BrandingScope) =>
+  queryOptions({
+    queryKey: ['branding', scopeKey(scope)],
+    queryFn: ({ signal }) =>
+      scope === 'platform'
+        ? unwrap(api.GET('/api/platform/branding', { signal }))
+        : unwrap(api.GET('/api/orgs/{orgId}/branding', { params: { path: { orgId: scope.orgId } }, signal })),
+  })
+
+// platformBrandingQuery is what the layout applies to the admin app itself.
+// It is not retried: without it the app keeps its built-in look.
+export const platformBrandingQuery = queryOptions({
+  ...brandingQuery('platform'),
+  retry: false,
+  staleTime: 5 * 60_000,
+})
+
+// assetUrl is where the BFF serves an asset of the active version or of the
+// draft; stamp changes the URL after an upload, so the browser loads it again.
+export function assetUrl(scope: BrandingScope, asset: BrandingAssetName, version: 'active' | 'draft', stamp?: number) {
+  const base = scope === 'platform' ? '/api/platform/branding' : `/api/orgs/${encodeURIComponent(scope.orgId)}/branding`
+  const query = new URLSearchParams({ version })
+  if (stamp !== undefined) {
+    query.set('v', String(stamp))
+  }
+  return `${base}/assets/${asset}?${query}`
+}
+
+// brandingCalls are the changes of one scope's branding.
+export function brandingCalls(scope: BrandingScope) {
+  // openapi-fetch sends FormData as it is, with the browser's multipart
+  // boundary; the schema types the part as a string.
+  const fileBody = (file: File) => {
+    const form = new FormData()
+    form.append('file', file)
+    return form as unknown as { file: string }
+  }
+  if (scope === 'platform') {
+    return {
+      save: (body: BrandingSettings) => unwrap(api.PUT('/api/platform/branding', { body })),
+      publish: () => unwrap(api.POST('/api/platform/branding/publish')),
+      reset: undefined,
+      upload: (asset: BrandingAssetName, file: File) =>
+        unwrap(api.PUT('/api/platform/branding/assets/{asset}', { params: { path: { asset } }, body: fileBody(file) })),
+      remove: (asset: BrandingAssetName) =>
+        unwrap(api.DELETE('/api/platform/branding/assets/{asset}', { params: { path: { asset } } })),
+    }
+  }
+  const orgId = scope.orgId
+  return {
+    save: (body: BrandingSettings) => unwrap(api.PUT('/api/orgs/{orgId}/branding', { params: { path: { orgId } }, body })),
+    publish: () => unwrap(api.POST('/api/orgs/{orgId}/branding/publish', { params: { path: { orgId } } })),
+    reset: () => unwrap(api.DELETE('/api/orgs/{orgId}/branding', { params: { path: { orgId } } })),
+    upload: (asset: BrandingAssetName, file: File) =>
+      unwrap(
+        api.PUT('/api/orgs/{orgId}/branding/assets/{asset}', {
+          params: { path: { orgId, asset } },
+          body: fileBody(file),
+        }),
+      ),
+    remove: (asset: BrandingAssetName) =>
+      unwrap(api.DELETE('/api/orgs/{orgId}/branding/assets/{asset}', { params: { path: { orgId, asset } } })),
+  }
+}

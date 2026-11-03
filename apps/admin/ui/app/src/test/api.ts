@@ -26,6 +26,14 @@ export function apiError(status: number, error: string) {
   return json({ error }, status)
 }
 
+// A JSON body is parsed; any other (a multipart upload) stays text.
+function parseBody(text: string, contentType: string | null) {
+  if (!text) {
+    return undefined
+  }
+  return contentType?.startsWith('application/json') ? JSON.parse(text) : text
+}
+
 export function mockApi(answers: Record<string, Answer>) {
   const routes = { ...answers }
   const calls: Call[] = []
@@ -38,7 +46,7 @@ export function mockApi(answers: Record<string, Answer>) {
       method: request.method,
       path: url.pathname,
       query: url.searchParams,
-      body: text ? JSON.parse(text) : undefined,
+      body: parseBody(text, request.headers.get('Content-Type')),
       headers: request.headers,
     }
     calls.push(call)

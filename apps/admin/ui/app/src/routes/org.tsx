@@ -4,6 +4,7 @@ import { CirclePause, CirclePlay, Trash2 } from 'lucide-react'
 import { api, unwrap } from '@/api/client'
 import { meQuery, orgQuery, projectsQuery, useChange, userQuery, usersQuery } from '@/api/queries'
 import { StateBadge, UserTypeBadge } from '@/components/badges'
+import { BrandingEditor } from '@/components/branding-editor'
 import { ConfirmButton } from '@/components/confirm'
 import { DetailList, Mono, PageHeader, QueryView } from '@/components/page'
 import { Badge } from '@/components/ui/badge'
@@ -21,13 +22,12 @@ const PREVIEW = 10
 
 export function OrgPage() {
   const { orgId } = route.useParams()
+  const { tab = 'overview' } = route.useSearch()
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const { data: org } = useSuspenseQuery(orgQuery(orgId))
   const { data: me } = useSuspenseQuery(meQuery)
   const self = useQuery(userQuery(me.subject))
-  const users = useQuery(usersQuery({ org_id: orgId, limit: PREVIEW }))
-  const projects = useQuery(projectsQuery({ org_id: orgId, limit: PREVIEW }))
 
   const path = { params: { path: { orgId } } }
   const deactivate = useChange(() => unwrap(api.POST('/api/orgs/{orgId}/deactivate', path)), {
@@ -104,6 +104,42 @@ export function OrgPage() {
         }
       />
 
+      <nav aria-label="Organization" className="flex gap-1 border-b">
+        {(
+          [
+            { tab: 'overview', label: 'Overview' },
+            { tab: 'branding', label: 'Branding' },
+          ] as const
+        ).map((item) => (
+          <Link
+            key={item.tab}
+            to="/orgs/$orgId"
+            params={{ orgId }}
+            search={item.tab === 'overview' ? {} : { tab: item.tab }}
+            aria-current={tab === item.tab ? 'page' : undefined}
+            className="-mb-px border-b-2 border-transparent px-3 py-2 text-sm text-muted-foreground transition-colors hover:text-foreground aria-[current=page]:border-primary aria-[current=page]:font-medium aria-[current=page]:text-foreground"
+          >
+            {item.label}
+          </Link>
+        ))}
+      </nav>
+
+      {tab === 'branding' ? (
+        <BrandingEditor scope={{ orgId }} name={org.name} />
+      ) : (
+        <OrgOverview orgId={orgId} />
+      )}
+    </div>
+  )
+}
+
+function OrgOverview({ orgId }: { orgId: string }) {
+  const { data: org } = useSuspenseQuery(orgQuery(orgId))
+  const users = useQuery(usersQuery({ org_id: orgId, limit: PREVIEW }))
+  const projects = useQuery(projectsQuery({ org_id: orgId, limit: PREVIEW }))
+
+  return (
+    <div className="flex flex-col gap-6">
       <Card>
         <CardHeader>
           <CardTitle>Details</CardTitle>
