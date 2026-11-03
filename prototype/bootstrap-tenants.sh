@@ -9,7 +9,9 @@
 # the app's client to the Secret admin/admin-oidc. It also creates the app's
 # service account admin-app with the instance role IAM_ORG_MANAGER, which the
 # app uses to manage organizations, users and role assignments (HAMSP-34), and
-# writes its personal access token to the Secret admin/admin-zitadel. Writes
+# a second one, admin-app-instance with IAM_OWNER, which the app uses only for
+# the platform (instance) branding (HAMSP-37). Their personal access tokens go
+# to the Secret admin/admin-zitadel (ZITADEL_TOKEN, ZITADEL_INSTANCE_TOKEN). Writes
 # the credentials to prototype/.tenants.json (git-ignored) for the e2e tests
 # and for signing in. Safe to run again: existing organizations, users and
 # projects are reused; client secrets, the service account's token and the
@@ -39,6 +41,11 @@ ADMIN_EMAIL_DOMAIN="admin.localtest.me"
 # organization, without the instance's settings.
 ADMIN_SA="admin-app"
 ADMIN_SA_ROLE="IAM_ORG_MANAGER"
+# The instance's branding needs iam.policy.write, which only IAM_OWNER has.
+# The admin app uses this account for the platform branding routes and
+# nothing else.
+INSTANCE_SA="admin-app-instance"
+INSTANCE_SA_ROLE="IAM_OWNER"
 
 # Access tokens live 60 s, so the e2e tests can prove that an expired token is
 # rejected (HAMSP-5 AC-5) without waiting hours.
@@ -256,39 +263,48 @@ grant "${viewer_id}" viewer "${VIEWER_ROLE}"
 
 # ── 6. the admin app's service account: it calls the Zitadel APIs ───────────
 
-# A machine user in the IAM admin's organization with an instance role; the
-# admin app checks the super-admin role of the signed-in user itself.
-sa_id=$(zitadel POST /management/v1/users/_search "$(jq -nc --arg u "${ADMIN_SA}" \
-  '{queries: [{userNameQuery: {userName: $u, method: "TEXT_QUERY_METHOD_EQUALS"}}]}')" \
-  | jq -r '.result[0].id // empty')
-if [[ -z "${sa_id}" ]]; then
-  sa_id=$(zitadel POST /management/v1/users/machine "$(jq -nc --arg u "${ADMIN_SA}" \
-    '{userName: $u, name: "Admin app", description: "apps/admin manages organizations, users and role assignments as this user"}')" \
-    | jq -r '.userId')
-  echo "Created machine user ${ADMIN_SA} (${sa_id})"
-else
-  echo "Reusing machine user ${ADMIN_SA} (${sa_id})"
-fi
-member_count=$(zitadel POST /admin/v1/members/_search "$(jq -nc --arg u "${sa_id}" \
-  '{queries: [{userIdQuery: {userId: $u}}]}')" | jq '.result // [] | length')
-if [[ "${member_count}" == "0" ]]; then
-  zitadel POST /admin/v1/members "$(jq -nc --arg u "${sa_id}" --arg r "${ADMIN_SA_ROLE}" \
-    '{userId: $u, roles: [$r]}')" >/dev/null
-  echo "  gave ${ADMIN_SA} the instance role ${ADMIN_SA_ROLE}"
-fi
-# One personal access token, new on every run; the old ones are removed.
-for token_id in $(zitadel POST "/management/v1/users/${sa_id}/pats/_search" '{}' | jq -r '.result[]?.id'); do
-  zitadel DELETE "/management/v1/users/${sa_id}/pats/${token_id}" >/dev/null
-done
-sa_token=$(zitadel POST "/management/v1/users/${sa_id}/pats" "$(jq -nc \
-  '{expirationDate: (now + 365 * 24 * 3600 | todate)}')" | jq -r '.token')
-if [[ -z "${sa_token}" || "${sa_token}" == "null" ]]; then
-  echo "ERROR: creating the token of ${ADMIN_SA} failed."
-  exit 1
-fi
+# service_account NAME ROLE DESCRIPTION — a machine user in the IAM admin's
+# organization with an instance role; prints a new personal access token (the
+# old ones are removed). The admin app checks the super-admin role of the
+# signed-in user itself.
+service_account() {
+  local name=$1 role=$2 description=$3 id count token_id token
+  id=$(zitadel POST /management/v1/users/_search "$(jq -nc --arg u "${name}" \
+    '{queries: [{userNameQuery: {userName: $u, method: "TEXT_QUERY_METHOD_EQUALS"}}]}')" \
+    | jq -r '.result[0].id // empty')
+  if [[ -z "${id}" ]]; then
+    id=$(zitadel POST /management/v1/users/machine "$(jq -nc --arg u "${name}" --arg d "${description}" \
+      '{userName: $u, name: $u, description: $d}')" | jq -r '.userId')
+    echo "Created machine user ${name} (${id})" >&2
+  else
+    echo "Reusing machine user ${name} (${id})" >&2
+  fi
+  count=$(zitadel POST /admin/v1/members/_search "$(jq -nc --arg u "${id}" \
+    '{queries: [{userIdQuery: {userId: $u}}]}')" | jq '.result // [] | length')
+  if [[ "${count}" == "0" ]]; then
+    zitadel POST /admin/v1/members "$(jq -nc --arg u "${id}" --arg r "${role}" \
+      '{userId: $u, roles: [$r]}')" >/dev/null
+    echo "  gave ${name} the instance role ${role}" >&2
+  fi
+  for token_id in $(zitadel POST "/management/v1/users/${id}/pats/_search" '{}' | jq -r '.result[]?.id'); do
+    zitadel DELETE "/management/v1/users/${id}/pats/${token_id}" >/dev/null
+  done
+  token=$(zitadel POST "/management/v1/users/${id}/pats" "$(jq -nc \
+    '{expirationDate: (now + 365 * 24 * 3600 | todate)}')" | jq -r '.token')
+  if [[ -z "${token}" || "${token}" == "null" ]]; then
+    echo "ERROR: creating the token of ${name} failed." >&2
+    return 1
+  fi
+  echo "${token}"
+}
+
+sa_token=$(service_account "${ADMIN_SA}" "${ADMIN_SA_ROLE}" \
+  "apps/admin manages organizations, users and role assignments as this user")
+instance_token=$(service_account "${INSTANCE_SA}" "${INSTANCE_SA_ROLE}" \
+  "apps/admin changes the platform (instance) branding as this user, and nothing else")
 
 # The admin app reads its client and session key from admin-oidc and the
-# service account's token from admin-zitadel (k8s/apps/admin). A new session
+# service accounts' tokens from admin-zitadel (k8s/apps/admin). A new session
 # key signs everyone out, which is fine for test users.
 kubectl create namespace admin --dry-run=client -o yaml | kubectl apply -f - >/dev/null
 kubectl -n admin create secret generic admin-oidc \
@@ -296,7 +312,7 @@ kubectl -n admin create secret generic admin-oidc \
   --from-literal=SESSION_KEY="$(openssl rand -hex 32)" \
   --dry-run=client -o yaml | kubectl apply -f - >/dev/null
 kubectl -n admin create secret generic admin-zitadel --from-literal=ZITADEL_TOKEN="${sa_token}" \
-  --dry-run=client -o yaml | kubectl apply -f - >/dev/null
+  --from-literal=ZITADEL_INSTANCE_TOKEN="${instance_token}" --dry-run=client -o yaml | kubectl apply -f - >/dev/null
 if kubectl -n admin get deployment admin &>/dev/null; then
   kubectl -n admin rollout restart deployment/admin >/dev/null
 fi
