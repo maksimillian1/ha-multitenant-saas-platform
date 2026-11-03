@@ -4,13 +4,14 @@
 # and `npm run gen:api` in ui/app.
 #
 # Every route needs a session with the admin role. State-changing requests
-# (POST, PATCH, DELETE) also need the header `X-Requested-With: XMLHttpRequest`
+# (POST, PUT, PATCH, DELETE) also need the header `X-Requested-With: XMLHttpRequest`
 # and must come from the app's own origin (CSRF). The data comes from Zitadel,
-# which the app calls with its own service account (HAMSP-34).
+# which the app calls with its own service account (HAMSP-34); the platform
+# branding routes use a second one with instance rights (HAMSP-37).
 openapi: 3.0.3
 info:
   title: Admin API
-  version: 0.2.0
+  version: 0.3.0
 paths:
   /api/me:
     get:
@@ -209,6 +210,190 @@ paths:
       responses:
         "204":
           description: Activated
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
+        "502":
+          $ref: "#/components/responses/Error"
+        "504":
+          $ref: "#/components/responses/Error"
+
+  /api/orgs/{orgId}/branding:
+    parameters:
+      - $ref: "#/components/parameters/OrgId"
+    get:
+      operationId: getOrgBranding
+      summary: >-
+        The organization's login branding: the active version, which the login
+        shows, and the draft, and whether the organization inherits the platform branding
+      responses:
+        "200":
+          description: The branding
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BrandingState"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "502":
+          $ref: "#/components/responses/Error"
+        "504":
+          $ref: "#/components/responses/Error"
+    put:
+      operationId: saveOrgBrandingDraft
+      summary: >-
+        Save the draft; the login keeps showing the active version until it is
+        published. An organization that inherits gets branding of its own, starting from the platform values.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BrandingSettings"
+      responses:
+        "204":
+          description: Saved
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
+        "502":
+          $ref: "#/components/responses/Error"
+        "504":
+          $ref: "#/components/responses/Error"
+    delete:
+      operationId: resetOrgBranding
+      summary: >-
+        Remove the organization's own branding, active and draft; it shows the
+        platform branding again
+      responses:
+        "204":
+          description: Reset
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "502":
+          $ref: "#/components/responses/Error"
+        "504":
+          $ref: "#/components/responses/Error"
+
+  /api/orgs/{orgId}/branding/publish:
+    parameters:
+      - $ref: "#/components/parameters/OrgId"
+    post:
+      operationId: publishOrgBranding
+      summary: Make the draft the active branding, which the login shows
+      responses:
+        "204":
+          description: Published
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
+        "502":
+          $ref: "#/components/responses/Error"
+        "504":
+          $ref: "#/components/responses/Error"
+
+  /api/orgs/{orgId}/branding/assets/{asset}:
+    parameters:
+      - $ref: "#/components/parameters/OrgId"
+      - $ref: "#/components/parameters/BrandingAsset"
+    get:
+      operationId: getOrgBrandingAsset
+      summary: >-
+        The asset's file, served from the app's origin with nosniff (and a
+        sandbox CSP for SVG)
+      parameters:
+        - $ref: "#/components/parameters/BrandingVersion"
+      responses:
+        "200":
+          description: The file
+          content:
+            "*/*":
+              schema:
+                type: string
+                format: binary
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "502":
+          $ref: "#/components/responses/Error"
+        "504":
+          $ref: "#/components/responses/Error"
+    put:
+      operationId: uploadOrgBrandingAsset
+      summary: >-
+        Put the asset into the draft. Images (logo, icon) are PNG, JPEG, GIF,
+        WebP or SVG, fonts TTF, OTF, WOFF or WOFF2, as told by the content; up
+        to 512 KiB.
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  # Handlers read the multipart form themselves.
+                  x-go-type: string
+      responses:
+        "204":
+          description: Uploaded
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
+        "502":
+          $ref: "#/components/responses/Error"
+        "504":
+          $ref: "#/components/responses/Error"
+        "413":
+          $ref: "#/components/responses/Error"
+    delete:
+      operationId: removeOrgBrandingAsset
+      summary: Remove the asset from the draft
+      responses:
+        "204":
+          description: Removed
+        "400":
+          $ref: "#/components/responses/Error"
         "401":
           $ref: "#/components/responses/Error"
         "403":
@@ -756,6 +941,167 @@ paths:
         "504":
           $ref: "#/components/responses/Error"
 
+  /api/platform/branding:
+    get:
+      operationId: getPlatformBranding
+      summary: >-
+        The platform's login branding: the active version, which the login
+        shows, and the draft
+      responses:
+        "200":
+          description: The branding
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BrandingState"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "502":
+          $ref: "#/components/responses/Error"
+        "504":
+          $ref: "#/components/responses/Error"
+    put:
+      operationId: savePlatformBrandingDraft
+      summary: >-
+        Save the draft; the login keeps showing the active version until it is
+        published.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BrandingSettings"
+      responses:
+        "204":
+          description: Saved
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
+        "502":
+          $ref: "#/components/responses/Error"
+        "504":
+          $ref: "#/components/responses/Error"
+
+  /api/platform/branding/publish:
+    post:
+      operationId: publishPlatformBranding
+      summary: Make the draft the active branding, which the login shows
+      responses:
+        "204":
+          description: Published
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
+        "502":
+          $ref: "#/components/responses/Error"
+        "504":
+          $ref: "#/components/responses/Error"
+
+  /api/platform/branding/assets/{asset}:
+    parameters:
+      - $ref: "#/components/parameters/BrandingAsset"
+    get:
+      operationId: getPlatformBrandingAsset
+      summary: >-
+        The asset's file, served from the app's origin with nosniff (and a
+        sandbox CSP for SVG)
+      parameters:
+        - $ref: "#/components/parameters/BrandingVersion"
+      responses:
+        "200":
+          description: The file
+          content:
+            "*/*":
+              schema:
+                type: string
+                format: binary
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "502":
+          $ref: "#/components/responses/Error"
+        "504":
+          $ref: "#/components/responses/Error"
+    put:
+      operationId: uploadPlatformBrandingAsset
+      summary: >-
+        Put the asset into the draft. Images (logo, icon) are PNG, JPEG, GIF,
+        WebP or SVG, fonts TTF, OTF, WOFF or WOFF2, as told by the content; up
+        to 512 KiB.
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  # Handlers read the multipart form themselves.
+                  x-go-type: string
+      responses:
+        "204":
+          description: Uploaded
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
+        "502":
+          $ref: "#/components/responses/Error"
+        "504":
+          $ref: "#/components/responses/Error"
+        "413":
+          $ref: "#/components/responses/Error"
+    delete:
+      operationId: removePlatformBrandingAsset
+      summary: Remove the asset from the draft
+      responses:
+        "204":
+          description: Removed
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
+        "502":
+          $ref: "#/components/responses/Error"
+        "504":
+          $ref: "#/components/responses/Error"
+
 components:
   parameters:
     Search:
@@ -806,6 +1152,21 @@ components:
       required: true
       schema:
         type: string
+
+    BrandingAsset:
+      name: asset
+      in: path
+      required: true
+      schema:
+        $ref: "#/components/schemas/BrandingAssetName"
+    BrandingVersion:
+      name: version
+      in: query
+      description: The active version (the default) or the draft
+      schema:
+        type: string
+        enum: [active, draft]
+        default: active
 
   responses:
     Error:
@@ -1339,3 +1700,84 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/ProjectRole"
+
+    BrandingAssetName:
+      type: string
+      enum: [logo, logo-dark, icon, icon-dark, font]
+
+    ThemeMode:
+      type: string
+      enum: [auto, light, dark]
+
+    BrandingSettings:
+      type: object
+      description: >-
+        What the draft sets. Colors are #rrggbb; an empty color leaves
+        Zitadel's built-in one.
+      required: [primary_color, background_color, warn_color, font_color, primary_color_dark,
+        background_color_dark, warn_color_dark, font_color_dark, hide_login_name_suffix, disable_watermark, theme_mode]
+      properties:
+        primary_color:
+          type: string
+        background_color:
+          type: string
+        warn_color:
+          type: string
+        font_color:
+          type: string
+        primary_color_dark:
+          type: string
+        background_color_dark:
+          type: string
+        warn_color_dark:
+          type: string
+        font_color_dark:
+          type: string
+        hide_login_name_suffix:
+          type: boolean
+          description: The login hides the organization's domain after the user name
+        disable_watermark:
+          type: boolean
+          description: The login hides "Powered by ZITADEL"
+        theme_mode:
+          $ref: "#/components/schemas/ThemeMode"
+
+    BrandingAssets:
+      type: object
+      description: Which assets the version has
+      required: [logo, logo-dark, icon, icon-dark, font]
+      properties:
+        logo:
+          type: boolean
+        logo-dark:
+          type: boolean
+        icon:
+          type: boolean
+        icon-dark:
+          type: boolean
+        font:
+          type: boolean
+
+    Branding:
+      type: object
+      required: [settings, assets]
+      properties:
+        settings:
+          $ref: "#/components/schemas/BrandingSettings"
+        assets:
+          $ref: "#/components/schemas/BrandingAssets"
+        changed_at:
+          type: string
+          format: date-time
+
+    BrandingState:
+      type: object
+      required: [inherited, active, draft]
+      properties:
+        inherited:
+          type: boolean
+          description: The organization has no branding of its own and shows the platform's (always false for the platform)
+        active:
+          $ref: "#/components/schemas/Branding"
+        draft:
+          $ref: "#/components/schemas/Branding"
