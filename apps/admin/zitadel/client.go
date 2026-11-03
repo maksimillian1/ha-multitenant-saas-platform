@@ -8,6 +8,9 @@
 // with protojson: field names in lowerCamelCase, 64-bit integers as strings,
 // enums by name, and fields with their default value left out.
 //
+// Branding (label policies and their assets) has no v2 write API in
+// v4.19.2, so branding.go calls the v1 REST gateway and the assets API.
+//
 // The client authenticates with the personal access token of the admin
 // app's service account, not with the signed-in admin's token.
 package zitadel
@@ -107,16 +110,10 @@ func (c *Client) call(ctx context.Context, service, method string, req, resp any
 }
 
 func (c *Client) do(req *http.Request, resp any) error {
-	req.Header.Set("Authorization", "Bearer "+c.token)
 	req.Header.Set("Accept", "application/json")
-	res, err := c.http.Do(req)
+	res, data, err := c.send(req)
 	if err != nil {
-		return fmt.Errorf("zitadel: %w", err)
-	}
-	defer res.Body.Close()
-	data, err := io.ReadAll(io.LimitReader(res.Body, maxAnswer))
-	if err != nil {
-		return fmt.Errorf("zitadel: reading the answer to %s: %w", req.URL.Path, err)
+		return err
 	}
 	if res.StatusCode != http.StatusOK {
 		return parseError(res.StatusCode, data)
@@ -128,6 +125,21 @@ func (c *Client) do(req *http.Request, resp any) error {
 		return fmt.Errorf("zitadel: decoding the answer to %s: %w", req.URL.Path, err)
 	}
 	return nil
+}
+
+// send makes the request with the client's token and reads the whole answer.
+func (c *Client) send(req *http.Request) (*http.Response, []byte, error) {
+	req.Header.Set("Authorization", "Bearer "+c.token)
+	res, err := c.http.Do(req)
+	if err != nil {
+		return nil, nil, fmt.Errorf("zitadel: %w", err)
+	}
+	defer res.Body.Close()
+	data, err := io.ReadAll(io.LimitReader(res.Body, maxAnswer))
+	if err != nil {
+		return nil, nil, fmt.Errorf("zitadel: reading the answer to %s: %w", req.URL.Path, err)
+	}
+	return res, data, nil
 }
 
 // grpcCodes names the numeric gRPC codes of the v1 REST gateway's errors.
