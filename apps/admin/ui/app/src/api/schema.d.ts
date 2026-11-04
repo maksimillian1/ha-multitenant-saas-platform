@@ -115,6 +115,68 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/orgs/{orgId}/branding": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                orgId: components["parameters"]["OrgId"];
+            };
+            cookie?: never;
+        };
+        /** The organization's login branding: the active version, which the login shows, and the draft, and whether the organization inherits the platform branding */
+        get: operations["getOrgBranding"];
+        /** Save the draft; the login keeps showing the active version until it is published. An organization that inherits gets branding of its own, starting from the platform values. */
+        put: operations["saveOrgBrandingDraft"];
+        post?: never;
+        /** Remove the organization's own branding, active and draft; it shows the platform branding again */
+        delete: operations["resetOrgBranding"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/orgs/{orgId}/branding/publish": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                orgId: components["parameters"]["OrgId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Make the draft the active branding, which the login shows */
+        post: operations["publishOrgBranding"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/orgs/{orgId}/branding/assets/{asset}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                orgId: components["parameters"]["OrgId"];
+                asset: components["parameters"]["BrandingAsset"];
+            };
+            cookie?: never;
+        };
+        /** The asset's file, served from the app's origin with nosniff (and a sandbox CSP for SVG) */
+        get: operations["getOrgBrandingAsset"];
+        /** Put the asset into the draft. Images (logo, icon) are PNG, JPEG, GIF, WebP or SVG, fonts TTF, OTF, WOFF or WOFF2, as told by the content; up to 512 KiB. */
+        put: operations["uploadOrgBrandingAsset"];
+        post?: never;
+        /** Remove the asset from the draft */
+        delete: operations["removeOrgBrandingAsset"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/users": {
         parameters: {
             query?: never;
@@ -432,6 +494,62 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/platform/branding": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The platform's login branding: the active version, which the login shows, and the draft */
+        get: operations["getPlatformBranding"];
+        /** Save the draft; the login keeps showing the active version until it is published. */
+        put: operations["savePlatformBrandingDraft"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/platform/branding/publish": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Make the draft the active branding, which the login shows */
+        post: operations["publishPlatformBranding"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/platform/branding/assets/{asset}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                asset: components["parameters"]["BrandingAsset"];
+            };
+            cookie?: never;
+        };
+        /** The asset's file, served from the app's origin with nosniff (and a sandbox CSP for SVG) */
+        get: operations["getPlatformBrandingAsset"];
+        /** Put the asset into the draft. Images (logo, icon) are PNG, JPEG, GIF, WebP or SVG, fonts TTF, OTF, WOFF or WOFF2, as told by the content; up to 512 KiB. */
+        put: operations["uploadPlatformBrandingAsset"];
+        post?: never;
+        /** Remove the asset from the draft */
+        delete: operations["removePlatformBrandingAsset"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -678,6 +796,46 @@ export interface components {
         ProjectRoleList: {
             items: components["schemas"]["ProjectRole"][];
         };
+        /** @enum {string} */
+        BrandingAssetName: "logo" | "logo-dark" | "icon" | "icon-dark" | "font";
+        /** @enum {string} */
+        ThemeMode: "auto" | "light" | "dark";
+        /** @description What the draft sets. Colors are #rrggbb; an empty color leaves Zitadel's built-in one. */
+        BrandingSettings: {
+            primary_color: string;
+            background_color: string;
+            warn_color: string;
+            font_color: string;
+            primary_color_dark: string;
+            background_color_dark: string;
+            warn_color_dark: string;
+            font_color_dark: string;
+            /** @description The login hides the organization's domain after the user name */
+            hide_login_name_suffix: boolean;
+            /** @description The login hides "Powered by ZITADEL" */
+            disable_watermark: boolean;
+            theme_mode: components["schemas"]["ThemeMode"];
+        };
+        /** @description Which assets the version has */
+        BrandingAssets: {
+            logo: boolean;
+            "logo-dark": boolean;
+            icon: boolean;
+            "icon-dark": boolean;
+            font: boolean;
+        };
+        Branding: {
+            settings: components["schemas"]["BrandingSettings"];
+            assets: components["schemas"]["BrandingAssets"];
+            /** Format: date-time */
+            changed_at?: string;
+        };
+        BrandingState: {
+            /** @description The organization has no branding of its own and shows the platform's (always false for the platform) */
+            inherited: boolean;
+            active: components["schemas"]["Branding"];
+            draft: components["schemas"]["Branding"];
+        };
     };
     responses: {
         /** @description An error: invalid input (400), no session (401), no admin role or a cross-site request (403), not found in Zitadel (404), a conflict with Zitadel's state or a refused change to the admin's own access (409), Zitadel unavailable or refusing the service account (502), Zitadel too slow (504) */
@@ -710,6 +868,9 @@ export interface components {
         UserId: string;
         ProjectId: string;
         AuthorizationId: string;
+        BrandingAsset: components["schemas"]["BrandingAssetName"];
+        /** @description The active version (the default) or the draft */
+        BrandingVersion: "active" | "draft";
     };
     requestBodies: never;
     headers: never;
@@ -947,6 +1108,211 @@ export interface operations {
                 };
                 content?: never;
             };
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+            404: components["responses"]["Error"];
+            409: components["responses"]["Error"];
+            502: components["responses"]["Error"];
+            504: components["responses"]["Error"];
+        };
+    };
+    getOrgBranding: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                orgId: components["parameters"]["OrgId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The branding */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BrandingState"];
+                };
+            };
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+            404: components["responses"]["Error"];
+            502: components["responses"]["Error"];
+            504: components["responses"]["Error"];
+        };
+    };
+    saveOrgBrandingDraft: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                orgId: components["parameters"]["OrgId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BrandingSettings"];
+            };
+        };
+        responses: {
+            /** @description Saved */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            400: components["responses"]["Error"];
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+            404: components["responses"]["Error"];
+            409: components["responses"]["Error"];
+            502: components["responses"]["Error"];
+            504: components["responses"]["Error"];
+        };
+    };
+    resetOrgBranding: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                orgId: components["parameters"]["OrgId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Reset */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+            404: components["responses"]["Error"];
+            502: components["responses"]["Error"];
+            504: components["responses"]["Error"];
+        };
+    };
+    publishOrgBranding: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                orgId: components["parameters"]["OrgId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Published */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            400: components["responses"]["Error"];
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+            404: components["responses"]["Error"];
+            409: components["responses"]["Error"];
+            502: components["responses"]["Error"];
+            504: components["responses"]["Error"];
+        };
+    };
+    getOrgBrandingAsset: {
+        parameters: {
+            query?: {
+                /** @description The active version (the default) or the draft */
+                version?: components["parameters"]["BrandingVersion"];
+            };
+            header?: never;
+            path: {
+                orgId: components["parameters"]["OrgId"];
+                asset: components["parameters"]["BrandingAsset"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The file */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": string;
+                };
+            };
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+            404: components["responses"]["Error"];
+            502: components["responses"]["Error"];
+            504: components["responses"]["Error"];
+        };
+    };
+    uploadOrgBrandingAsset: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                orgId: components["parameters"]["OrgId"];
+                asset: components["parameters"]["BrandingAsset"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": {
+                    /** Format: binary */
+                    file: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Uploaded */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            400: components["responses"]["Error"];
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+            404: components["responses"]["Error"];
+            409: components["responses"]["Error"];
+            413: components["responses"]["Error"];
+            502: components["responses"]["Error"];
+            504: components["responses"]["Error"];
+        };
+    };
+    removeOrgBrandingAsset: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                orgId: components["parameters"]["OrgId"];
+                asset: components["parameters"]["BrandingAsset"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Removed */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            400: components["responses"]["Error"];
             401: components["responses"]["Error"];
             403: components["responses"]["Error"];
             404: components["responses"]["Error"];
@@ -1527,6 +1893,177 @@ export interface operations {
             };
             401: components["responses"]["Error"];
             403: components["responses"]["Error"];
+            502: components["responses"]["Error"];
+            504: components["responses"]["Error"];
+        };
+    };
+    getPlatformBranding: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The branding */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BrandingState"];
+                };
+            };
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+            404: components["responses"]["Error"];
+            502: components["responses"]["Error"];
+            504: components["responses"]["Error"];
+        };
+    };
+    savePlatformBrandingDraft: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BrandingSettings"];
+            };
+        };
+        responses: {
+            /** @description Saved */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            400: components["responses"]["Error"];
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+            404: components["responses"]["Error"];
+            409: components["responses"]["Error"];
+            502: components["responses"]["Error"];
+            504: components["responses"]["Error"];
+        };
+    };
+    publishPlatformBranding: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Published */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            400: components["responses"]["Error"];
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+            404: components["responses"]["Error"];
+            409: components["responses"]["Error"];
+            502: components["responses"]["Error"];
+            504: components["responses"]["Error"];
+        };
+    };
+    getPlatformBrandingAsset: {
+        parameters: {
+            query?: {
+                /** @description The active version (the default) or the draft */
+                version?: components["parameters"]["BrandingVersion"];
+            };
+            header?: never;
+            path: {
+                asset: components["parameters"]["BrandingAsset"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The file */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": string;
+                };
+            };
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+            404: components["responses"]["Error"];
+            502: components["responses"]["Error"];
+            504: components["responses"]["Error"];
+        };
+    };
+    uploadPlatformBrandingAsset: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                asset: components["parameters"]["BrandingAsset"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": {
+                    /** Format: binary */
+                    file: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Uploaded */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            400: components["responses"]["Error"];
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+            404: components["responses"]["Error"];
+            409: components["responses"]["Error"];
+            413: components["responses"]["Error"];
+            502: components["responses"]["Error"];
+            504: components["responses"]["Error"];
+        };
+    };
+    removePlatformBrandingAsset: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                asset: components["parameters"]["BrandingAsset"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Removed */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            400: components["responses"]["Error"];
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+            404: components["responses"]["Error"];
+            409: components["responses"]["Error"];
             502: components["responses"]["Error"];
             504: components["responses"]["Error"];
         };

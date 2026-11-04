@@ -51,6 +51,20 @@ var apiRoutes = []struct {
 	{"GET", "/api/projects/p-admin", nil},
 	{"GET", "/api/projects/p-admin/roles", nil},
 	{"GET", "/api/projects/p-admin/authorizations", nil},
+
+	{"GET", "/api/orgs/org-a/branding", nil},
+	{"PUT", "/api/orgs/org-a/branding", brandingInput()},
+	{"DELETE", "/api/orgs/org-b/branding", nil},
+	{"POST", "/api/orgs/org-b/branding/publish", nil},
+	{"GET", "/api/orgs/org-b/branding/assets/logo", nil},
+	{"PUT", "/api/orgs/org-a/branding/assets/icon", fileBody(pngFile)},
+	{"DELETE", "/api/orgs/org-b/branding/assets/logo", nil},
+	{"GET", "/api/platform/branding", nil},
+	{"PUT", "/api/platform/branding", brandingInput()},
+	{"POST", "/api/platform/branding/publish", nil},
+	{"GET", "/api/platform/branding/assets/logo?version=draft", nil},
+	{"PUT", "/api/platform/branding/assets/font", fileBody(woffFile)},
+	{"DELETE", "/api/platform/branding/assets/logo", nil},
 }
 
 func isChange(method string) bool { return method != http.MethodGet }

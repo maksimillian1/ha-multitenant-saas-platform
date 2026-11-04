@@ -1,8 +1,8 @@
-import { screen, within } from '@testing-library/react'
+import { screen, waitFor, within } from '@testing-library/react'
 import { afterEach, describe, expect, it } from 'vitest'
 import { setTheme } from '@/lib/theme'
-import { mockApi } from '@/test/api'
-import { signedIn } from '@/test/fixtures'
+import { apiError, mockApi } from '@/test/api'
+import { platformBranding, platformSettings, signedIn } from '@/test/fixtures'
 import { renderApp } from '@/test/render'
 
 const overview = { 'GET /api/overview': { organizations: 0, human_users: 0, machine_users: 0, projects: 0 } }
@@ -48,5 +48,67 @@ describe('layout', () => {
     await user.click(screen.getByRole('button', { name: 'Theme: Light' }))
     await user.click(screen.getByRole('menuitemradio', { name: 'System' }))
     expect(localStorage.getItem('admin.theme')).toBeNull()
+  })
+
+  it('applies the platform branding', async () => {
+    const assets = { logo: true, 'logo-dark': false, icon: true, 'icon-dark': true, font: false }
+    mockApi({
+      ...signedIn,
+      ...overview,
+      'GET /api/platform/branding': {
+        ...platformBranding,
+        active: {
+          ...platformBranding.active,
+          settings: { ...platformSettings, primary_color: '#facc15', primary_color_dark: '#1e3a8a' },
+          assets,
+        },
+      },
+    })
+    const { user } = renderApp('/')
+
+    await waitFor(() => expect(document.getElementById('platform-brand')).not.toBeNull())
+    const css = document.getElementById('platform-brand')?.textContent
+    // A light primary gets dark text, a dark one light text.
+    expect(css).toContain(':root { --primary: #facc15; --primary-foreground: #0a0a0a;')
+    expect(css).toContain('.dark { --primary: #1e3a8a; --primary-foreground: #fafafa;')
+
+    const sidebar = screen.getByRole('complementary')
+    expect(within(sidebar).getByRole('img', { name: 'HAMSP admin' })).toHaveAttribute(
+      'src',
+      expect.stringMatching(/^\/api\/platform\/branding\/assets\/logo\?version=active/),
+    )
+    const icon = () => sidebar.querySelector('img[alt=""]')?.getAttribute('src')
+    expect(icon()).toMatch(/^\/api\/platform\/branding\/assets\/icon\?version=active/)
+
+    // The dark theme takes the dark icon; there is no dark logo, so the logo stays.
+    await user.click(screen.getByRole('button', { name: 'Theme: System' }))
+    await user.click(screen.getByRole('menuitemradio', { name: 'Dark' }))
+    expect(icon()).toMatch(/^\/api\/platform\/branding\/assets\/icon-dark\?/)
+    expect(within(sidebar).getByRole('img', { name: 'HAMSP admin' }).getAttribute('src')).toMatch(/\/logo\?/)
+  })
+
+  it('falls back to the built-in look', async () => {
+    for (const answer of [
+      apiError(502, 'Zitadel refused the admin app\'s service account'),
+      // Nothing usable set: no assets, and colors that are not #rrggbb.
+      {
+        ...platformBranding,
+        active: {
+          ...platformBranding.active,
+          settings: { ...platformSettings, primary_color: 'red;}*{', primary_color_dark: '' },
+          assets: { ...platformBranding.active.assets, logo: false },
+        },
+      },
+    ]) {
+      const api = mockApi({ ...signedIn, ...overview, 'GET /api/platform/branding': answer })
+      const { unmount } = renderApp('/')
+
+      // The pages keep working.
+      expect(await screen.findByRole('heading', { name: 'Overview' })).toBeInTheDocument()
+      await waitFor(() => expect(api.sent('GET', '/api/platform/branding')).toHaveLength(1))
+      expect(document.getElementById('platform-brand')).toBeNull()
+      expect(within(screen.getByRole('complementary')).getByText('HA')).toBeInTheDocument()
+      unmount()
+    }
   })
 })

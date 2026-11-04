@@ -48,6 +48,12 @@ type fakeZitadel struct {
 	changeReq     bool
 	newGrant      [3]string // user, project, organization
 	roleKeys      []string
+
+	// Branding (fake_branding_test.go): the instance's, and the
+	// organizations' own.
+	instanceLabel *fakeLabel
+	orgLabels     map[string]*fakeLabel
+	upload        fakeUpload
 }
 
 var created1 = time.Date(2026, 10, 1, 8, 0, 0, 0, time.UTC)
@@ -65,6 +71,8 @@ func newFakeZitadel() *fakeZitadel {
 		projects:       map[string]*zitadel.Project{},
 		roles:          map[string][]zitadel.ProjectRole{},
 		secrets:        map[string]string{},
+		instanceLabel:  platformLabel(),
+		orgLabels:      map[string]*fakeLabel{"org-b": tenantBLabel()},
 	}
 	for _, o := range []struct {
 		id, name string
@@ -470,7 +478,7 @@ func newEnvWith(t *testing.T, sessions fakeSessions) *env {
 	t.Helper()
 	logs := &bytes.Buffer{}
 	z := newFakeZitadel()
-	svc := NewService(sessions, z, "super-admin", testOrigin+"/", slog.New(slog.NewJSONHandler(logs, nil)))
+	svc := NewService(sessions, z, fakePlatform{z}, "super-admin", testOrigin+"/", slog.New(slog.NewJSONHandler(logs, nil)))
 	mux := http.NewServeMux()
 	svc.Register(mux)
 	return &env{t: t, z: z, mux: mux, logs: logs}
@@ -483,10 +491,13 @@ func newEnv(t *testing.T) *env { return newEnvWith(t, adminSession()) }
 func (e *env) do(method, target string, body any, headers ...[2]string) *httptest.ResponseRecorder {
 	e.t.Helper()
 	var reader io.Reader
+	contentType := "application/json"
 	switch b := body.(type) {
 	case nil:
 	case string:
 		reader = strings.NewReader(b)
+	case multipartFile:
+		reader, contentType = b.encode(e.t)
 	default:
 		raw, err := json.Marshal(b)
 		if err != nil {
@@ -496,7 +507,7 @@ func (e *env) do(method, target string, body any, headers ...[2]string) *httptes
 	}
 	r := httptest.NewRequest(method, target, reader)
 	r.Host = "admin.test"
-	r.Header.Set("Content-Type", "application/json")
+	r.Header.Set("Content-Type", contentType)
 	r.Header.Set("X-Requested-With", "XMLHttpRequest")
 	r.Header.Set("Origin", testOrigin)
 	r.Header.Set("Sec-Fetch-Site", "same-origin")

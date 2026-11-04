@@ -1,18 +1,20 @@
 import { useSuspenseQuery } from '@tanstack/react-query'
 import { Link, Outlet } from '@tanstack/react-router'
-import { Building2, FolderKanban, LayoutDashboard, PanelLeftClose, PanelLeftOpen, Users } from 'lucide-react'
+import { Building2, FolderKanban, LayoutDashboard, PanelLeftClose, PanelLeftOpen, Palette, Users } from 'lucide-react'
 import { useState } from 'react'
 import { meQuery } from '@/api/queries'
 import { ThemeMenu } from '@/components/theme-menu'
 import { Button } from '@/components/ui/button'
 import { Toaster } from '@/components/ui/sonner'
 import { UserMenu } from '@/components/user-menu'
+import { useBrand, type Brand } from '@/lib/brand'
 
 const nav = [
   { to: '/', label: 'Overview', icon: LayoutDashboard, exact: true },
   { to: '/orgs', label: 'Organizations', icon: Building2, exact: false },
   { to: '/users', label: 'Users', icon: Users, exact: false },
   { to: '/projects', label: 'Projects', icon: FolderKanban, exact: false },
+  { to: '/branding', label: 'Branding', icon: Palette, exact: false },
 ] as const
 
 const linkStyle =
@@ -38,10 +40,34 @@ function NavLinks({ collapsed = false, className = '' }: { collapsed?: boolean; 
   )
 }
 
-function Logo() {
+// Logo is the platform's icon, or its logo, or the built-in mark.
+function Logo({ brand }: { brand: Brand }) {
+  const src = brand.icon ?? brand.logo
+  if (src) {
+    return <img src={src} alt="" className="size-8 shrink-0 rounded-lg object-contain" />
+  }
   return (
     <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary text-xs font-bold text-primary-foreground">
       HA
+    </span>
+  )
+}
+
+// Wordmark is the platform's logo when it has one; the name stays for
+// screen readers.
+function Wordmark({ brand }: { brand: Brand }) {
+  if (brand.logo && brand.icon) {
+    return (
+      <span className="flex min-w-0 flex-col">
+        <img src={brand.logo} alt="HAMSP admin" className="h-6 max-w-40 object-contain object-left" />
+        <span className="truncate text-xs text-muted-foreground">Platform administration</span>
+      </span>
+    )
+  }
+  return (
+    <span className="flex min-w-0 flex-col">
+      <span className="truncate text-sm font-semibold">HAMSP admin</span>
+      <span className="truncate text-xs text-muted-foreground">Platform administration</span>
     </span>
   )
 }
@@ -68,6 +94,7 @@ function storeCollapsed(collapsed: boolean) {
 export function RootLayout() {
   const { data: me } = useSuspenseQuery(meQuery)
   const [collapsed, setCollapsed] = useState(storedCollapsed)
+  const brand = useBrand()
   const toggle = () => {
     storeCollapsed(!collapsed)
     setCollapsed(!collapsed)
@@ -79,15 +106,8 @@ export function RootLayout() {
         className={`sticky top-0 hidden h-svh shrink-0 flex-col gap-6 border-r bg-sidebar px-3 py-4 text-sidebar-foreground transition-[width] duration-200 md:flex ${collapsed ? 'w-16' : 'w-64'}`}
       >
         <Link to="/" className={`flex items-center gap-2.5 ${collapsed ? 'justify-center' : 'px-1.5'}`}>
-          <Logo />
-          {collapsed ? (
-            <span className="sr-only">HAMSP admin</span>
-          ) : (
-            <span className="flex min-w-0 flex-col">
-              <span className="truncate text-sm font-semibold">HAMSP admin</span>
-              <span className="truncate text-xs text-muted-foreground">Platform administration</span>
-            </span>
-          )}
+          <Logo brand={brand} />
+          {collapsed ? <span className="sr-only">HAMSP admin</span> : <Wordmark brand={brand} />}
         </Link>
         <nav aria-label="Main" className="flex flex-col gap-1">
           {!collapsed && (
@@ -114,7 +134,7 @@ export function RootLayout() {
               {collapsed ? <PanelLeftOpen /> : <PanelLeftClose />}
             </Button>
             <Link to="/" className="flex items-center gap-2 font-semibold md:hidden">
-              <Logo />
+              <Logo brand={brand} />
               HAMSP admin
             </Link>
             <div className="ml-auto flex items-center gap-1">
