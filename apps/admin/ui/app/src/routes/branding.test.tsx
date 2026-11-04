@@ -160,6 +160,42 @@ describe('organization branding', () => {
     expect(within(light).getByText('ann')).toBeInTheDocument()
   })
 
+  it("previews the draft's icon, dark logo and font", async () => {
+    const all = { logo: true, 'logo-dark': true, icon: true, 'icon-dark': true, font: true }
+    mockApi({
+      ...orgAnswers,
+      'GET /api/orgs/org-b/branding': { ...tenantBBranding, draft: { ...tenantBBranding.draft, assets: all } },
+    })
+    renderApp('/orgs/org-b?tab=branding')
+    const light = await screen.findByTestId('preview-light')
+    const dark = screen.getByTestId('preview-dark')
+    const src = (scope: HTMLElement, name: string) => within(scope).getByRole('img', { name }).getAttribute('src')
+
+    // Light shows the logo and icon, dark their dark versions, all from the draft.
+    expect(src(light, 'Logo')).toMatch(/\/branding\/assets\/logo\?version=draft/)
+    expect(src(light, 'Icon')).toMatch(/\/branding\/assets\/icon\?version=draft/)
+    expect(src(dark, 'Logo')).toMatch(/\/branding\/assets\/logo-dark\?version=draft/)
+    expect(src(dark, 'Icon')).toMatch(/\/branding\/assets\/icon-dark\?version=draft/)
+
+    // The draft's font is loaded from the BFF and used by both cards.
+    const fontFace = screen.getByRole('figure', { name: 'Login preview (light)' }).querySelector('style')?.textContent ?? ''
+    const family = fontFace.match(/font-family: "([^"]+)"/)?.[1]
+    expect(fontFace).toMatch(/src: url\("\/api\/orgs\/org-b\/branding\/assets\/font\?version=draft&v=\d+"\)/)
+    expect(family).toBeTruthy()
+    expect(light.style.fontFamily).toContain(family)
+    expect(dark.style.fontFamily).toContain(family)
+  })
+
+  it('shows a dark logo fallback and no font without those assets', async () => {
+    mockApi(orgAnswers)
+    renderApp('/orgs/org-a?tab=branding')
+    const dark = await screen.findByTestId('preview-dark')
+    // Without a dark logo the dark card shows the light one, as Zitadel does.
+    expect(within(dark).getByRole('img', { name: 'Logo' }).getAttribute('src')).toMatch(/\/assets\/logo\?/)
+    expect(within(dark).queryByRole('img', { name: 'Icon' })).not.toBeInTheDocument()
+    expect(dark.style.fontFamily).toBe('')
+  })
+
   it('publishes the draft after confirming', async () => {
     const api = mockApi({ ...orgAnswers, 'POST /api/orgs/org-b/branding/publish': noContent() })
     const { user } = renderApp('/orgs/org-b?tab=branding')
