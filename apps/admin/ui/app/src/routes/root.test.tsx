@@ -2,8 +2,17 @@ import { screen, waitFor, within } from '@testing-library/react'
 import { afterEach, describe, expect, it } from 'vitest'
 import { setTheme } from '@/lib/theme'
 import { apiError, mockApi } from '@/test/api'
-import { platformBranding, platformSettings, signedIn } from '@/test/fixtures'
+import { me, platformBranding, platformSettings, signedIn } from '@/test/fixtures'
 import { renderApp } from '@/test/render'
+
+type User = ReturnType<typeof renderApp>['user']
+
+// pickTheme picks a theme in the user menu at the foot of the sidebar.
+async function pickTheme(user: User, theme: 'Light' | 'Dark' | 'System') {
+  const sidebar = await screen.findByRole('complementary')
+  await user.click(within(sidebar).getByRole('button', { name: new RegExp(me.name) }))
+  await user.click(screen.getByRole('menuitemradio', { name: theme }))
+}
 
 const overview = { 'GET /api/overview': { organizations: 0, human_users: 0, machine_users: 0, projects: 0 } }
 
@@ -32,22 +41,56 @@ describe('layout', () => {
     expect(await screen.findByRole('button', { name: 'Expand sidebar' })).toBeInTheDocument()
   })
 
-  it('switches between the light, dark and system themes', async () => {
+  it('collapses the sidebar with Ctrl+B, but not while typing', async () => {
     mockApi({ ...signedIn, ...overview })
     const { user } = renderApp('/')
 
-    await user.click(await screen.findByRole('button', { name: 'Theme: System' }))
-    await user.click(screen.getByRole('menuitemradio', { name: 'Dark' }))
+    await screen.findByRole('button', { name: 'Collapse sidebar' })
+    await user.keyboard('{Control>}b{/Control}')
+    expect(screen.getByRole('button', { name: 'Expand sidebar' })).toHaveAttribute('aria-keyshortcuts', 'Control+B Meta+B')
+    await user.keyboard('{Meta>}b{/Meta}')
+    expect(screen.getByRole('button', { name: 'Collapse sidebar' })).toBeInTheDocument()
+
+    const field = document.createElement('input')
+    document.body.append(field)
+    field.focus()
+    await user.keyboard('{Control>}b{/Control}')
+    expect(screen.getByRole('button', { name: 'Collapse sidebar' })).toBeInTheDocument()
+    field.remove()
+  })
+
+  it('has no header: the theme and sign-out are in the user menu', async () => {
+    mockApi({ ...signedIn, ...overview })
+    const { user } = renderApp('/')
+
+    await screen.findByRole('heading', { name: 'Overview' })
+    expect(screen.queryByRole('banner')).not.toBeInTheDocument()
+
+    await pickTheme(user, 'Dark')
     expect(document.documentElement).toHaveClass('dark')
     expect(localStorage.getItem('admin.theme')).toBe('dark')
 
-    await user.click(screen.getByRole('button', { name: 'Theme: Dark' }))
-    await user.click(screen.getByRole('menuitemradio', { name: 'Light' }))
+    await pickTheme(user, 'Light')
     expect(document.documentElement).not.toHaveClass('dark')
 
-    await user.click(screen.getByRole('button', { name: 'Theme: Light' }))
+    const sidebar = screen.getByRole('complementary')
+    await user.click(within(sidebar).getByRole('button', { name: new RegExp(me.name) }))
+    expect(screen.getByRole('menuitemradio', { name: 'Light' })).toHaveAttribute('aria-checked', 'true')
+    expect(screen.getByRole('menuitem', { name: 'Sign out' })).toBeInTheDocument()
     await user.click(screen.getByRole('menuitemradio', { name: 'System' }))
     expect(localStorage.getItem('admin.theme')).toBeNull()
+  })
+
+  it('opens the menu sheet from the floating button on small screens', async () => {
+    mockApi({ ...signedIn, ...overview })
+    const { user } = renderApp('/')
+
+    await user.click(await screen.findByRole('button', { name: 'Open menu' }))
+    const sheet = screen.getByRole('dialog', { name: 'Menu' })
+    expect(within(sheet).getByRole('button', { name: new RegExp(me.name) })).toBeInTheDocument()
+
+    await user.click(within(sheet).getByRole('link', { name: 'Overview' }))
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Menu' })).not.toBeInTheDocument())
   })
 
   it('applies the platform branding', async () => {
@@ -81,8 +124,7 @@ describe('layout', () => {
     expect(icon()).toMatch(/^\/api\/platform\/branding\/assets\/icon\?version=active/)
 
     // The dark theme takes the dark icon; there is no dark logo, so the logo stays.
-    await user.click(screen.getByRole('button', { name: 'Theme: System' }))
-    await user.click(screen.getByRole('menuitemradio', { name: 'Dark' }))
+    await pickTheme(user, 'Dark')
     expect(icon()).toMatch(/^\/api\/platform\/branding\/assets\/icon-dark\?/)
     expect(within(sidebar).getByRole('img', { name: 'HAMSP admin' }).getAttribute('src')).toMatch(/\/logo\?/)
   })
