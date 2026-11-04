@@ -117,3 +117,80 @@ func TestBrandingTokensGoToTheirRoutes(t *testing.T) {
 		}
 	}
 }
+
+// TestTokensNeverReachTheBrowser calls every branding route against a
+// Zitadel that echoes the caller's token wherever it can: in a header, in
+// the message of failed writes and as the content of an asset. Neither token
+// may appear in what the BFF answers (HAMSP-37, AC-8).
+func TestTokensNeverReachTheBrowser(t *testing.T) {
+	zitadel := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		token := strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer ")
+		w.Header().Set("X-Echo-Token", token)
+		switch {
+		case strings.HasSuffix(r.URL.Path, "/ListOrganizations"):
+			w.Header().Set("Content-Type", "application/json")
+			_ = json.NewEncoder(w).Encode(map[string]any{"result": []any{map[string]any{"id": "org-a", "name": "tenant-a"}}})
+		case strings.HasPrefix(r.URL.Path, "/assets/") && r.Method == http.MethodGet:
+			_, _ = io.WriteString(w, "token "+token)
+		case r.Method == http.MethodGet:
+			w.Header().Set("Content-Type", "application/json")
+			_ = json.NewEncoder(w).Encode(map[string]any{"policy": map[string]any{"primaryColor": "#5469d4", "token": token}})
+		default:
+			w.WriteHeader(http.StatusInternalServerError)
+			_ = json.NewEncoder(w).Encode(map[string]any{"code": "internal", "message": "failed for token " + token})
+		}
+	}))
+	defer zitadel.Close()
+
+	log := slog.New(slog.NewTextHandler(io.Discard, nil))
+	mux := http.NewServeMux()
+	newAPIService(core.Config{ZitadelURL: zitadel.URL, ZitadelToken: "org-token-secret", ZitadelInstanceToken: "instance-token-secret",
+		AdminRole: "super-admin", PublicURL: "http://admin.test"}, adminSession{}, zitadel.Client(), log).Register(mux)
+
+	settings := `{"primary_color":"#7c3aed","background_color":"#fafafa","warn_color":"#cd3d56","font_color":"#000000",
+		"primary_color_dark":"#c4b5fd","background_color_dark":"#111827","warn_color_dark":"#ff3b5b","font_color_dark":"#ffffff",
+		"hide_login_name_suffix":false,"disable_watermark":false,"theme_mode":"auto"}`
+	png := "\x89PNG\r\n\x1a\n" + strings.Repeat("\x00", 32)
+	upload := "--b\r\nContent-Disposition: form-data; name=\"file\"; filename=\"x.png\"\r\nContent-Type: image/png\r\n\r\n" + png + "\r\n--b--\r\n"
+
+	routes := []struct{ method, path, contentType, body string }{
+		{"GET", "/api/me", "", ""},
+	}
+	for _, base := range []string{"/api/orgs/org-a/branding", "/api/platform/branding"} {
+		routes = append(routes,
+			struct{ method, path, contentType, body string }{"GET", base, "", ""},
+			struct{ method, path, contentType, body string }{"PUT", base, "application/json", settings},
+			struct{ method, path, contentType, body string }{"POST", base + "/publish", "", ""},
+			struct{ method, path, contentType, body string }{"GET", base + "/assets/logo", "", ""},
+			struct{ method, path, contentType, body string }{"GET", base + "/assets/logo?version=draft", "", ""},
+			struct{ method, path, contentType, body string }{"PUT", base + "/assets/logo", "multipart/form-data; boundary=b", upload},
+			struct{ method, path, contentType, body string }{"DELETE", base + "/assets/logo", "", ""},
+		)
+	}
+	routes = append(routes, struct{ method, path, contentType, body string }{"DELETE", "/api/orgs/org-a/branding", "", ""})
+
+	for _, route := range routes {
+		r := httptest.NewRequest(route.method, route.path, strings.NewReader(route.body))
+		r.Host = "admin.test"
+		r.Header.Set("Origin", "http://admin.test")
+		r.Header.Set("Sec-Fetch-Site", "same-origin")
+		r.Header.Set("X-Requested-With", "XMLHttpRequest")
+		if route.contentType != "" {
+			r.Header.Set("Content-Type", route.contentType)
+		}
+		rec := httptest.NewRecorder()
+		mux.ServeHTTP(rec, r)
+		if rec.Code == http.StatusForbidden || rec.Code == http.StatusUnauthorized {
+			t.Errorf("%s %s: status %d; the request did not reach the handler", route.method, route.path, rec.Code)
+		}
+		answer := rec.Body.String()
+		for name, values := range rec.Header() {
+			answer += "\n" + name + ": " + strings.Join(values, ",")
+		}
+		for _, token := range []string{"org-token-secret", "instance-token-secret"} {
+			if strings.Contains(answer, token) {
+				t.Errorf("%s %s answered with the token %s:\n%s", route.method, route.path, token, answer)
+			}
+		}
+	}
+}
