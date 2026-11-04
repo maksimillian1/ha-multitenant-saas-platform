@@ -7,6 +7,8 @@
 //
 // The API manages Zitadel's organizations, users and role assignments as the
 // app's own service account (ZITADEL_TOKEN), never with the admin's token.
+// Only the platform branding uses a second account with the instance role
+// IAM_OWNER (ZITADEL_INSTANCE_TOKEN).
 package main
 
 import (
@@ -73,10 +75,19 @@ func bootstrapServices(ctx context.Context, cfg core.Config, log *slog.Logger) (
 	authService := auth.NewService(provider, cookies, cfg.PublicURL, cfg.ClientID, log)
 	// The issuer client also reaches the Zitadel APIs: same host, same
 	// in-cluster dial address.
-	zitadelClient := zitadel.NewClient(cfg.ZitadelURL, cfg.ZitadelToken, issuerClient)
-	apiService := api.NewService(authService, zitadelClient, cfg.AdminRole, cfg.PublicURL, log)
+	apiService := newAPIService(cfg, authService, issuerClient, log)
 	uiService := ui.NewService(authService, log)
 	healthService := health.NewService()
 
 	return authService, apiService, uiService, healthService, nil
+}
+
+// newAPIService builds the API with its two Zitadel clients: the admin app's
+// account for everything, and the instance account for the platform
+// branding only.
+func newAPIService(cfg core.Config, sessions core.SessionReader, httpClient *http.Client, log *slog.Logger) *api.Service {
+	return api.NewService(sessions,
+		zitadel.NewClient(cfg.ZitadelURL, cfg.ZitadelToken, httpClient),
+		zitadel.NewClient(cfg.ZitadelURL, cfg.ZitadelInstanceToken, httpClient),
+		cfg.AdminRole, cfg.PublicURL, log)
 }

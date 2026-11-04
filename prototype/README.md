@@ -102,7 +102,7 @@ Deleting an organization deletes it in Zitadel only: the tenant's rows in Postgr
 
 The app calls Zitadel's v2 APIs (Connect with JSON) as its own service account `admin-app`, a machine user with the instance role `IAM_ORG_MANAGER`, never with the admin's token. Zitadel's audit trail therefore shows `admin-app` as the editor; the app's log has a line `admin change` with the admin's user ID, the route, the target and the status for every change. State-changing requests need the header `X-Requested-With: XMLHttpRequest` and must come from the app's origin (CSRF).
 
-`bootstrap-tenants.sh` sets it up. It switches the instance to Zitadel's built-in login (the instance requires Login V2, which this cluster does not deploy), creates the project, the role and an OIDC web app, writes the app's client and a session key to the Secret `admin/admin-oidc`, creates the service account with a personal access token (new on every run, valid for a year) in the Secret `admin/admin-zitadel`, and creates three human users in the IAM admin's organization: `super-admin` with the role (all pages), `viewer` with the role `viewer` only (access denied page) and `regular-user` with no role (Zitadel refuses the sign-in). Their passwords are new on every run:
+`bootstrap-tenants.sh` sets it up. It switches the instance to Zitadel's built-in login (the instance requires Login V2, which this cluster does not deploy), creates the project, the role and an OIDC web app, writes the app's client and a session key to the Secret `admin/admin-oidc`, creates the service accounts `admin-app` and `admin-app-instance` with personal access tokens (new on every run, valid for a year) in the Secret `admin/admin-zitadel`, and creates three human users in the IAM admin's organization: `super-admin` with the role (all pages), `viewer` with the role `viewer` only (access denied page) and `regular-user` with no role (Zitadel refuses the sign-in). Their passwords are new on every run:
 
 ```bash
 jq -r '.admin.users[] | "\(.username)  \(.password)  roles: \(.roles)"' prototype/.tenants.json
@@ -116,6 +116,19 @@ The Zitadel client has an integration test that runs against this cluster with t
 ZITADEL_TEST_URL=http://zitadel.localtest.me:30080 \
 ZITADEL_TEST_TOKEN=$(kubectl -n admin get secret admin-zitadel -o jsonpath='{.data.ZITADEL_TOKEN}' | base64 -d) \
 go test -C apps/admin -count=1 -run TestIntegration -v ./zitadel/
+```
+
+### Login branding
+
+The Branding tab of an organization and the Platform branding page edit Zitadel's label policies (HAMSP-37): colors for light and dark, theme mode, two flags, and the logo, icon and font. Changes go to a draft, which a preview shows; **Publish** makes the Zitadel login show it. An organization without its own branding shows the platform's, and **Reset to platform branding** removes its own. The admin app takes its primary color, logo and icon from the published platform branding.
+
+The platform branding needs the instance role `IAM_OWNER`, so `bootstrap-tenants.sh` creates a second machine user, `admin-app-instance`, and writes its token as `ZITADEL_INSTANCE_TOKEN` to the same Secret; the app uses it for the platform branding only. The app does not start without it. The integration test publishes branding for `tenant-a` and checks the login's CSS for `tenant-a`, `tenant-b` and the platform; it restores what it changed:
+
+```bash
+ZITADEL_TEST_URL=http://zitadel.localtest.me:30080 \
+ZITADEL_TEST_TOKEN=$(kubectl -n admin get secret admin-zitadel -o jsonpath='{.data.ZITADEL_TOKEN}' | base64 -d) \
+ZITADEL_TEST_INSTANCE_TOKEN=$(kubectl -n admin get secret admin-zitadel -o jsonpath='{.data.ZITADEL_INSTANCE_TOKEN}' | base64 -d) \
+go test -C apps/admin -count=1 -run TestBrandingIntegration -v ./zitadel/
 ```
 
 The SPA lives in `apps/admin/ui/app` (Node 22, `.nvmrc`); `npm test` runs its tests (Vitest, jsdom), which render the real pages against a stubbed API. `npm run dev` proxies `/api` and `/auth` to a Go server on `localhost:8080`; signing in through it needs `PUBLIC_URL=http://localhost:5173` and that callback URL added to the Zitadel app, which the bootstrap does not do. The API is described in `apps/admin/openapi.yaml`: after changing it, run `go generate ./...` in `apps/admin` and `npm run gen:api` in `apps/admin/ui/app`. CI fails when the generated types are out of date, and a Go test fails when a route and the spec disagree.
