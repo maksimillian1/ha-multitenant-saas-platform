@@ -1,10 +1,11 @@
 import { useSuspenseQuery } from '@tanstack/react-query'
 import { Link, Outlet } from '@tanstack/react-router'
-import { Building2, FolderKanban, LayoutDashboard, PanelLeftClose, PanelLeftOpen, Palette, Users } from 'lucide-react'
-import { useState } from 'react'
-import { meQuery } from '@/api/queries'
-import { ThemeMenu } from '@/components/theme-menu'
+import { Building2, ChevronLeft, ChevronRight, FolderKanban, LayoutDashboard, Menu, Palette, Users } from 'lucide-react'
+import { Dialog as DialogPrimitive } from 'radix-ui'
+import { useCallback, useEffect, useState } from 'react'
+import { meQuery, type Me } from '@/api/queries'
 import { Button } from '@/components/ui/button'
+import { Dialog, DialogOverlay, DialogPortal, DialogTitle } from '@/components/ui/dialog'
 import { Toaster } from '@/components/ui/sonner'
 import { UserMenu } from '@/components/user-menu'
 import { useBrand, type Brand } from '@/lib/brand'
@@ -21,7 +22,15 @@ const linkStyle =
   'flex items-center gap-2.5 rounded-lg text-sm whitespace-nowrap text-muted-foreground transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground data-[status=active]:bg-sidebar-accent data-[status=active]:font-medium data-[status=active]:text-sidebar-accent-foreground'
 
 // A collapsed link keeps its label for screen readers and as a tooltip.
-function NavLinks({ collapsed = false, className = '' }: { collapsed?: boolean; className?: string }) {
+function NavLinks({
+  collapsed = false,
+  className = '',
+  onNavigate,
+}: {
+  collapsed?: boolean
+  className?: string
+  onNavigate?: () => void
+}) {
   return (
     <>
       {nav.map(({ to, label, icon: Icon, exact }) => (
@@ -30,6 +39,7 @@ function NavLinks({ collapsed = false, className = '' }: { collapsed?: boolean; 
           to={to}
           activeOptions={{ exact, includeSearch: false }}
           title={collapsed ? label : undefined}
+          onClick={onNavigate}
           className={`${linkStyle} ${className}`}
         >
           <Icon className="size-4 shrink-0" />
@@ -91,24 +101,94 @@ function storeCollapsed(collapsed: boolean) {
   }
 }
 
+// Ctrl+B (Cmd+B on a Mac) toggles the sidebar, except while typing, where it
+// may mean bold.
+function isToggleKey(event: KeyboardEvent) {
+  const target = event.target as HTMLElement | null
+  const typing = target?.closest('input, textarea, select, [contenteditable="true"]')
+  return (event.ctrlKey || event.metaKey) && !event.altKey && !event.shiftKey && event.key.toLowerCase() === 'b' && !typing
+}
+
+// MobileMenu replaces the sidebar on small screens: a floating button opens
+// a sheet with the same links and the user menu.
+function MobileMenu({ me, brand }: { me: Me; brand: Brand }) {
+  const [open, setOpen] = useState(false)
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogPrimitive.Trigger asChild>
+        <Button size="icon-lg" aria-label="Open menu" className="fixed bottom-4 left-4 z-40 size-12 rounded-full shadow-lg md:hidden">
+          <Menu />
+        </Button>
+      </DialogPrimitive.Trigger>
+      <DialogPortal>
+        <DialogOverlay />
+        <DialogPrimitive.Content
+          aria-describedby={undefined}
+          className="fixed inset-y-0 left-0 z-50 flex w-72 max-w-[85vw] flex-col gap-6 border-r bg-sidebar px-3 py-4 text-sidebar-foreground outline-none data-open:animate-in data-open:slide-in-from-left data-closed:animate-out data-closed:slide-out-to-left"
+        >
+          <DialogTitle className="sr-only">Menu</DialogTitle>
+          <Link to="/" onClick={() => setOpen(false)} className="flex items-center gap-2.5 px-1.5">
+            <Logo brand={brand} />
+            <Wordmark brand={brand} />
+          </Link>
+          <nav aria-label="Menu" className="flex flex-col gap-1">
+            <NavLinks className="px-2.5 py-2" onNavigate={() => setOpen(false)} />
+          </nav>
+          <div className="mt-auto border-t pt-3">
+            <UserMenu me={me} side="top" />
+          </div>
+        </DialogPrimitive.Content>
+      </DialogPortal>
+    </Dialog>
+  )
+}
+
 export function RootLayout() {
   const { data: me } = useSuspenseQuery(meQuery)
   const [collapsed, setCollapsed] = useState(storedCollapsed)
   const brand = useBrand()
-  const toggle = () => {
-    storeCollapsed(!collapsed)
-    setCollapsed(!collapsed)
-  }
+  const toggle = useCallback(
+    () =>
+      setCollapsed((was) => {
+        storeCollapsed(!was)
+        return !was
+      }),
+    [],
+  )
+
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      if (isToggleKey(event)) {
+        event.preventDefault()
+        toggle()
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [toggle])
 
   return (
     <div className="flex min-h-svh bg-muted/40">
       <aside
-        className={`sticky top-0 hidden h-svh shrink-0 flex-col gap-6 border-r bg-sidebar px-3 py-4 text-sidebar-foreground transition-[width] duration-200 md:flex ${collapsed ? 'w-16' : 'w-64'}`}
+        className={`sticky top-0 z-30 hidden h-svh shrink-0 flex-col gap-6 border-r bg-sidebar px-3 py-4 text-sidebar-foreground transition-[width] duration-200 md:flex ${collapsed ? 'w-16' : 'w-64'}`}
       >
         <Link to="/" className={`flex items-center gap-2.5 ${collapsed ? 'justify-center' : 'px-1.5'}`}>
           <Logo brand={brand} />
           {collapsed ? <span className="sr-only">HAMSP admin</span> : <Wordmark brand={brand} />}
         </Link>
+        {/* The handle sits on the sidebar's border, level with the logo. */}
+        <Button
+          variant="outline"
+          size="icon-xs"
+          aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+          aria-expanded={!collapsed}
+          aria-keyshortcuts="Control+B Meta+B"
+          title={`${collapsed ? 'Expand' : 'Collapse'} sidebar (Ctrl+B)`}
+          onClick={toggle}
+          className="absolute top-6 -right-3 rounded-full bg-background text-muted-foreground shadow-xs hover:text-foreground"
+        >
+          {collapsed ? <ChevronRight /> : <ChevronLeft />}
+        </Button>
         <nav aria-label="Main" className="flex flex-col gap-1">
           {!collapsed && (
             <span className="px-2.5 pb-1 text-xs font-medium tracking-wide text-muted-foreground uppercase">Manage</span>
@@ -116,42 +196,14 @@ export function RootLayout() {
           <NavLinks collapsed={collapsed} className={collapsed ? 'justify-center px-0 py-2' : 'px-2.5 py-2'} />
         </nav>
         <div className="mt-auto border-t pt-3">
-          <UserMenu me={me} placement="sidebar" collapsed={collapsed} />
+          <UserMenu me={me} collapsed={collapsed} />
         </div>
       </aside>
 
-      <div className="flex min-w-0 flex-1 flex-col">
-        <header className="sticky top-0 z-20 border-b bg-background/95 backdrop-blur">
-          <div className="flex h-14 items-center gap-2 px-4 md:px-6">
-            <Button
-              variant="ghost"
-              size="icon-lg"
-              className="hidden md:inline-flex"
-              aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-              aria-expanded={!collapsed}
-              onClick={toggle}
-            >
-              {collapsed ? <PanelLeftOpen /> : <PanelLeftClose />}
-            </Button>
-            <Link to="/" className="flex items-center gap-2 font-semibold md:hidden">
-              <Logo brand={brand} />
-              HAMSP admin
-            </Link>
-            <div className="ml-auto flex items-center gap-1">
-              <ThemeMenu />
-              <div className="md:hidden">
-                <UserMenu me={me} />
-              </div>
-            </div>
-          </div>
-          <nav aria-label="Sections" className="flex gap-1 overflow-x-auto px-4 pb-2 md:hidden">
-            <NavLinks className="px-2.5 py-1.5" />
-          </nav>
-        </header>
-        <main className="mx-auto w-full max-w-7xl min-w-0 px-4 py-6 md:px-8 md:py-8">
-          <Outlet />
-        </main>
-      </div>
+      <main className="mx-auto w-full max-w-7xl min-w-0 px-4 pt-6 pb-24 md:px-8 md:py-8">
+        <Outlet />
+      </main>
+      <MobileMenu me={me} brand={brand} />
       <Toaster position="bottom-right" />
     </div>
   )
