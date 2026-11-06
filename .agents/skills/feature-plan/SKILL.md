@@ -33,7 +33,9 @@ A risk or bug found outside the issue's scope becomes a new issue in Triage, lin
 
 ## 4. Write the plan
 
-Keep it short: the plan is a map, not the code. Show it to the user and ask before saving it into the issue (`save_issue`). Append it after the existing sections:
+Keep it short: the plan is a map, not the code. Show it to the user and ask before saving it into the issue (`save_issue`). Append it after the existing sections.
+
+When the target stage is `alpha` or higher, the owner's approval of the checklist is gate G-07 (`docs/process/review.md`, R-1). Show the integration, contract and end-to-end rows and the touched QS first, separately from the rest of the plan, so they can be reviewed alone. When the owner approves, add `**Checklist approved:** <YYYY-MM-DD>` under the Checklist in the issue. Implementation does not start before that.
 
 ```markdown
 ## Plan
@@ -54,10 +56,22 @@ Keep it short: the plan is a map, not the code. Show it to the user and ask befo
 |---|---|---|---|
 | AC-1 | `apps/api/tenant_test.go: TestCreateTenant` | integration | `go test ./apps/api/...` |
 | QS-01 | `apps/api/isolation_test.go: TestCrossTenantRead` | integration | `go test -run CrossTenant ./apps/api/...` |
+
+**Checklist** (target stage `alpha`, level `basic`; owner reviews the integration, contract and end-to-end rows)
+| Item | Kind | Plan |
+|---|---|---|
+| T-01 | integration | applies: a token of tenant B on tenant A's record; gateway → ExampleApp → PostgreSQL |
+| T-02 | contract | applies: new `POST /v1/tenants` in `docs/contracts/tenant/openapi.yaml` |
+| T-08 | integration | does not apply: no migration |
+| T-11 | fuzz | unsure: depends on whether the request body gets its own decoder |
+
+**Touched QS:** QS-03, QS-18. Load and chaos runs are chosen by `feature-verify`.
 ```
 
 Rules:
-- Every AC-n and every touched QS-xx appears in the Test map. A row without a test is not allowed. If something can only be checked by hand, write `manual: <exact steps>` in the Test column and say why.
+- **Checklist, plan pass** (`docs/process/testing.md`, sections 4 and 5). Take the target stage from the issue's `stage:*` label and its level (`basic` for `alpha`, `full` for `beta` and `stable`); add the *critical* items when the plan touches a `critical` zone. For each item write *applies*, *does not apply* with one line why, or *unsure*. For integration, contract and end-to-end items that apply, one line on the scenario and the components involved. No test names and no unit-level detail here: that is the verify pass. Skip the checklist when the target stage is `proto`.
+- Touched QS-xx: list them. A cheap QS test (integration, low load on kind) is a row of the Test map. Do not plan load or chaos runs; `feature-verify` proposes them from the actual change.
+- Every AC-n appears in the Test map, and so does every touched QS-xx that has a cheap test. A row without a test is not allowed. If something can only be checked by hand, write `manual: <exact steps>` in the Test column and say why.
 - Tests come first in the steps that introduce them, or in the same step as the code. Never in a final "add tests" step.
 - Steps are small enough for one commit each and name the files they touch.
 - Use the test names you intend to create, so `feature-verify` can find them. Update the Test map if names change during implementation.
@@ -65,4 +79,4 @@ Rules:
 
 ## 5. Report
 
-In chat: the approach in two lines, the docs-check findings that matter (conflicts, missing ADRs), the number of steps, and Triage issues created. Do not change the issue status. Implementation follows the steps; `feature-verify` checks the result.
+In chat: the approach in two lines, the checklist rows for owner review, the docs-check findings that matter (conflicts, missing ADRs), the number of steps, and Triage issues created. Do not change the issue status. Implementation follows the steps; `feature-verify` checks the result.
