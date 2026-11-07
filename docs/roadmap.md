@@ -9,9 +9,9 @@ Two parts:
 
 ## Feature stages
 
-Agents write most of the code, so a feature ships in stages: `proto`, `alpha`, `beta`, `stable`. Up to `beta` it is checked by agents and automated guardrails; `stable` means the owner has read the code. Each stage switches a release flag per tenant and environment.
+Agents write most of the code, so a feature ships in stages: `proto`, `alpha`, `beta`, `stable`. Up to `beta` it is checked by agents and automated guardrails; `stable` means the owner has read the code.
 
-What each stage promises, which guardrails it needs and how features move between stages: [Feature stages](process/feature-stages.md). The flags: [ADR-0011](adr/0011-feature-flags.md).
+What each stage promises, which guardrails it needs and how features move between stages: [Feature stages](process/feature-stages.md). The decision: [ADR-0011](adr/0011-feature-stages.md).
 
 ## Part 1: local prototype (kind)
 
@@ -21,7 +21,7 @@ Without it, agent-shipped code is not under control.
 
 * Feature map: one file per feature in `docs/features/` with its stage, code, checklist and reviews, and a generated map of all features (HAMSP-45). First: the other guardrails depend on it.
 * Pre-commit hooks and agent rules (HAMSP-40, HAMSP-44).
-* Feature flags per [ADR-0011](adr/0011-feature-flags.md) (HAMSP-63). `feature-verify` checks the gates of a stage (HAMSP-64).
+* Feature flags, optional until a feature needs one (HAMSP-63). `feature-verify` checks the gates of a stage (HAMSP-64).
 * AGPL check in CI (HAMSP-21, C-03), arm64 builds (HAMSP-27, C-06).
 
 ### Phase 1: close the gaps in the existing core
@@ -68,7 +68,7 @@ Runs after the merge, in parallel with part 2. The owner reads the code feature 
 2. The rest of the core: ExampleApp, Usage Writer, the usage store.
 3. Features from phase 2, in the order they depend on each other.
 
-A feature becomes `stable` when it is reviewed, its flag is removed and the quality scenarios it touches pass. Scenarios that need load pass only after part 2.
+A feature becomes `stable` when it is reviewed, its flag, if it has one, is removed and the quality scenarios it touches pass. Scenarios that need load pass only after part 2.
 
 ## Part 2: AWS
 

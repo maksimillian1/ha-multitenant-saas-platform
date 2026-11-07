@@ -43,7 +43,7 @@ One test may cover several IDs; it is listed under each of them.
 
 ### Gates outside the checklist
 
-- **G-01, flag off:** a feature that changes behaviour has a release flag in the registry that names this feature, and the suite passes with it off. At `alpha` and above, the AC tests also run with it on.
+- **G-01, flag off:** release flags are optional. A feature without one gets `n/a` with the note "no release flag". A feature with one passes the suite with it off, and at `alpha` and above the AC tests also run with it on.
 - **G-03, contracts:** every schema the feature adds or changes is in `docs/contracts/` and its examples pass. Its contract rows are under the approved plan (G-07); a schema the plan did not mention is a deviation and waits for the owner.
 - **G-05, quality scenarios:** propose load and chaos runs for the touched QS from the actual change, using the table in `docs/process/testing.md`, section 7. Load and chaos runs never count toward the verdict: report each as run (with its result) or *not run*.
 - **G-08, structure** (checking `beta` or `stable`): the architecture fitness functions pass, and the change to the architecture rules since the feature started is listed for the owner (`docs/process/review.md`, R-4). Without G-08 `pass` from the owner the gate fails. A rule change that allows a new dependency on a critical feature is listed at every stage.
