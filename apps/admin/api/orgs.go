@@ -52,7 +52,7 @@ func (s *Service) listOrgs(w http.ResponseWriter, r *http.Request, _ core.Sessio
 	for _, o := range list.Organizations {
 		items = append(items, orgFromZitadel(o, defaultID))
 	}
-	core.WriteJSON(w, http.StatusOK, OrgList{Items: items, Total: int64(list.Total)})
+	core.WriteJSON(w, http.StatusOK, OrgList{Items: items, Total: total(list.Total)})
 }
 
 func (s *Service) getOrg(w http.ResponseWriter, r *http.Request, _ core.Session) {

@@ -22,6 +22,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math"
 	"net/http"
 	"strconv"
 	"strings"
@@ -100,6 +101,7 @@ func (c *Client) call(ctx context.Context, service, method string, req, resp any
 	if err != nil {
 		return err
 	}
+	//nolint:gosec // G704: baseURL is the configured Zitadel address; service and method are constants of this package.
 	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, c.baseURL+"/"+service+"/"+method, bytes.NewReader(body))
 	if err != nil {
 		return err
@@ -111,7 +113,7 @@ func (c *Client) call(ctx context.Context, service, method string, req, resp any
 
 func (c *Client) do(req *http.Request, resp any) error {
 	req.Header.Set("Accept", "application/json")
-	res, data, err := c.send(req)
+	res, data, err := c.send(req) //nolint:bodyclose // send reads and closes the body before it returns.
 	if err != nil {
 		return err
 	}
@@ -130,7 +132,7 @@ func (c *Client) do(req *http.Request, resp any) error {
 // send makes the request with the client's token and reads the whole answer.
 func (c *Client) send(req *http.Request) (*http.Response, []byte, error) {
 	req.Header.Set("Authorization", "Bearer "+c.token)
-	res, err := c.http.Do(req)
+	res, err := c.http.Do(req) //nolint:gosec // G704: every request goes to the configured Zitadel base URL.
 	if err != nil {
 		return nil, nil, fmt.Errorf("zitadel: %w", err)
 	}
@@ -227,7 +229,7 @@ type pagination struct {
 }
 
 func (p Page) ascending() *pagination {
-	return &pagination{Offset: uint64(max(p.Offset, 0)), Limit: uint32(max(p.Limit, 0)), Asc: true}
+	return &pagination{Offset: uint64(max(p.Offset, 0)), Limit: uint32(min(max(p.Limit, 0), math.MaxUint32)), Asc: true}
 }
 
 // Text query methods: object.v2.TextQueryMethod (org and user v2) and
@@ -260,7 +262,7 @@ func (c *Client) ServiceAccount(ctx context.Context) (ServiceAccount, error) {
 	if c.account != nil {
 		return *c.account, nil
 	}
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, c.baseURL+"/auth/v1/users/me", nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, c.baseURL+"/auth/v1/users/me", nil) //nolint:gosec // G704: configured Zitadel base URL and a fixed path.
 	if err != nil {
 		return ServiceAccount{}, err
 	}

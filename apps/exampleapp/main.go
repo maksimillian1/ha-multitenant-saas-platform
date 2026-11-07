@@ -93,7 +93,7 @@ func migrate(ctx context.Context, cfg core.Config, log *slog.Logger) error {
 	if err != nil {
 		return err
 	}
-	defer conn.Close(context.Background())
+	defer conn.Close(context.WithoutCancel(ctx))
 
 	if err := store.Migrate(ctx, conn); err != nil {
 		return err

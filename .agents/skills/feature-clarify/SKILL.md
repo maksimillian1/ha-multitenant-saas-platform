@@ -16,6 +16,7 @@ Input: an issue ID (`HAMSP-N`) or a feature slug. If neither is given, ask for o
 3. `docs/index.md`. Use it to pick the affected subsystem files in `docs/architecture/`, `docs/contracts/` and `docs/ops/`. Read only those.
 4. `docs/architecture/requirements.md`: find the FR, QS and C items the feature touches.
 5. The ADRs in `docs/adr/` that the issue or the subsystem files reference. An **Accepted** ADR overrides every other doc. A **Proposed** ADR is input, not law.
+6. The rules in `AGENTS.md`, section Guardrails. An AC never asks to weaken a check or to change an existing test so it passes. When the feature is critical, say so in the issue: its code changes are announced and get boundary tests first.
 
 Do not read code at this step unless the issue is about changing existing code.
 

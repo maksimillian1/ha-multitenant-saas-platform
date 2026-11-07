@@ -25,3 +25,17 @@ A feature is keyed by its slug. Its file `docs/features/<slug>.yaml` holds the v
 4. `feature-verify <slug or HAMSP-N>`: runs the planned tests. The feature is ready only when every AC, checklist item of its level and touched QS has a test that ran and passed, or `n/a` with a reason. Writes the result into the feature file and regenerates the map.
 
 The skills are in `.agents/skills/`; `.claude/skills` links to the same folder.
+
+## Guardrails
+
+These rules hold while you write code. Checks run at commit (`lefthook.yml`, and for Claude Code also `.claude/hooks/pre-commit.sh`) and in CI. CI is the only layer that enforces them (`docs/process/testing.md`, section 1).
+
+1. **Do not weaken a check to get green.** Disabling or relaxing a linter, a `//nolint`, a type option, a coverage gate or a CI job needs its own issue. A `//nolint` names the linter and the reason: `//nolint:gosec // G704: configured base URL`. A fake secret in a test carries `// gitleaks:allow`.
+2. **Do not change a test to make it pass.** A failing test is either a bug in the code or a test that no longer matches an agreed acceptance criterion. Changing the criterion is the owner's decision.
+3. **Read the feature file first.** Before changing code, find the feature that owns it (`code` in `docs/features/*.yaml`) and read its acceptance criteria and checklist.
+4. **Critical code: announce, then test, then code.** A change to the code of a critical feature (`critical: true`; `docs/process/feature-stages.md`, "Critical features") is announced to the owner before you start. Its boundary tests come before the code: tenant boundaries (T-01), authorization (T-04) and the control canary (T-12) from `docs/process/testing.md`, section 4.
+5. **Check before you report done.** Before you say the work is done, run lint and the tests of the touched packages, and report what ran and what failed:
+   * `golangci-lint run --config ../../.golangci.yml ./...` in each touched app under `apps/`;
+   * `go test ./<touched packages>/...`; database tests need `TEST_DATABASE_URL` (`apps/usage/internal/testpg`), and a skipped test is not a pass;
+   * `npm run lint && npm test` in `apps/admin/ui/app` when the SPA changed.
+6. **Never skip the hooks.** Do not use `git commit --no-verify` or `-n`. Fix the finding instead.
