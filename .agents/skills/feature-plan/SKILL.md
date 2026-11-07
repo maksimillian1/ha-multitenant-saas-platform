@@ -47,7 +47,7 @@ Keep it short: the plan is a map, not the code. Show it to the user and ask befo
 
 ```yaml
 critical: false                     # true when the feature itself is critical; the owner decides
-flag: tenant-suspend                # release flag, if the feature changes behaviour
+flag: tenant-suspend                # optional release flag (feature-stages.md, "Flags"); omit when not needed
 code:
   - apps/gateway/suspend/**
 c4: [apiGateway]                    # optional: elements of docs/architecture/c4/workspace.dsl

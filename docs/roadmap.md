@@ -21,7 +21,7 @@ Without it, agent-shipped code is not under control.
 
 * Feature map: one file per feature in `docs/features/` with its stage, code, checklist and reviews, and a generated map of all features (HAMSP-45). First: the other guardrails depend on it.
 * Pre-commit hooks and agent rules (HAMSP-40, HAMSP-44).
-* Feature flags, optional until a feature needs one (HAMSP-63). `feature-verify` checks the gates of a stage (HAMSP-64).
+* `feature-verify` checks the gates of a stage (HAMSP-64).
 * AGPL check in CI (HAMSP-21, C-03), arm64 builds (HAMSP-27, C-06).
 
 ### Phase 1: close the gaps in the existing core
@@ -55,10 +55,16 @@ The owner decides first; agents implement after the decision.
 * Rolling deploys without failed requests: PDBs, readiness, preStop (QS-10, HAMSP-65). Restore drill from MinIO (QS-13, HAMSP-66).
 * Usage Writer autoscaled on consumer lag with KEDA (HAMSP-69); may move to part 2.
 * How secrets are kept out of the GitOps manifests is decided (HAMSP-68); it is implemented in part 2.
-* Every v1 feature is at `beta` or explicitly left lower and switched off by default.
+* Every v1 feature is at `beta` or explicitly left lower. A feature left lower that has a release flag is switched off by default.
 * `HAMSP-23-platform-skeleton` is merged to `master` against its checklist (HAMSP-67). This is the v1 prototype. Manual review has not happened yet; it is the next track.
 
-**Exit criteria:** every v1 FR is at `beta` or switched off. Every quality scenario that needs no load is `Pass` on kind.
+**Exit criteria:** every v1 FR is at `beta` or explicitly left lower. Every quality scenario that needs no load is `Pass` on kind.
+
+### Optional
+
+Not part of the development process and not required for the merge. Done when there is time, in any phase.
+
+* Feature flags, decided and built when the first feature needs one (HAMSP-63; [Feature stages](process/feature-stages.md), "Flags").
 
 ## Stabilization: `beta` → `stable`
 
