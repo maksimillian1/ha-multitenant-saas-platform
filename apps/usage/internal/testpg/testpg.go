@@ -61,18 +61,8 @@ func New(t testing.TB) DB {
 	}
 	t.Cleanup(func() { admin.Close(ctx) })
 
-	for _, stmt := range []string{
-		fmt.Sprintf(`DO $$ BEGIN
-			IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = '%[1]s') THEN CREATE ROLE %[1]s LOGIN; END IF;
-			IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = '%[2]s') THEN CREATE ROLE %[2]s LOGIN; END IF;
-			IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = '%[3]s') THEN CREATE ROLE %[3]s NOLOGIN; END IF;
-		END $$`, OwnerRole, WriterRole, ReaderRole),
-		fmt.Sprintf("ALTER ROLE %s PASSWORD '%s'", OwnerRole, password),
-		fmt.Sprintf("ALTER ROLE %s PASSWORD '%s' NOSUPERUSER NOBYPASSRLS", WriterRole, password),
-	} {
-		if _, err := admin.Exec(ctx, stmt); err != nil {
-			t.Fatal(err)
-		}
+	if err := setupRoles(ctx, admin); err != nil {
+		t.Fatal(err)
 	}
 
 	name := fmt.Sprintf("usage_test_%d", time.Now().UnixNano())
@@ -100,6 +90,38 @@ func New(t testing.TB) DB {
 	}
 	pauseJobs(t, super)
 	return DB{Name: name, Super: super, Owner: owner, WriterDSN: dsnFor(t, base, WriterRole, name)}
+}
+
+// rolesLock is the advisory lock key that serializes setupRoles across test
+// processes ("usage" in hex). All callers connect to the database of
+// TEST_DATABASE_URL, so they share one advisory lock space.
+const rolesLock = 0x7573616765
+
+// setupRoles creates the shared roles and sets their passwords. The roles are
+// cluster-wide, and go test runs the store and writer packages in parallel
+// against one server: two ALTER ROLE on the same role at the same time fail
+// with "tuple concurrently updated", and two CREATE ROLE with a duplicate key
+// (HAMSP-32). The transaction-level advisory lock runs one setup at a time.
+func setupRoles(ctx context.Context, admin *pgx.Conn) error {
+	return pgx.BeginFunc(ctx, admin, func(tx pgx.Tx) error {
+		if _, err := tx.Exec(ctx, "SELECT pg_advisory_xact_lock($1)", rolesLock); err != nil {
+			return fmt.Errorf("roles lock: %w", err)
+		}
+		for _, stmt := range []string{
+			fmt.Sprintf(`DO $$ BEGIN
+				IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = '%[1]s') THEN CREATE ROLE %[1]s LOGIN; END IF;
+				IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = '%[2]s') THEN CREATE ROLE %[2]s LOGIN; END IF;
+				IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = '%[3]s') THEN CREATE ROLE %[3]s NOLOGIN; END IF;
+			END $$`, OwnerRole, WriterRole, ReaderRole),
+			fmt.Sprintf("ALTER ROLE %s PASSWORD '%s'", OwnerRole, password),
+			fmt.Sprintf("ALTER ROLE %s PASSWORD '%s' NOSUPERUSER NOBYPASSRLS", WriterRole, password),
+		} {
+			if _, err := tx.Exec(ctx, stmt); err != nil {
+				return err
+			}
+		}
+		return nil
+	})
 }
 
 // Count returns the stored rows with the given event IDs, as the superuser.

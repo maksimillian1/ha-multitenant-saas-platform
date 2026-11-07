@@ -56,7 +56,7 @@ func (s *Service) Handler(w http.ResponseWriter, r *http.Request) {
 		if strings.HasPrefix(name, "assets/") {
 			w.Header().Set("Cache-Control", "private, max-age=31536000, immutable")
 		}
-		http.ServeFileFS(w, r, s.Files, name)
+		http.ServeFileFS(w, r, s.Files, name) //nolint:gosec // G703: name is cleaned and s.Files is an fs.FS, which rejects paths outside its root.
 		return
 	}
 
