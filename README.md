@@ -36,6 +36,14 @@ Architectural changes must be peer-reviewed via the `adr-tools` standard before 
 
 ## Setup
 
+### Pre-commit checks
+`lefthook.yml` checks staged files before each commit: Go formatting and lint (the shared `.golangci.yml`), oxlint and `tsc` for the admin SPA, and gitleaks for secrets. CI runs the same linters (`.github/workflows/lint.yml`, `admin.yml`).
+
+* brew install lefthook golangci-lint gitleaks
+* lefthook install
+
+A `//nolint` names the linter and the reason: `//nolint:gosec // G704: configured base URL`. A fake secret in a test is marked with a `// gitleaks:allow` comment on its line.
+
 ### Terraform
 * terraform init
 * terraform apply
