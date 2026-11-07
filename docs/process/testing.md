@@ -2,6 +2,8 @@
 
 How features are tested and where the results are kept. [Feature stages](feature-stages.md) says which stage needs which gate; this page is the detail behind gates G-01, G-04, G-05 and G-07 there. What the owner reviews is in [Review](review.md).
 
+This page describes the target. Which of these checks run today and which are still missing: [Guardrails](guardrails.md).
+
 Three rules hold everywhere:
 
 * **A test that did not run is not evidence.** Neither is reading the code.
