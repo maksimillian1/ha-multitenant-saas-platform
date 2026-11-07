@@ -13,7 +13,7 @@ Each feature's stage and the gates behind it ([Feature stages](../process/featur
 | [`admin-zitadel`](admin-zitadel.yaml) **critical** | — |  |  |  |  |  |  |  |  | — | HAMSP-23 |
 | [`exampleapp`](exampleapp.yaml) | — |  |  |  |  |  |  |  |  | — | HAMSP-23 |
 | [`exampleapp-store`](exampleapp-store.yaml) **critical** | — |  |  |  |  |  |  |  |  | — | HAMSP-23 |
-| [`feature-map`](feature-map.yaml) | — |  |  |  |  |  |  |  |  | 2026-11-07 not-ready for alpha | HAMSP-45 |
+| [`feature-map`](feature-map.yaml) | — | n/a | ? | n/a | ✓ basic | n/a |  |  |  | 2026-11-07 not-ready for alpha | HAMSP-45 |
 | [`gateway-auth`](gateway-auth.yaml) **critical** | — |  |  |  |  |  |  |  |  | — | HAMSP-23 |
 | [`gateway-routing`](gateway-routing.yaml) | — |  |  |  |  |  |  |  |  | — | HAMSP-23 |
 | [`gateway-tenant-header`](gateway-tenant-header.yaml) **critical** | — |  |  |  |  |  |  |  |  | — | HAMSP-23 |
