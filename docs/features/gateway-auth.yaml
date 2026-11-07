@@ -3,6 +3,18 @@ title: JWT validation and tenant context in the API Gateway
 critical: true
 code:
   - apps/gateway/auth/**
-c4: [apiGateway]
+  - prototype/bootstrap-tenants.sh
+c4: [apiGateway, authService]
 links:
-  issues: [HAMSP-23]
+  issues: [HAMSP-23, HAMSP-24]
+requirements: [FR-03, QS-18]
+acceptance:
+  AC-1:
+    text: A machine user of an organization without a platform-api project grant asks Zitadel for a client_credentials token with the platform-api audience scope, and Zitadel issues no token.
+    level: e2e
+  AC-2:
+    text: A machine user of a tenant organization (one with a platform-api project grant) gets a token with the platform-api audience, and the API Gateway serves its request with x-tenant-id set to its organization ID.
+    level: e2e
+  AC-3:
+    text: prototype/bootstrap-tenants.sh enables the project check on platform-api and grants platform-api to every tenant organization it creates; a rerun changes nothing.
+    level: e2e
