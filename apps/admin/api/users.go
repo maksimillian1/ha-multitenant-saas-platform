@@ -62,7 +62,7 @@ func (s *Service) listUsers(w http.ResponseWriter, r *http.Request, _ core.Sessi
 	for _, u := range list.Users {
 		items = append(items, userFromZitadel(u, names))
 	}
-	core.WriteJSON(w, http.StatusOK, UserList{Items: items, Total: int64(list.Total)})
+	core.WriteJSON(w, http.StatusOK, UserList{Items: items, Total: total(list.Total)})
 }
 
 func (s *Service) getUser(w http.ResponseWriter, r *http.Request, _ core.Session) {

@@ -3,6 +3,7 @@ package zitadel
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"io"
 	"mime"
 	"mime/multipart"
@@ -280,8 +281,8 @@ func TestAssetErrorsCarryAConnectCode(t *testing.T) {
 			"POST /assets/v1/org/policy/label/logo": {tc.status, "text/plain", tc.body},
 		})
 		err := NewClient(url, "t", httpClient).UploadBrandingAsset(context.Background(), OrgScope("org-a"), AssetLogo, "a.png", "image/png", []byte("x"))
-		zerr, ok := err.(*Error)
-		if !ok || zerr.Status != tc.status || zerr.Code != tc.code || zerr.Message != tc.msg {
+		var zerr *Error
+		if !errors.As(err, &zerr) || zerr.Status != tc.status || zerr.Code != tc.code || zerr.Message != tc.msg {
 			t.Errorf("%d: err = %#v, want code %s message %q", tc.status, err, tc.code, tc.msg)
 		}
 	}

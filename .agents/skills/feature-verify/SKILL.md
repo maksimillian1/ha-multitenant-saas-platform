@@ -17,6 +17,7 @@ Input: a feature slug, or an issue ID (`HAMSP-N`) whose feature is found under `
 2. The QS rows the feature touches in `docs/architecture/requirements.md`.
 3. The diff of the branch against the branch it merges into: the integration branch for a sub-issue (`AGENTS.md`), otherwise `master` (`git diff <base>...HEAD --stat`, then the files you need).
 4. The other feature files whose `code` the diff touches. The change is critical when it touches the code of a feature with `critical: true`, or the feature itself is critical. Note every `stable` feature it changes.
+5. The rules in `AGENTS.md`, section Guardrails. A diff that weakens a check (a disabled linter, a `//nolint` or `gitleaks:allow` without a reason, a relaxed CI job) or changes an existing test's assertion without an AC change is a deviation for the owner, listed first in the report.
 
 The Linear issue is not needed. Read it only for context the file does not have.
 

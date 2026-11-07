@@ -36,7 +36,7 @@ func (s *Service) listProjects(w http.ResponseWriter, r *http.Request, _ core.Se
 	for _, project := range list.Projects {
 		items = append(items, projectFromZitadel(project, names))
 	}
-	core.WriteJSON(w, http.StatusOK, ProjectList{Items: items, Total: int64(list.Total)})
+	core.WriteJSON(w, http.StatusOK, ProjectList{Items: items, Total: total(list.Total)})
 }
 
 func (s *Service) getProject(w http.ResponseWriter, r *http.Request, _ core.Session) {

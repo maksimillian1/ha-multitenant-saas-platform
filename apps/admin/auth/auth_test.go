@@ -17,7 +17,7 @@ import (
 )
 
 const (
-	testKey    = "0123456789abcdef0123456789abcdef"
+	testKey    = "0123456789abcdef0123456789abcdef" // gitleaks:allow — a fake key for the tests
 	endSession = "http://zitadel.test/oidc/v1/end_session"
 )
 

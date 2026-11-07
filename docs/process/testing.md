@@ -13,7 +13,7 @@ Three rules hold everywhere:
 | Layer | Time | What runs | Can be skipped? |
 |---|---|---|---|
 | **L1: pre-commit** | seconds | gofmt, golangci-lint and oxlint on changed files, `tsc`, gitleaks, semgrep on changed files | Yes, with `--no-verify`. |
-| **L2: pre-push and the agent hook** | about a minute | unit tests of the touched packages, contract tests of the touched contracts | Yes. |
+| **L2: pre-push, and the agent before it reports done** ([AGENTS.md](../../AGENTS.md), Guardrails) | about a minute | unit tests of the touched packages, contract tests of the touched contracts | Yes. |
 | **L3: CI, every pull request** | no limit | L1 and L2 again on the whole change; all unit tests with `-race`; build for `amd64` and `arm64`; licence check; govulncheck, trivy, npm audit; the flag-off suite once release flags exist (section 3); diff coverage (section 6) | No. Required checks. |
 
 CI repeats L1 and L2 because local hooks can be skipped. CI is the only layer that enforces anything; L1 and L2 exist to fail early and cheaply. Everything in L3 is the *baseline* of [Feature stages](feature-stages.md): it applies to every change at every stage.

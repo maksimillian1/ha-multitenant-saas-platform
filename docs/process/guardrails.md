@@ -16,18 +16,19 @@ Runtime controls are not rows here: RLS policies, token validation, the tenant h
 |---|---|---|---|---|
 | Linear workflow: issue ID in branch, commits and PR; closing comment; new problems go to Triage | agent | `AGENTS.md` | the owner, at merge | runs |
 | Feature workflow: clarify, plan, verify | agent | `AGENTS.md`, `.agents/skills/` | the skills; `featuremap -check` checks what they write (`features.yml`) | runs |
-| Development rules: do not weaken a gate, do not change a test to make it pass, read the feature file first | agent | HAMSP-44 | none | missing, HAMSP-44 |
+| Development rules: do not weaken a check, do not change a test to make it pass, read the feature file first, never skip the hooks | agent | `AGENTS.md`, "Guardrails" | the owner, at merge; the CI checks below | runs |
 
 ## Local hooks
 
 | Guardrail | Layer | Rule in | Checked by | Status |
 |---|---|---|---|---|
-| gofmt and golangci-lint on changed files | L1 | [Testing](testing.md) §1 | lefthook | missing, HAMSP-40 |
-| oxlint and `tsc` on changed files | L1 | [Testing](testing.md) §1 | lefthook | missing, HAMSP-40 |
-| gitleaks | L1 | [Testing](testing.md) §1 | lefthook | missing, HAMSP-40 |
+| gofmt, goimports and golangci-lint on changed files | L1 | [Testing](testing.md) §1 | `lefthook.yml`: `go-fmt`, `go-lint-*` | runs |
+| oxlint and `tsc` on changed files | L1 | [Testing](testing.md) §1 | `lefthook.yml`: `spa-oxlint`, `spa-tsc` | runs |
+| gitleaks on staged changes | L1 | [Testing](testing.md) §1 | `lefthook.yml`: `gitleaks` | runs |
+| Claude Code runs the pre-commit checks before every `git commit` | L1 | `AGENTS.md`, "Guardrails" | `.claude/hooks/pre-commit.sh` (`.claude/settings.json`) | runs |
 | semgrep on changed files | L1 | [Testing](testing.md) §1 | lefthook | missing, HAMSP-46 |
 | Unit and contract tests of the touched packages before push | L2 | [Testing](testing.md) §1 | lefthook `pre-push` | missing, HAMSP-87 |
-| The agent hook runs the local checks | L2 | [Testing](testing.md) §1 | Claude Code hook | missing, HAMSP-44 |
+| The agent runs lint and the touched tests before it reports done | L2 | `AGENTS.md`, "Guardrails" 5; [Testing](testing.md) §1 | the agent itself; nothing enforces it | runs |
 
 ## CI baseline
 
@@ -38,8 +39,9 @@ Every pull request, every stage ([Feature stages](feature-stages.md), "Gates per
 | `go vet` and all Go tests | CI | [Testing](testing.md) §1 | `admin.yml`, `gateway.yml`, `exampleapp.yml`, `usage.yml` | runs |
 | Database tests fail the job when skipped | CI | `exampleapp.yml`, `usage.yml` | the `Fail if database tests were skipped` step | runs |
 | Go tests with `-race` | CI | [Testing](testing.md) §1 | none | missing, HAMSP-85 |
-| gofmt and golangci-lint on every Go module | CI | [Testing](testing.md) §1 | `usage.yml` runs golangci-lint with depguard only; the other modules run nothing | missing, HAMSP-40 |
-| gitleaks on the PR diff | CI | [Testing](testing.md) §1 | none | missing, HAMSP-40 |
+| gofmt, goimports and golangci-lint on every Go module | CI | [Testing](testing.md) §1 | `lint.yml`, job `go` (shared `.golangci.yml`); `usage.yml` adds its depguard rules | runs |
+| gitleaks on the PR's commits | CI | [Testing](testing.md) §1 | `lint.yml`, job `gitleaks` | runs |
+| The hooks refuse the bad changes they are for | CI | HAMSP-40 | `lint.yml`, job `hooks` (`tools/hooktest/test.sh`) | runs |
 | Admin SPA: oxlint, `tsc`, unit tests, build | CI | [Testing](testing.md) §1 | `admin.yml`, job `spa` | runs |
 | Strict TypeScript, Zod checks of BFF responses | CI | HAMSP-41 | none | missing, HAMSP-41 |
 | Strict input decoding in Go services | CI | HAMSP-42 | none | missing, HAMSP-42 |

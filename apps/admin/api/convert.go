@@ -2,6 +2,7 @@ package api
 
 import (
 	"context"
+	"math"
 	"slices"
 	"strings"
 	"sync"
@@ -188,7 +189,7 @@ func authorizationList(list zitadel.AuthorizationList) AuthorizationList {
 	for _, a := range list.Authorizations {
 		items = append(items, authorizationFromZitadel(a))
 	}
-	return AuthorizationList{Items: items, Total: int64(list.Total)}
+	return AuthorizationList{Items: items, Total: total(list.Total)}
 }
 
 func projectFromZitadel(p zitadel.Project, orgNames map[string]string) Project {
@@ -230,4 +231,13 @@ func nonNil[T any](s []T) []T {
 		return []T{}
 	}
 	return s
+}
+
+// total converts a Zitadel count to the API's int64, capped at the largest
+// int64 instead of wrapping to a negative number.
+func total(n uint64) int64 {
+	if n > math.MaxInt64 {
+		return math.MaxInt64
+	}
+	return int64(n)
 }
