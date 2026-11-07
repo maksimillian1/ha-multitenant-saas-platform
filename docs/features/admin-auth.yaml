@@ -1,7 +1,6 @@
 feature: admin-auth
 title: Admin app sign-in, session and CSRF protection
 target: beta
-stage: beta  # merged at beta with HAMSP-23, before review (docs/roadmap.md)
 critical: true
 code:
   - apps/admin/auth/**

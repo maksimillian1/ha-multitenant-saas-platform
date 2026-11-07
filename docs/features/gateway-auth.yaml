@@ -1,7 +1,6 @@
 feature: gateway-auth
 title: JWT validation and tenant context in the API Gateway
 target: beta
-stage: beta  # merged at beta with HAMSP-23, before review (docs/roadmap.md)
 critical: true
 code:
   - apps/gateway/auth/**

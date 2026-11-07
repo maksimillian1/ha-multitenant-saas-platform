@@ -1,7 +1,6 @@
 feature: gateway-tenant-header
 title: The x-tenant-id header the API Gateway sets for services behind it
 target: beta
-stage: beta  # merged at beta with HAMSP-23, before review (docs/roadmap.md)
 critical: true
 code:
   - apps/gateway/proxy/**

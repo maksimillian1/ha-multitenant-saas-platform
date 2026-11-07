@@ -1,7 +1,6 @@
 feature: usage-store
 title: "The usage store: schema, RLS views and roles, writes through the store interface"
 target: beta
-stage: beta  # merged at beta with HAMSP-23, before review (docs/roadmap.md)
 critical: true
 code:
   - apps/usage/internal/store/**
