@@ -86,6 +86,10 @@ identifierPrefix: usage           # every DSL identifier starts with it (default
 output:
   components: c4/usage.components.dsl   # C3 fragment; empty = do not write
   code: c4/usage.code.dsl               # code workspace; empty = do not write
+containers:                       # optional: one module, several binaries
+  - name: Writer                  # header of the fragment; default prefix usage_writer
+    main: cmd/writer              # main package, relative to the module root
+    output: c4/usage.writer.dsl   # C3 fragment of this binary
 code:
   maxElements: 30                 # types per code view (default 30)
   maxMethods: 6                   # methods listed per type (default 6)
@@ -127,6 +131,8 @@ detectors:
 
 important: [store]                # diff lists changes touching these first
 ```
+
+A module that builds several binaries is drawn as one container per binary. For each entry under `containers`, c4sync writes a fragment with only the components that the main package imports, directly or through other packages. A component used by two binaries, such as a shared `core`, appears in both fragments, because it is compiled into both. The rules, `check` and `diff` still cover the whole module.
 
 A component without metadata is still drawn, under its go-arch-lint name. A key in `components` or `important` that `.go-arch-lint.yml` does not declare is an error that names the line.
 
@@ -279,6 +285,7 @@ Structurizr has no code-level element type. c4sync models Go types as components
 - **Values built at runtime.** A topic read from an environment variable, or a route built with `fmt.Sprintf`, shows as `? (in FuncName)`. The diagram tells you where to look. It does not guess the value.
 - **SQL is matched with patterns, not parsed.** c4sync finds tables after `FROM`, `JOIN`, `INSERT INTO`, `UPDATE`, `DELETE FROM`, `MERGE INTO`, `COPY`, `CREATE TABLE` and `ALTER TABLE`. A name followed by `(` is a function and shows as `name()`. Postgres built-ins (`pg_*`, `unnest`, `json_*` and others) are skipped. Add your own names to `sql.ignore`.
 - **Detectors cover only calls you list.** A library that c4sync has no matcher for adds no routes, topics or tables. Add a `call` or `field` matcher for it.
+- **Containers are cut by package, not by function.** A binary that imports a package gets everything that package does. If `cmd/writer` imports `internal/kafka` only for its consumer, the Usage Writer fragment still shows the topics that `kafka` produces.
 - **Only Go.** The model does not depend on the language, but there is only a Go extractor.
 
 ## Development

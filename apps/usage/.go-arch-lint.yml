@@ -1,0 +1,28 @@
+# Components of the usage module and the imports allowed between them.
+# c4sync draws these components (docs/architecture/c4/generated/); the
+# allowed edges are refined in HAMSP-70.
+version: 3
+workdir: .
+allow:
+  depOnAnyVendor: true
+exclude:
+  - internal/contracttest   # test helpers
+  - internal/testpg
+excludeFiles:
+  - "^.*_test\\.go$"
+components:
+  cmd:        { in: cmd/** }
+  writeapi:   { in: internal/writeapi }
+  writer:     { in: internal/writer }
+  kafka:      { in: internal/kafka }
+  store:      { in: internal/store }
+  migrations: { in: internal/migrations }
+  httpx:      { in: internal/httpx }
+  health:     { in: internal/health }
+  core:       { in: internal/core }
+deps:
+  cmd:      { anyProjectDeps: true }
+  writeapi: { mayDependOn: [core, httpx, kafka] }   # kafka: Producer injected in cmd/writeapi (deepScan)
+  writer:   { mayDependOn: [core, kafka, store] }    # store: injected in cmd/writer (deepScan)
+  kafka:    { mayDependOn: [core] }
+  store:    { mayDependOn: [core] }

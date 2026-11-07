@@ -1,0 +1,8 @@
+# C4 metadata for the admin BFF. Only the code workspace is generated: the
+# component fragment goes into workspace.dsl once ADR-0009 is accepted.
+name: Admin
+identifierPrefix: admin
+output:
+  code: ../../docs/architecture/c4/generated/admin.code.dsl
+detectors:
+  http: true

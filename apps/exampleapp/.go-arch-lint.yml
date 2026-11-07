@@ -1,0 +1,18 @@
+# Components of exampleapp and the imports allowed between them.
+# c4sync draws these components; the allowed edges are refined in HAMSP-70.
+version: 3
+workdir: .
+allow:
+  depOnAnyVendor: true
+excludeFiles:
+  - "^.*_test\\.go$"
+components:
+  main:   { in: . }
+  items:  { in: items }
+  store:  { in: store }
+  health: { in: health }
+  core:   { in: core }
+deps:
+  main:  { anyProjectDeps: true }
+  items: { mayDependOn: [core, store] }   # store: injected in main (deepScan)
+  store: { mayDependOn: [core] }

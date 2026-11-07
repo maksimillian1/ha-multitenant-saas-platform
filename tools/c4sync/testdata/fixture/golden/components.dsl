@@ -18,6 +18,11 @@ fx_bus = component "bus" "" "" "c4sync" {
         "topic.produces" "? (in Announce), dead-letter"
     }
 }
+fx_cmd = component "cmd" "" "" "c4sync" {
+    properties {
+        "go.packages" "cmd/migrate cmd/server"
+    }
+}
 fx_migrations = component "migrations" "" "" "c4sync" {
     properties {
         "go.packages" "internal/migrations"
@@ -34,6 +39,9 @@ fx_store = component "Store" "" "database/sql" "c4sync" {
 fx_api -> fx_app "Uses" "Go import" "c4sync"
 fx_app -> fx_bus "Uses" "Go import" "c4sync"
 fx_bus -> fx_app "Uses" "Go import" "c4sync"
+fx_cmd -> fx_api "Uses" "Go import" "c4sync"
+fx_cmd -> fx_migrations "Uses" "Go import" "c4sync"
+fx_cmd -> fx_store "Uses" "Go import" "c4sync"
 fx_store -> fx_app "Uses" "Go import" "c4sync"
 fx_store -> sys.db "Uses" "database/sql" "c4sync"
 fx_app -> sys.broker "Produces topics: events.v1" "" "c4sync"
