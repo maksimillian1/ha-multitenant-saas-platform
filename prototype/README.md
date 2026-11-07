@@ -52,7 +52,9 @@ go test -C prototype/e2e -count=1 -v ./...
 
 `bootstrap-tenants.sh` waits for Zitadel, creates the organizations `tenant-a` and `tenant-b` with one machine user each, and writes their client credentials to `prototype/.tenants.json` (git-ignored). It also sets the access token lifetime to 60 s for the expiry test.
 
-It also creates the Zitadel project `platform-api`. Its ID is the audience every token must carry (HAMSP-22). Zitadel generates the ID, so the script writes it to the ConfigMap `gateway/api-gateway-audience` and restarts the API Gateway. Until the script has run, the API Gateway pods wait in `CreateContainerConfigError` and ArgoCD shows the `gateway` app as Degraded.
+It also creates the Zitadel project `platform-api`. Its ID is the audience every token must carry (HAMSP-22). Zitadel gives that audience to a machine user of any organization, so the API Gateway also serves only the organizations on its tenant list (HAMSP-24). The script writes the project ID to the ConfigMap `gateway/api-gateway-audience` and the tenants' organization IDs, separated by commas, to `gateway/api-gateway-tenants`, and restarts the API Gateway when either changed. Until the script has run, the API Gateway pods wait in `CreateContainerConfigError` and ArgoCD shows the `gateway` app as Degraded.
+
+Two more machine users are not tenants: `outsider-client` in the organization `outsider` and `iam-admin-org-client` in the IAM admin's organization. Their credentials are under `non_tenants` in `.tenants.json`; the e2e tests check that their tokens get 401.
 
 The e2e tests take about ten minutes, most of it the usage outage tests (UsageWriteAPI unreachable for 60 s, the usage database unreachable for 5 minutes, a Kafka broker deleted). `-short` skips them and the token expiry test. The outage tests add temporary `CiliumNetworkPolicy` deny rules and remove them at the end.
 
