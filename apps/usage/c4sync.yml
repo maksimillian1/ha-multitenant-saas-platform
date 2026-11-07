@@ -6,11 +6,11 @@ output:
 containers:
   - name: UsageWriteAPI
     main: cmd/writeapi
-    output: ../../docs/architecture/c4/generated/usage.writeapi.dsl
+    output: ../../docs/architecture/c4/generated/usage.writeapi.components.dsl
     identifierPrefix: usage_writeapi
   - name: Usage Writer
     main: cmd/writer
-    output: ../../docs/architecture/c4/generated/usage.writer.dsl
+    output: ../../docs/architecture/c4/generated/usage.writer.components.dsl
     identifierPrefix: usage_writer
 components:
   cmd:
