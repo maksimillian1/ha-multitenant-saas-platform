@@ -102,10 +102,10 @@ workspace "HAMSP" "High-Availability Multi-Tenant SaaS Platform" {
         # do not edit generated/. They come last because they point at the
         # containers above (tools/c4sync/README.md).
         !element hamsp.usageWriteApi {
-            !include generated/usage.writeapi.dsl
+            !include generated/usage.writeapi.components.dsl
         }
         !element hamsp.usageWriter {
-            !include generated/usage.writer.dsl
+            !include generated/usage.writer.components.dsl
         }
         !element hamsp.exampleApp {
             !include generated/exampleapp.components.dsl
