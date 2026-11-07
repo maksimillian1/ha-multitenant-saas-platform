@@ -1,7 +1,9 @@
 // Package auth validates Zitadel access tokens locally against the issuer's
 // JWKS (ADR-0003) and returns the caller's tenant: the Organization ID claim.
 // A token must carry the platform API's audience, so a token issued for
-// another application of the same Zitadel instance is rejected.
+// another application of the same Zitadel instance is rejected, and its
+// organization must be a tenant: Zitadel issues the audience to a machine user
+// of any organization (HAMSP-24).
 package auth
 
 import (
@@ -28,6 +30,7 @@ var (
 	ErrNoToken       = errors.New("missing bearer token")
 	ErrNoTenant      = errors.New("token has no valid tenant claim")
 	ErrWrongAudience = errors.New("token is not issued for the platform API")
+	ErrNotTenant     = errors.New("token's organization is not a tenant")
 
 	tenantRe = regexp.MustCompile(`^[A-Za-z0-9_-]{1,64}$`)
 )
@@ -35,18 +38,24 @@ var (
 type Verifier struct {
 	verifier *op.AccessTokenVerifier
 	audience string
+	tenants  map[string]struct{}
 }
 
-// NewVerifier validates tokens of issuer that list audience in aud. Keys come
-// from jwksURL and are cached; an unknown key ID triggers a refetch, so
-// Zitadel's key rotation needs no restart.
-func NewVerifier(issuer, audience, jwksURL string, client *http.Client) *Verifier {
+// NewVerifier validates tokens of issuer that list audience in aud and belong
+// to one of tenants, the Zitadel Organization IDs of the tenants. With no
+// tenants it accepts no token. Keys come from jwksURL and are cached; an
+// unknown key ID triggers a refetch, so Zitadel's key rotation needs no restart.
+func NewVerifier(issuer, audience string, tenants []string, jwksURL string, client *http.Client) *Verifier {
 	keys := rp.NewRemoteKeySet(client, jwksURL)
-	return &Verifier{verifier: op.NewAccessTokenVerifier(issuer, keys), audience: audience}
+	set := make(map[string]struct{}, len(tenants))
+	for _, t := range tenants {
+		set[t] = struct{}{}
+	}
+	return &Verifier{verifier: op.NewAccessTokenVerifier(issuer, keys), audience: audience, tenants: set}
 }
 
-// Tenant checks the token's issuer, signature, expiry and audience and returns
-// its tenant.
+// Tenant checks the token's issuer, signature, expiry and audience, checks
+// that its organization is a tenant and returns it.
 func (v *Verifier) Tenant(ctx context.Context, token string) (string, error) {
 	claims, err := op.VerifyAccessToken[*oidc.AccessTokenClaims](ctx, token, v.verifier)
 	if err != nil {
@@ -59,6 +68,9 @@ func (v *Verifier) Tenant(ctx context.Context, token string) (string, error) {
 	tenant, _ := claims.Claims[TenantClaim].(string)
 	if !tenantRe.MatchString(tenant) {
 		return "", ErrNoTenant
+	}
+	if _, ok := v.tenants[tenant]; !ok {
+		return "", ErrNotTenant
 	}
 	return tenant, nil
 }

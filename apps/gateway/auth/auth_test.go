@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"crypto/rsa"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -17,6 +18,8 @@ import (
 const (
 	issuer   = "http://zitadel.test"
 	audience = "platform-api-project"
+	tenantA  = "396438053259838069"
+	tenantB  = "396438053259838070"
 )
 
 func newKey(t *testing.T, kid string) jose.JSONWebKey {
@@ -46,15 +49,21 @@ func sign(t *testing.T, key jose.JSONWebKey, claims map[string]any) string {
 	return tok
 }
 
-// newTestVerifier serves the public part of key as the issuer's JWKS.
+// newTestVerifier serves the public part of key as the issuer's JWKS and
+// accepts the tenants tenantA and tenantB.
 func newTestVerifier(t *testing.T, key jose.JSONWebKey) *Verifier {
+	t.Helper()
+	return newTestVerifierFor(t, key, []string{tenantA, tenantB})
+}
+
+func newTestVerifierFor(t *testing.T, key jose.JSONWebKey, tenants []string) *Verifier {
 	t.Helper()
 	jwks := jose.JSONWebKeySet{Keys: []jose.JSONWebKey{key.Public()}}
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		_ = json.NewEncoder(w).Encode(jwks)
 	}))
 	t.Cleanup(srv.Close)
-	return NewVerifier(issuer, audience, srv.URL, srv.Client())
+	return NewVerifier(issuer, audience, tenants, srv.URL, srv.Client())
 }
 
 func claims(mod func(map[string]any)) map[string]any {
@@ -62,7 +71,7 @@ func claims(mod func(map[string]any)) map[string]any {
 	c := map[string]any{
 		"iss": issuer, "sub": "user-1", "aud": []string{"client-1", audience},
 		"iat": now.Unix(), "exp": now.Add(time.Minute).Unix(),
-		TenantClaim: "396438053259838069",
+		TenantClaim: tenantA,
 	}
 	if mod != nil {
 		mod(c)
@@ -76,7 +85,7 @@ func TestValidTokenReturnsOrganizationID(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if tenant != "396438053259838069" {
+	if tenant != tenantA {
 		t.Fatalf("tenant = %q", tenant)
 	}
 }
@@ -115,6 +124,39 @@ func TestInvalidTokensAreRejected(t *testing.T) {
 		if tenant, err := v.Tenant(context.Background(), tok); err == nil {
 			t.Errorf("%s: accepted, tenant %q", name, tenant)
 		}
+	}
+}
+
+// HAMSP-24: a valid token of an organization that is not a tenant, such as the
+// IAM admin's, is rejected; Zitadel issues such tokens to any organization.
+// Verifies: gateway-auth AC-1; T-01
+func TestTenantNotInListIsRejected(t *testing.T) {
+	key := newKey(t, "k1")
+	v := newTestVerifier(t, key)
+	for name, org := range map[string]string{
+		"unknown organization": "396438053259838071",
+		"prefix of a tenant":   tenantA[:10],
+		"tenant with suffix":   tenantA + "1",
+	} {
+		_, err := v.Tenant(context.Background(), sign(t, key, claims(func(c map[string]any) { c[TenantClaim] = org })))
+		if !errors.Is(err, ErrNotTenant) {
+			t.Errorf("%s: err = %v, want ErrNotTenant", name, err)
+		}
+	}
+	// Control: the second tenant of the list is accepted.
+	tenant, err := v.Tenant(context.Background(), sign(t, key, claims(func(c map[string]any) { c[TenantClaim] = tenantB })))
+	if err != nil || tenant != tenantB {
+		t.Fatalf("tenant B: %q, %v", tenant, err)
+	}
+}
+
+// A verifier without tenants accepts no token (fail closed).
+// Verifies: gateway-auth AC-4; T-01
+func TestEmptyTenantListRejectsAll(t *testing.T) {
+	key := newKey(t, "k1")
+	_, err := newTestVerifierFor(t, key, nil).Tenant(context.Background(), sign(t, key, claims(nil)))
+	if !errors.Is(err, ErrNotTenant) {
+		t.Fatalf("err = %v, want ErrNotTenant", err)
 	}
 }
 
