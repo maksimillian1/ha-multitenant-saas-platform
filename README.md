@@ -42,6 +42,8 @@ Architectural changes must be peer-reviewed via the `adr-tools` standard before 
 * brew install lefthook golangci-lint gitleaks
 * lefthook install
 
+Claude Code has its own step before every `git commit` (`.claude/hooks/pre-commit.sh`): it formats the fully staged Go files, stages them, runs the same lefthook checks and blocks the commit if one fails; `--no-verify` is refused.
+
 A `//nolint` names the linter and the reason: `//nolint:gosec // G704: configured base URL`. A fake secret in a test is marked with a `// gitleaks:allow` comment on its line.
 
 ### Terraform
