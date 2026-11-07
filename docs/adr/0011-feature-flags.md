@@ -18,7 +18,7 @@ What we need:
 * no extra network call and no new failure point on the request path;
 * the flag state in Git and deployed by ArgoCD (C-04), so every change is a reviewed pull request;
 * the same answer in every service for the same tenant;
-* a check that ties each flag to a Linear issue and a stage, and that removes it at `stable`;
+* a check that ties each flag to a feature and its stage, and that removes it at `stable`;
 * a way to swap the backend later without touching call sites.
 
 Services are separate Go modules (`apps/gateway`, `apps/usage`, `apps/exampleapp`, `apps/admin`); there is no shared Go module yet.
@@ -38,15 +38,16 @@ The file is a ConfigMap mounted as a volume. The provider watches it, so a chang
 ```yaml
 tenant-suspend:
   kind: release          # release | ops
-  stage: alpha           # proto | alpha | beta
-  issue: HAMSP-52
+  feature: tenant-suspend  # docs/features/tenant-suspend.yaml
   review_by: 2027-01-15
   description: API Gateway rejects requests of a suspended tenant.
 ```
 
+A release flag has no stage of its own: it takes the `stage` of its feature file (`docs/features/README.md`), so promoting the feature moves the flag. A feature with no verified stage yet counts as `proto`.
+
 A small generator (`libs/flags/cmd/flagsgen`) writes from it:
 
-* `flags.json` per environment, from the stage:
+* `flags.json` per environment, from the feature's stage:
 
   | Stage | kind | EKS staging |
   |---|---|---|
@@ -89,13 +90,10 @@ A `stable` package declares the interface; the new implementation lives in its o
 |---|---|
 | Generated files are current | `flags.json` or the Go constants differ from what `flagsgen` produces |
 | Valid flagd file | a `flags.json` does not pass flagd's JSON schema |
-| Every flag has an issue | `issue` is empty or not a `HAMSP-N` |
-| Stage matches Linear | the registry stage differs from the issue's `stage:*` label |
-| No `stable` flags | a `release` flag is in the registry with stage `stable`, or its issue is `stage:stable` |
+| Every release flag has a feature | `feature` names no file in `docs/features/`, or that file's `flag` is a different key |
+| No `stable` flags | a `release` flag's feature is `stable` |
 | Not expired | `review_by` has passed |
 | Used and declared | a registry flag is not referenced in code, or code references a key not in the registry |
-
-The Linear check needs an API token in CI; until it exists, that rule runs in `feature-verify` instead.
 
 ### 7. Tests
 
@@ -117,7 +115,7 @@ The Linear check needs an API token in CI; until it exists, that rule runs in `f
 
 ## Consequences
 
-* Every release flag costs a registry entry, a Linear issue and tests in both states, and it must be removed at `stable`. Flags are cheap to add and visible until they are gone.
+* Every release flag costs a registry entry, a feature file and tests in both states, and it must be removed at `stable`. Flags are cheap to add and visible until they are gone.
 * Changing a flag is a pull request and an ArgoCD sync, about a minute end to end. Good enough for the prototype and staging; not an incident kill switch measured in seconds.
-* `libs/flags` is the first shared Go module. Its changes affect every service, so it is a `high` risk zone in the review map.
+* `libs/flags` is the first shared Go module. Its changes affect every service, so it gets a feature file of its own: after its review, every change to it shows as a delta for the owner.
 * Entitlements (what a tenant's plan includes) are not flags. They belong to Tenant Management, with billing in v2.

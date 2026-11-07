@@ -1,0 +1,13 @@
+feature: admin-app
+title: "Admin app BFF API and SPA: organizations, users, roles, projects, login branding"
+critical: false
+code:
+  - apps/admin/api/**
+  - apps/admin/core/**
+  - apps/admin/health/**
+  - apps/admin/ui/**
+  - apps/admin/main.go
+  - apps/admin/openapi.yaml
+c4: [adminPortal]
+links:
+  issues: [HAMSP-23]

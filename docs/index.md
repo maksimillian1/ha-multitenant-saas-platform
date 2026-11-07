@@ -20,8 +20,9 @@ Specific technical constraints must be sourced from the specialized files below:
 - [C4 model](architecture/c4/README.md): diagrams generated from [workspace.dsl](architecture/c4/workspace.dsl)
 - [Roadmap](roadmap.md): what gets built, in what order, for v1 and v2
 - [Feature stages](process/feature-stages.md): how a feature goes from `proto` to `stable`, and which gates each stage needs
-- [Testing](process/testing.md): where checks run, the QA checklist, flags in both states, quality scenario runs, QA records in `qa/`
+- [Testing](process/testing.md): where checks run, the QA checklist, flags in both states, quality scenario runs, where results are kept
 - [Review](process/review.md): what the owner reviews at each gate, and the architecture fitness functions that check the rest
+- [Features](features/README.md): one file per feature with its stage and the gates behind it; the [feature map](features/map.md) is generated from them
 
 **Override Rule**: Accepted ADRs in [adr/](adr/) hold absolute priority over all other architectural documentation.
 
@@ -43,8 +44,8 @@ The Deployment view (namespaces, node pools, Karpenter, KEDA, Cilium) is not dra
 
 <h2 id="directory-structure">Repository Structure</h2>
 
-* `/docs` - Documentation: requirements, C4 model, ADRs (`/docs/adr`), subsystem notes and the development process (`/docs/process`).
-* `/qa` - QA records: the verified state of each feature (`qa/features/`) and the log of load and chaos runs (`qa/qs-runs.md`).
+* `/docs` - Documentation: requirements, C4 model, ADRs (`/docs/adr`), subsystem notes, the development process (`/docs/process`) and the state of each feature (`/docs/features`).
+* `/tools` - Repository tooling: `tools/featuremap` generates the feature map.
 * `/prototype` - Local kind cluster with GitOps manifests (ArgoCD ApplicationSet, CloudNativePG, MinIO).
 * `/apps` - Go services: `apps/gateway` (API Gateway, ADR-0004), `apps/usage` (UsageWriteAPI and Usage Writer), `apps/exampleapp` (the minimal per-tenant test service) and `apps/admin` (the super admin app, a Go BFF with a React SPA, ADR-0009).
 * `/images` - Container images that are not Go services: `images/timescaledb`, the TimescaleDB extension image of the usage cluster (ADR-0008). It holds Timescale License (TSL) binaries; see [Data Tier](architecture/data-tier.md).
