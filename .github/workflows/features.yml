@@ -1,8 +1,7 @@
 name: features
 
-# The feature map (docs/features/README.md) is generated from the feature
-# files. It depends on every change: a change to the code of a stable feature
-# shows that feature as beta. So this runs on every pull request.
+# Feature files in docs/features and the map generated from them
+# (docs/features/README.md). See docs/features/README.md, "CI".
 on:
   pull_request:
   push:
@@ -10,11 +9,10 @@ on:
 
 jobs:
   map:
+    # tools/featuremap is its own Go module; no other workflow tests it.
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0 # the review commits named in the feature files
       - uses: actions/setup-go@v5
         with:
           go-version-file: tools/featuremap/go.mod
@@ -23,3 +21,38 @@ jobs:
         run: go -C tools/featuremap test -count=1 ./...
       - name: Feature files are valid and the map is up to date
         run: go -C tools/featuremap run . -check
+
+  touched:
+    # A comment on the pull request: the features whose code it changes,
+    # with their stage. It changes no stage; the owner decides.
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # the base branch and the review commits
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: tools/featuremap/go.mod
+          cache-dependency-path: tools/featuremap/go.sum
+      - name: Report
+        run: go -C tools/featuremap run . -pr "origin/${{ github.base_ref }}" > "$RUNNER_TEMP/features.md"
+      - name: Comment
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const body = fs.readFileSync(`${process.env.RUNNER_TEMP}/features.md`, 'utf8');
+            const marker = '<!-- featuremap-pr -->';
+            const { owner, repo } = context.repo;
+            const issue_number = context.issue.number;
+            const comments = await github.paginate(github.rest.issues.listComments, { owner, repo, issue_number });
+            const mine = comments.find(c => c.user.type === 'Bot' && c.body.startsWith(marker));
+            if (mine) {
+              await github.rest.issues.updateComment({ owner, repo, comment_id: mine.id, body });
+            } else {
+              await github.rest.issues.createComment({ owner, repo, issue_number, body });
+            }

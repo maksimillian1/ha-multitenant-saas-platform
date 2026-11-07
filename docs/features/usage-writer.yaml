@@ -1,6 +1,5 @@
 feature: usage-writer
 title: Usage Writer consumes usage events, drops duplicates and writes them in batches
-target: beta
 critical: true
 code:
   - apps/usage/internal/writer/**

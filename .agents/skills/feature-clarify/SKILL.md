@@ -1,6 +1,6 @@
 ---
 name: feature-clarify
-description: "Interview the user about a HAMSP feature before planning. Reads the Linear issue, the feature file and docs/, asks up to 5 targeted questions, then writes the target stage and testable acceptance criteria into docs/features/<slug>.yaml. Use when the user says clarify, refine or 'ask me about' an issue (HAMSP-N) or a feature."
+description: "Interview the user about a HAMSP feature before planning. Reads the Linear issue, the feature file and docs/, asks up to 5 targeted questions, then writes testable acceptance criteria into docs/features/<slug>.yaml. Use when the user says clarify, refine or 'ask me about' an issue (HAMSP-N) or a feature."
 ---
 
 # feature-clarify
@@ -25,7 +25,6 @@ Check the issue against this list. For each item, decide whether it is answered 
 
 | Area | What must be clear |
 |---|---|
-| Target stage | `proto`, `alpha` or `beta` (`docs/process/feature-stages.md`). Always ask when the file has no `target`; recommend `proto` when the feature depends on an open decision. |
 | Scope | Which actor (platform admin, tenant admin, end user, API client) and which FR-xx. What is out of scope. |
 | Tenant isolation | Where `tenant_id` comes from. RLS on every new multi-tenant table. What a cross-tenant attempt returns. Network policy for new workloads. |
 | Data & durability | What is written, when a write counts as acknowledged, the idempotency or dedup key. |
@@ -56,7 +55,6 @@ Show the user both changes and ask before saving.
 ```yaml
 feature: tenant-suspend
 title: Suspend a tenant
-target: alpha
 links:
   issues: [HAMSP-52]
 requirements: [FR-01, QS-03]
@@ -74,7 +72,7 @@ Fill only these fields. `code`, `planned` and the checklist come from `feature-p
 ## Goal
 <one or two sentences>
 
-**Feature:** [`<slug>`](<link to docs/features/<slug>.yaml on the branch>), target `<stage>`. Acceptance criteria and test status are in the file.
+**Feature:** [`<slug>`](<link to docs/features/<slug>.yaml on the branch>). Acceptance criteria and test status are in the file.
 
 ## Touched requirements
 FR-xx, QS-xx, C-xx — one line each on how this feature touches it.
@@ -97,8 +95,7 @@ Rules for acceptance criteria:
 - Use numbers where the docs have them (status codes, latency, counts). If a number is `TODO` in `requirements.md`, list it under Open questions rather than inventing it.
 - Each touched QS-xx either gets an AC or an explicit note in Touched requirements on why the feature does not need to prove it.
 - IDs belong to the feature, not to the issue. Never renumber existing ACs; a later issue adds new ones at the end. An AC that no longer holds is removed only with the user's approval, and the removal is recorded under Decisions.
-- Changing `target` clears `plan_approved` (`docs/process/feature-stages.md`, "Raising the target").
 
 ## 5. Report
 
-In chat: the feature slug and target stage, the questions asked and their answers, the ACs added or changed, and any Triage issues created. Do not change the issue status. The next step is `feature-plan`.
+In chat: the feature slug, the questions asked and their answers, the ACs added or changed, and any Triage issues created. Do not change the issue status. The next step is `feature-plan`.

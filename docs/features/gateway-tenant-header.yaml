@@ -1,6 +1,5 @@
 feature: gateway-tenant-header
 title: The x-tenant-id header the API Gateway sets for services behind it
-target: beta
 critical: true
 code:
   - apps/gateway/proxy/**

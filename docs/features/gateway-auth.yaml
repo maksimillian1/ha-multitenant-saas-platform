@@ -1,6 +1,5 @@
 feature: gateway-auth
 title: JWT validation and tenant context in the API Gateway
-target: beta
 critical: true
 code:
   - apps/gateway/auth/**

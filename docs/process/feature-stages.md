@@ -15,15 +15,17 @@ Feature flags that switch features on and off by stage: [ADR-0011](../adr/0011-f
 | `beta` | Does it safely: boundaries, security, end-to-end behaviour are tested. Ready to be read. | Agent, plus every guardrail of its stage. | On. | kind and EKS staging. |
 | `stable` | The owner has read it and stands behind it. | Owner: an entry in the feature's `reviews`. | Removed. | Everywhere. |
 
-`HAMSP-23-platform-skeleton` is merged to `master` at `beta`, before any manual review. Features below `beta` may be in `master` with their flag off.
+`HAMSP-23-platform-skeleton` is merged to `master` before its features are verified or reviewed; they get a stage one by one, through `feature-verify`. Features below `beta` may be in `master` with their flag off.
 
 ## Where the stage is kept
 
-Each feature has a file, `docs/features/<slug>.yaml` ([Features](../features/README.md)). It holds the target stage, the stage last verified, the code the feature owns, its acceptance criteria, its checklist, the owner's approvals and reviews, and every `feature-verify` run. The map of all features is generated from these files.
+Each feature has a file, `docs/features/<slug>.yaml` ([Features](../features/README.md)). It holds the stage last verified, the code the feature owns, its acceptance criteria, its checklist, the owner's approvals and reviews, and every `feature-verify` run. The map of all features is generated from these files.
 
 The slug is the key. Linear issues are the work on a feature and are linked from its file for people to follow; no gate, skill or CI check depends on Linear.
 
-A change to the code of another feature is a change to that feature too: if that feature is `stable`, it drops to `beta` until the owner has read the delta (see "Going down").
+Work on a feature is aimed at the next stage above its current one (`proto` when it has none).
+
+A change to the code of another feature is a change to that feature too. Every pull request gets a comment listing the features whose code it changes, with their stages; the owner decides what the change means for each (see "Going down").
 
 ## Gates per stage
 
@@ -50,19 +52,19 @@ A gate whose tooling is not built yet does not block. `feature-verify` reports i
 
 | Transition | Who | What it takes |
 |---|---|---|
-| none → `proto` | Agent | A feature file with a target stage. A release flag in the registry. |
+| none → `proto` | Agent | A feature file. A release flag in the registry. |
 | `proto` → `alpha` | Agent | `feature-verify` Ready for `alpha`. The decisions it depends on are Accepted. |
 | `alpha` → `beta` | Agent, owner | `feature-verify` Ready for `beta`; the owner approved the structure (G-08). |
 | `beta` → `stable` | Owner | A "Stabilize X" issue assigned to the owner. Review recorded in the feature's `reviews` (G-06), release flag and the old code path removed. |
-| any → lower | Automatic | See below. |
+| any → lower | Owner | See below. |
 
-**Raising the target.** When the work moves on to the next stage, `target` changes in the feature file and `plan_approved` is cleared. `feature-plan` adds what the higher level needs (`basic` → `full` checklist, G-08), and the owner approves that delta before implementation.
+**The next stage.** When `feature-verify` raises `stage`, `plan_approved` is cleared. `feature-plan` adds what the next level needs (`basic` → `full` checklist, G-08), and the owner approves that delta before implementation.
 
-An issue is Done when the feature reaches the issue's target stage. Stabilization is always its own issue.
+An issue is Done when the feature reaches the stage the issue names. Stabilization is always its own issue.
 
 **Going down.** A stage is a statement about a commit, not about a feature forever:
 
-* A change to the code of a `stable` feature (its `code` globs) shows it as `beta` in the map until the owner has read the delta and added a `reviews` entry with `scope: delta`.
+* A change to the code of a reviewed feature (its `code` globs) is listed in the pull request comment, with the files changed since its last review. Nothing changes automatically. The owner reads the change and adds a `reviews` entry with `scope: delta`, or lowers its `stage` by hand.
 * A guardrail that starts failing for a feature (a new scanner finding, a coverage drop) blocks its next promotion and is fixed before anything else in that feature.
 * A release flag whose `review_by` date has passed is flagged in CI ([ADR-0011](../adr/0011-feature-flags.md)). Its feature is promoted or deleted.
 
@@ -122,8 +124,8 @@ The schema is shared by every tenant, so a migration cannot hide behind a flag.
 
 ## The feature workflow
 
-* `feature-clarify` creates or updates the feature file: slug, target stage, acceptance criteria. It asks for the target stage when it is missing.
+* `feature-clarify` creates or updates the feature file: slug and acceptance criteria.
 * `feature-plan` adds the code globs, the planned tests and the plan pass of the checklist to the file, and the steps to the issue.
-* `feature-verify` checks the gates of the target stage, reports Ready or Not ready for it, writes the result into the feature file ([Testing](testing.md), section 8) and regenerates the map.
+* `feature-verify` checks the gates of the next stage, reports Ready or Not ready for it, writes the result into the feature file ([Testing](testing.md), section 8) and regenerates the map.
 * The Linear issue gets the verdict and a link to the feature file. Its status follows `AGENTS.md`.
 * Stabilization is a "Stabilize X" issue assigned to the owner.

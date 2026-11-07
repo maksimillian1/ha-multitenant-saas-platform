@@ -1,6 +1,5 @@
 feature: admin-zitadel
 title: Admin app calls to the Zitadel management API with its service account
-target: beta
 critical: true
 code:
   - apps/admin/zitadel/**

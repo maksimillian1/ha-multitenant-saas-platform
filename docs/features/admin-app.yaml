@@ -1,6 +1,5 @@
 feature: admin-app
 title: "Admin app BFF API and SPA: organizations, users, roles, projects, login branding"
-target: beta
 critical: false
 code:
   - apps/admin/api/**

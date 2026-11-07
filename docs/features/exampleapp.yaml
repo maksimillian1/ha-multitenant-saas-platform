@@ -1,6 +1,5 @@
 feature: exampleapp
 title: ExampleApp API and health
-target: beta
 critical: false
 code:
   - apps/exampleapp/items/**

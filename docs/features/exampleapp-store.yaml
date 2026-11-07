@@ -1,6 +1,5 @@
 feature: exampleapp-store
 title: ExampleApp tenant data in PostgreSQL with RLS
-target: beta
 critical: true
 code:
   - apps/exampleapp/store/**

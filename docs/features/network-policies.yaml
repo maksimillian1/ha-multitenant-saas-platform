@@ -1,6 +1,5 @@
 feature: network-policies
 title: Cilium network policies that admit only the expected callers
-target: beta
 critical: true
 code:
   - prototype/k8s/apps/*/network-policy.yaml

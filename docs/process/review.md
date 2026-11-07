@@ -8,11 +8,11 @@ Gates are defined in [Feature stages](feature-stages.md); the QA checklist is in
 
 | ID | Review | When | What the owner reads | Gate |
 |---|---|---|---|---|
-| R-1 | **Plan checklist** | Before implementation, when the target stage is `alpha` or higher. | The integration, contract and end-to-end rows of the plan checklist and the touched QS ([Testing](testing.md), section 5). Other details of the plan only when something is unclear. | G-07 |
+| R-1 | **Plan checklist** | Before implementation, when the next stage is `alpha` or higher. | The integration, contract and end-to-end rows of the plan checklist and the touched QS ([Testing](testing.md), section 5). Other details of the plan only when something is unclear. | G-07 |
 | R-2 | **Contracts** | Every pull request that changes a schema in `docs/contracts/`. | The schema diff, before merging. The owner merges every pull request, so a merged schema has been read. | G-03 |
 | R-3 | **Verify deviations** | After each `feature-verify` run. | Only the deviations from the approved plan and the items `feature-verify` added. | G-04 |
 | R-4 | **Structure** | Before `beta`. | The change to the architecture rules since the feature started (section below), and the component view once it is generated. Not the code. | G-08 |
-| R-5 | **Code** | Before `stable`, and again for every later change to the code of a `stable` feature. | The feature's code, or the delta since its last `reviews` entry. | G-06 |
+| R-5 | **Code** | Before `stable`, and for a later change to the code of a reviewed feature when the owner decides it needs one. | The feature's code, or the delta since its last `reviews` entry, listed in the pull request comment. | G-06 |
 
 The owner does not read: unit tests, implementation below `stable`, formatting, coverage numbers, scanner output that passed. CI and `feature-verify` check those.
 
@@ -35,7 +35,7 @@ An architecture fitness function is an automated check that the code keeps an ar
 Rules for the rules:
 
 * **Rules are files in the repo.** A property that matters and can be checked becomes a rule; a review comment that repeats twice is a candidate.
-* **Edges into critical features are read at every stage.** A rule change that allows a new dependency on the code of a critical feature is listed in the `feature-verify` report, whatever the target stage, and waits for the owner.
+* **Edges into critical features are read at every stage.** A rule change that allows a new dependency on the code of a critical feature is listed in the `feature-verify` report at every stage and waits for the owner.
 * **Other rule changes are reviewed at `beta`** (R-4). Below `beta` an agent adds the rules for the components it creates, and CI enforces whatever rules exist. Before `beta` the owner reads the rule diff since the feature started: new components, new edges, new external calls.
 * **A failing fitness function is fixed in the code, not in the rule.** Loosening a rule is a rule change and goes through the same review.
 
@@ -51,4 +51,4 @@ A feature file can name its elements of the C4 model (`c4:`), so the map links a
 
 ## Where reviews are recorded
 
-In the feature file ([Features](../features/README.md)): `plan_approved` (R-1), `structure_approved` (R-4) and `reviews` (R-5). Each `reviews` entry has the date, the commit reviewed up to and its scope: `full`, or `delta` since the previous entry. The generated map shows a `stable` feature whose code changed after its last entry as `beta`, with that commit, so the owner reads only the delta.
+In the feature file ([Features](../features/README.md)): `plan_approved` (R-1), `structure_approved` (R-4) and `reviews` (R-5). Each `reviews` entry has the date, the commit reviewed up to and its scope: `full`, or `delta` since the previous entry. Every pull request gets a comment listing the features whose code it changes, with their stage and the files changed since their last review, so the owner reads only the delta and decides: a new `reviews` entry, or a lower `stage`. Nothing is lowered automatically.
