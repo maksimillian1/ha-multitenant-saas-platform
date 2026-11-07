@@ -187,3 +187,54 @@ if curl -s -m 5 -o /dev/null http://exampleapp.exampleapp.svc:8080/healthz; then
 		})
 	}
 }
+
+// HAMSP-24: Zitadel gives any organization's machine user a token with the
+// platform API audience. A token of an organization that is not a tenant (one
+// of its own, and the IAM admin's) gets 401 at the gateway and never reaches
+// ExampleApp.
+// Verifies: gateway-auth AC-1; T-01
+func TestNonTenantOrgGets401(t *testing.T) {
+	probes := map[string]string{}
+	for _, nt := range cfg.NonTenants {
+		tok := token(t, nt)
+		// The token is one the audience check alone would accept.
+		if _, _, _, claims := jwtParts(t, tok); !hasAudience(claims["aud"], cfg.Audience) || claims[tenantClaim] != nt.OrgID {
+			t.Fatalf("%s: token has aud %v and organization %v, want %s and %s",
+				nt.Name, claims["aud"], claims[tenantClaim], cfg.Audience, nt.OrgID)
+		}
+		probe := newUUID()
+		probes[nt.Name] = probe
+		if r := call(t, http.MethodGet, "/items/"+probe, tok, nil); r.Status != http.StatusUnauthorized {
+			t.Errorf("%s: status %d, want 401; body %s", nt.Name, r.Status, r.Body)
+		}
+	}
+
+	// Positive control: a tenant's request is logged by ExampleApp.
+	control := newUUID()
+	mustStatus(t, call(t, http.MethodGet, "/items/"+control, token(t, tenA), nil), http.StatusNotFound, "tenant A, unknown item")
+	logs := exampleAppLogs(t)
+	if !strings.Contains(logs, control) {
+		t.Fatalf("ExampleApp logs miss the control request %s; the log check would prove nothing", control)
+	}
+	for name, probe := range probes {
+		if strings.Contains(logs, probe) {
+			t.Errorf("%s: the rejected request reached ExampleApp (path %s is in its logs)", name, probe)
+		}
+	}
+}
+
+// HAMSP-24: a tenant's machine user gets a token with the platform API
+// audience, and the gateway serves it as that tenant.
+// Verifies: gateway-auth AC-2
+func TestGrantedTenantGetsPlatformToken(t *testing.T) {
+	for _, ten := range []tenant{tenA, tenB} {
+		tok := token(t, ten)
+		if _, _, _, claims := jwtParts(t, tok); !hasAudience(claims["aud"], cfg.Audience) {
+			t.Fatalf("%s: token has aud %v, want it to contain %s", ten.Name, claims["aud"], cfg.Audience)
+		}
+		it := createItem(t, tok, "hamsp24-"+randomID())
+		if it.TenantID != ten.OrgID {
+			t.Errorf("%s: served as tenant %q, want %q", ten.Name, it.TenantID, ten.OrgID)
+		}
+	}
+}

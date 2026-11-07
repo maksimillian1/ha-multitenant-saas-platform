@@ -42,6 +42,9 @@ type config struct {
 	// Audience is the Zitadel project ID of the platform API (HAMSP-22).
 	Audience string   `json:"audience"`
 	Tenants  []tenant `json:"tenants"`
+	// NonTenants are machine users of organizations that are not tenants
+	// (HAMSP-24): the Gateway must reject their tokens.
+	NonTenants []tenant `json:"non_tenants"`
 }
 
 type item struct {
@@ -76,6 +79,9 @@ func loadConfig() error {
 	}
 	if len(cfg.Tenants) < 2 {
 		return fmt.Errorf("%s: need 2 tenants, got %d", path, len(cfg.Tenants))
+	}
+	if len(cfg.NonTenants) == 0 {
+		return fmt.Errorf("%s has no non_tenants (rerun prototype/bootstrap-tenants.sh)", path)
 	}
 	tenA, tenB = cfg.Tenants[0], cfg.Tenants[1]
 	dialer := &net.Dialer{Timeout: 5 * time.Second}

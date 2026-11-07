@@ -127,38 +127,54 @@ kubectl -n gateway rollout status deployment/api-gateway --timeout=3m
 
 # ── 4. one organization and one machine user per tenant ────────────────────────
 
-tenants_json="[]"
-for name in "${TENANTS[@]}"; do
-  ORG=""
-  org_id=$(zitadel POST /admin/v1/orgs/_search "$(jq -nc --arg n "${name}" \
+# org_named NAME — prints the ID of the organization NAME, created if missing.
+org_named() {
+  local id
+  id=$(ORG="" zitadel POST /admin/v1/orgs/_search "$(jq -nc --arg n "$1" \
     '{queries: [{nameQuery: {name: $n, method: "TEXT_QUERY_METHOD_EQUALS"}}]}')" \
     | jq -r '.result[0].id // empty')
-  if [[ -z "${org_id}" ]]; then
-    org_id=$(zitadel POST /management/v1/orgs "$(jq -nc --arg n "${name}" '{name: $n}')" | jq -r '.id')
-    echo "Created organization ${name} (${org_id})"
+  if [[ -z "${id}" ]]; then
+    id=$(ORG="" zitadel POST /management/v1/orgs "$(jq -nc --arg n "$1" '{name: $n}')" | jq -r '.id')
+    echo "Created organization $1 (${id})" >&2
   else
-    echo "Reusing organization ${name} (${org_id})"
+    echo "Reusing organization $1 (${id})" >&2
   fi
+  echo "${id}"
+}
 
-  ORG="${org_id}"
-  username="${name}-client"
-  user_id=$(zitadel POST /management/v1/users/_search "$(jq -nc --arg u "${username}" \
+# machine_client ORG_ID NAME — prints {name, org_id, client_id, client_secret}
+# of the machine user NAME-client in the organization, created if missing,
+# with a new client secret.
+machine_client() {
+  local org_id="$1" name="$2" username="$2-client" user_id secret
+  user_id=$(ORG="${org_id}" zitadel POST /management/v1/users/_search "$(jq -nc --arg u "${username}" \
     '{queries: [{userNameQuery: {userName: $u, method: "TEXT_QUERY_METHOD_EQUALS"}}]}')" \
     | jq -r '.result[0].id // empty')
   if [[ -z "${user_id}" ]]; then
     # JWT access tokens, so the Gateway can validate them locally (ADR-0003).
-    user_id=$(zitadel POST /management/v1/users/machine "$(jq -nc --arg u "${username}" --arg n "${name}" \
+    user_id=$(ORG="${org_id}" zitadel POST /management/v1/users/machine "$(jq -nc --arg u "${username}" --arg n "${name}" \
       '{userName: $u, name: ($n + " API client"), accessTokenType: "ACCESS_TOKEN_TYPE_JWT"}')" \
       | jq -r '.userId')
-    echo "  created machine user ${username} (${user_id})"
+    echo "  created machine user ${username} (${user_id})" >&2
   fi
-  secret=$(zitadel PUT "/management/v1/users/${user_id}/secret" '{}')
-
-  tenants_json=$(jq -c --arg name "${name}" --arg org "${org_id}" \
+  secret=$(ORG="${org_id}" zitadel PUT "/management/v1/users/${user_id}/secret" '{}')
+  jq -nc --arg name "${name}" --arg org "${org_id}" \
     --arg cid "$(jq -r '.clientId' <<<"${secret}")" --arg cs "$(jq -r '.clientSecret' <<<"${secret}")" \
-    '. + [{name: $name, org_id: $org, client_id: $cid, client_secret: $cs}]' <<<"${tenants_json}")
+    '{name: $name, org_id: $org, client_id: $cid, client_secret: $cs}'
+}
+
+tenants_json="[]"
+for name in "${TENANTS[@]}"; do
+  client=$(machine_client "$(org_named "${name}")" "${name}")
+  tenants_json=$(jq -c --argjson c "${client}" '. + [$c]' <<<"${tenants_json}")
 done
-ORG=""
+
+# Machine users of organizations that are not tenants (HAMSP-24): one in an
+# organization of its own, one in the IAM admin's. Zitadel gives both a token
+# with the platform API audience; the e2e tests prove the Gateway rejects it.
+iam_org_id=$(ORG="" zitadel GET /management/v1/orgs/me | jq -r '.org.id')
+non_tenants_json=$(jq -nc --argjson a "$(machine_client "$(org_named outsider)" outsider)" \
+  --argjson b "$(machine_client "${iam_org_id}" iam-admin-org)" '[$a, $b]')
 
 # ── 5. the super admin app (apps/admin): browser sign-in, project role ─────────
 
@@ -324,8 +340,8 @@ admin_json=$(jq -nc --arg url "${ADMIN_URL}" --arg role "${ADMIN_ROLE}" --arg vr
                                     {username: "regular-user", password: $rp, roles: []}]}')
 
 jq -n --arg issuer "${ISSUER}" --arg gw "${GATEWAY}" --arg aud "${project_id}" --argjson t "${tenants_json}" \
-  --argjson admin "${admin_json}" \
-  '{issuer: $issuer, gateway: $gw, audience: $aud, tenants: $t, admin: $admin}' >"${OUT}"
+  --argjson nt "${non_tenants_json}" --argjson admin "${admin_json}" \
+  '{issuer: $issuer, gateway: $gw, audience: $aud, tenants: $t, non_tenants: $nt, admin: $admin}' >"${OUT}"
 chmod 600 "${OUT}"
 echo ""
 echo "Wrote ${OUT}. Super admin page: ${ADMIN_URL} (users: jq .admin.users ${OUT})"
