@@ -40,6 +40,12 @@ spec:
             - name: AUDIENCE
               valueFrom:
                 configMapKeyRef: {name: api-gateway-audience, key: audience}
+            # Zitadel Organization IDs of the tenants, separated by commas: a
+            # token of any other organization gets 401 (HAMSP-24). Written by
+            # prototype/bootstrap-tenants.sh like the audience.
+            - name: TENANTS
+              valueFrom:
+                configMapKeyRef: {name: api-gateway-tenants, key: tenants}
             - name: ROUTES
               value: /items=http://exampleapp.exampleapp.svc:8080
             # Every API call becomes a usage event (HAMSP-26).

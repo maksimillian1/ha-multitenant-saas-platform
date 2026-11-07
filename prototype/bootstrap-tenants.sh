@@ -2,8 +2,11 @@
 # Creates the two test tenants of the walking skeleton (HAMSP-5): one Zitadel
 # Organization per tenant with one machine user that gets tokens through
 # client_credentials. Also creates the platform API project, whose ID is the
-# audience the API Gateway requires (HAMSP-22), and hands that ID to the
-# Gateway. For the super admin app (apps/admin) it creates the platform-admin
+# audience the API Gateway requires (HAMSP-22), and hands that ID and the
+# tenants' organization IDs to the Gateway, which serves only those
+# organizations (HAMSP-24). Two more machine users, in the organization
+# outsider and in the IAM admin's, are not tenants; the e2e tests use them.
+# For the super admin app (apps/admin) it creates the platform-admin
 # project with the super-admin and viewer roles, an OIDC web app and three
 # human test users, super-admin, viewer and regular-user (no role), and writes
 # the app's client to the Secret admin/admin-oidc. It also creates the app's
@@ -101,9 +104,10 @@ fi
 
 # ── 3. the platform API project: its ID is the token audience ──────────────────
 
-# Created in the IAM admin's organization. Tenant organizations get no project
-# grants yet, so any user of the instance can still ask for this audience;
-# restricting it is part of the tenant lifecycle (HAMSP-6).
+# Created in the IAM admin's organization. Zitadel gives this audience to a
+# machine user of any organization, project grants or not (HAMSP-24), so the
+# API Gateway also checks the token's organization against its tenant list
+# (section 5).
 project_id=$(zitadel POST /management/v1/projects/_search "$(jq -nc --arg n "${PROJECT}" \
   '{queries: [{nameQuery: {name: $n, method: "TEXT_QUERY_METHOD_EQUALS"}}]}')" \
   | jq -r '.result[0].id // empty')
@@ -113,17 +117,6 @@ if [[ -z "${project_id}" ]]; then
 else
   echo "Reusing project ${PROJECT} (${project_id})"
 fi
-
-# The API Gateway reads the audience from this ConfigMap (k8s/apps/gateway).
-wait_for "API Gateway Deployment (ArgoCD)" 60 kubectl -n gateway get deployment api-gateway
-current=$(kubectl -n gateway get configmap api-gateway-audience -o jsonpath='{.data.audience}' 2>/dev/null || true)
-if [[ "${current}" != "${project_id}" ]]; then
-  echo "Setting the API Gateway audience to ${project_id}..."
-  kubectl -n gateway create configmap api-gateway-audience --from-literal=audience="${project_id}" \
-    --dry-run=client -o yaml | kubectl apply -f -
-  kubectl -n gateway rollout restart deployment/api-gateway
-fi
-kubectl -n gateway rollout status deployment/api-gateway --timeout=3m
 
 # ── 4. one organization and one machine user per tenant ────────────────────────
 
@@ -176,7 +169,33 @@ iam_org_id=$(ORG="" zitadel GET /management/v1/orgs/me | jq -r '.org.id')
 non_tenants_json=$(jq -nc --argjson a "$(machine_client "$(org_named outsider)" outsider)" \
   --argjson b "$(machine_client "${iam_org_id}" iam-admin-org)" '[$a, $b]')
 
-# ── 5. the super admin app (apps/admin): browser sign-in, project role ─────────
+# ── 5. the API Gateway's audience and tenant list ──────────────────────────────
+
+# The API Gateway reads both from ConfigMaps (k8s/apps/gateway) and accepts a
+# token only with this audience and of one of these organizations (HAMSP-22,
+# HAMSP-24). It restarts only when one of them changed.
+gateway_changed=false
+# gateway_config NAME KEY VALUE — writes the ConfigMap gateway/NAME if KEY differs.
+gateway_config() {
+  local current
+  current=$(kubectl -n gateway get configmap "$1" -o jsonpath="{.data.$2}" 2>/dev/null || true)
+  if [[ "${current}" != "$3" ]]; then
+    echo "Setting the API Gateway $2 to $3..."
+    kubectl -n gateway create configmap "$1" --from-literal="$2=$3" --dry-run=client -o yaml | kubectl apply -f -
+    gateway_changed=true
+  fi
+}
+wait_for "API Gateway Deployment (ArgoCD)" 60 kubectl -n gateway get deployment api-gateway
+gateway_config api-gateway-audience audience "${project_id}"
+gateway_config api-gateway-tenants tenants "$(jq -r 'map(.org_id) | join(",")' <<<"${tenants_json}")"
+if [[ "${gateway_changed}" == true ]]; then
+  kubectl -n gateway rollout restart deployment/api-gateway
+else
+  echo "API Gateway audience and tenants unchanged"
+fi
+kubectl -n gateway rollout status deployment/api-gateway --timeout=3m
+
+# ── 6. the super admin app (apps/admin): browser sign-in, project role ─────────
 
 # The instance requires Login V2, which this cluster does not deploy (the
 # chart's login is disabled). Zitadel's built-in login serves browser sign-in
@@ -277,7 +296,7 @@ fi
 grant "${super_admin_id}" super-admin "${ADMIN_ROLE}"
 grant "${viewer_id}" viewer "${VIEWER_ROLE}"
 
-# ── 6. the admin app's service account: it calls the Zitadel APIs ───────────
+# ── 7. the admin app's service account: it calls the Zitadel APIs ───────────
 
 # service_account NAME ROLE DESCRIPTION — a machine user in the IAM admin's
 # organization with an instance role; prints a new personal access token (the
