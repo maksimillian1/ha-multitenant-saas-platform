@@ -9,13 +9,10 @@ name: c4
 #        artifact with the views workspaces. R-4 and G-08 read it.
 
 on:
+  # Every pull request, without a paths filter: GitHub applies the filter to the
+  # whole PR diff, so a PR whose structural change was reverted would not run
+  # and would keep a stale comment (HAMSP-84).
   pull_request:
-    paths:
-      - "apps/**"
-      - "tools/c4sync/**"
-      - "docs/architecture/c4/**"
-      - "Makefile"
-      - ".github/workflows/c4.yml"
   push:
     branches: [master]
     paths:
