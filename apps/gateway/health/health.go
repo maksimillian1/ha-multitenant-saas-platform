@@ -2,6 +2,7 @@ package health
 
 import "net/http"
 
+// Service answers the liveness probe.
 type Service struct{}
 
 func NewService() *Service {
