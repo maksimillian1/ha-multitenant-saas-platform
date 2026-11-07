@@ -86,6 +86,10 @@ identifierPrefix: usage           # every DSL identifier starts with it (default
 output:
   components: c4/usage.components.dsl   # C3 fragment; empty = do not write
   code: c4/usage.code.dsl               # code workspace; empty = do not write
+containers:                       # optional: one module, several binaries
+  - name: Writer                  # header of the fragment; default prefix usage_writer
+    main: cmd/writer              # main package, relative to the module root
+    output: c4/usage.writer.dsl   # C3 fragment of this binary
 code:
   maxElements: 30                 # types per code view (default 30)
   maxMethods: 6                   # methods listed per type (default 6)
@@ -127,6 +131,8 @@ detectors:
 
 important: [store]                # diff lists changes touching these first
 ```
+
+A module that builds several binaries is drawn as one container per binary. For each entry under `containers`, c4sync writes a fragment with only the components that the main package imports, directly or through other packages. A component used by two binaries, such as a shared `core`, appears in both fragments, because it is compiled into both. The rules, `check` and `diff` still cover the whole module.
 
 A component without metadata is still drawn, under its go-arch-lint name. A key in `components` or `important` that `.go-arch-lint.yml` does not declare is an error that names the line.
 
