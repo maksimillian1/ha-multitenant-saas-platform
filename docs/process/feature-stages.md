@@ -4,18 +4,18 @@ Agents write most of the code. A feature therefore ships in stages: first it is 
 
 The term is **stage**, as in Kubernetes feature gates (`alpha`, `beta`, `stable`). The roadmap's *phases* are something else: the order in which the work is done ([Roadmap](../roadmap.md)).
 
-Feature flags that switch features on and off by stage: [ADR-0011](../adr/0011-feature-flags.md).
+The decision behind this page: [ADR-0011](../adr/0011-feature-stages.md).
 
 ## Stages
 
-| Stage | What it promises | Checked by | Release flag | On where |
-|---|---|---|---|---|
-| `proto` | It compiles and does roughly the right thing. May be thrown away. | Agent: build, lint, unit tests. | Off. | Only through a local override. |
-| `alpha` | Does what the acceptance criteria say. Its contracts and schema may still change. | Agent: `feature-verify` is Ready. | On for alpha tenants. | kind. |
-| `beta` | Does it safely: boundaries, security, end-to-end behaviour are tested. Ready to be read. | Agent, plus every guardrail of its stage. | On. | kind and EKS staging. |
-| `stable` | The owner has read it and stands behind it. | Owner: gate G-06 in the feature file. | Removed. | Everywhere. |
+| Stage | What it promises | Checked by |
+|---|---|---|
+| `proto` | It compiles and does roughly the right thing. May be thrown away. | Agent: build, lint, unit tests. |
+| `alpha` | Does what the acceptance criteria say. Its contracts and schema may still change. | Agent: `feature-verify` is Ready. |
+| `beta` | Does it safely: boundaries, security, end-to-end behaviour are tested. Ready to be read. | Agent, plus every guardrail of its stage. |
+| `stable` | The owner has read it and stands behind it. | Owner: gate G-06 in the feature file. |
 
-`HAMSP-23-platform-skeleton` is merged to `master` before its features are verified or reviewed; they get a stage one by one, through `feature-verify`. Features below `beta` may be in `master` with their flag off.
+`HAMSP-23-platform-skeleton` is merged to `master` before its features are verified or reviewed; they get a stage one by one, through `feature-verify`. Features below `beta` may be in `master`.
 
 ## Where the stage is kept
 
@@ -35,7 +35,7 @@ A change to the code of another feature is a change to that feature too. Every p
 
 | ID | Gate | Checked by | `proto` | `alpha` | `beta` | `stable` |
 |---|---|---|---|---|---|---|
-| G-01 | **Flag off is safe.** Everything passes with the release flag off, and the off path is the old behaviour or a refusal. | CI | ● | ● | ● | (no flag) |
+| G-01 | **Flag off is safe.** For a feature with a release flag: everything passes with the flag off, and the off path is the old behaviour or a refusal. `n/a` for a feature without a flag (see "Flags"). | CI | ● | ● | ● | (no flag) |
 | G-02 | **Acceptance criteria.** Every `AC-n` is traced to a test that ran and passed. | `feature-verify` | | ● | ● | ● |
 | G-03 | **Contracts.** Every input that crosses a service boundary has a schema in `docs/contracts/` and the code passes its examples. The owner approved the schema: its contract rows are part of the approved plan (G-07), and the owner reads the schema diff before merging ([Review](review.md), R-2). | CI, owner | | ● | ● | ● |
 | G-04 | **QA checklist** ([Testing](testing.md), section 4). | `feature-verify` | | `basic` | `full` | `full` |
@@ -52,10 +52,10 @@ A gate whose tooling is not built yet does not block. `feature-verify` reports i
 
 | Transition | Who | What it takes |
 |---|---|---|
-| none → `proto` | Agent | A feature file. A release flag in the registry. |
+| none → `proto` | Agent | A feature file. |
 | up to `alpha` | Agent, owner | The `alpha` gates pass: `feature-verify` and the owner's plan approval (G-07). The decisions it depends on are Accepted. |
 | up to `beta` | Agent, owner | The `beta` gates pass, including the owner's structure approval (G-08). |
-| `beta` → `stable` | Owner | A "Stabilize X" issue assigned to the owner. Review recorded in gate G-06, release flag and the old code path removed. |
+| `beta` → `stable` | Owner | A "Stabilize X" issue assigned to the owner. Review recorded in gate G-06. A release flag, if the feature has one, is removed with the old code path. |
 | any → lower | Owner | See below. |
 
 **A higher stage later.** `feature-plan` adds what the higher level needs (`basic` → `full` checklist, G-08) and sets G-07 back to `not-checked` until the owner approves that delta.
@@ -66,7 +66,6 @@ An issue is Done when the feature reaches the stage the issue names. Stabilizati
 
 * A change to the code of a reviewed feature (its `code` globs) is listed in the pull request comment, with the files changed since its last review. Nothing changes automatically. The owner reads the change and moves gate G-06 to the new commit, or lowers its `stage` by hand.
 * A guardrail that starts failing for a feature (a new scanner finding, a coverage drop) blocks its next promotion and is fixed before anything else in that feature.
-* A release flag whose `review_by` date has passed is flagged in CI ([ADR-0011](../adr/0011-feature-flags.md)). Its feature is promoted or deleted.
 
 **Decisions are not shipped by agents.** Issues labelled `decision` and ADRs become Accepted only through the owner. An agent may prepare the options and implement after the decision. A feature that depends on an open decision stays at `proto`.
 
@@ -83,7 +82,9 @@ A change is *critical* when it touches the code of a critical feature, whichever
 
 ## Flags
 
-[ADR-0011](../adr/0011-feature-flags.md) has the implementation. The rules that matter for stages:
+Release flags are optional for now: a feature does not need one at any stage, and no flag tooling exists yet. How flags are implemented is decided when the first feature needs one (HAMSP-63). Until then a feature's stage does not limit who can reach it.
+
+When a feature has a flag, these rules apply:
 
 * **Three kinds of flags, never mixed:**
   * **release** flags follow a feature's stage and are removed at `stable`;
@@ -95,8 +96,8 @@ A change is *critical* when it touches the code of a critical feature, whichever
 ## Code structure
 
 * **`stable` code does not import code of a lower stage** (depguard, from the `code` globs and stages of the feature files).
-* **Branch by abstraction.** The `stable` package declares an interface. The new implementation lives in its own package. `cmd/` builds a switch that holds both implementations and picks one per request from the flag, because a flag can differ per tenant. Only `cmd/` and the flags package may see both.
-* At `stable` the old implementation, the switch and the flag are deleted in the same change.
+* **Branch by abstraction**, for a feature with a release flag. The `stable` package declares an interface. The new implementation lives in its own package. `cmd/` builds a switch that holds both implementations and picks one per request from the flag, because a flag can differ per tenant. Only `cmd/` and the flags package may see both.
+* At `stable` the old implementation, the switch and the flag, if any, are deleted in the same change.
 
 ## Database migrations
 
@@ -114,6 +115,8 @@ The schema is shared by every tenant, so a migration cannot hide behind a flag.
 * From `stable` on, a contract changes only through the versioning rules of ADR-0010.
 
 ## Environments
+
+Without release flags, merged code runs in every environment it is deployed to. With a flag, the intended split is:
 
 | Environment | Stages on |
 |---|---|

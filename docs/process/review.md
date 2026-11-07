@@ -4,8 +4,6 @@ What the owner reads, when, and what automated checks cover instead. The owner's
 
 Gates are defined in [Feature stages](feature-stages.md); the QA checklist is in [Testing](testing.md).
 
-This page describes the target. Which of the checks below run today and which are still missing: [Guardrails](guardrails.md).
-
 ## What the owner reviews
 
 | ID | Review | When | What the owner reads | Gate |
@@ -33,7 +31,7 @@ An architecture fitness function is an automated check that the code keeps an ar
 | **Dangerous constructs stay in critical features.** Tenant context, raw SQL, JWT parsing, tenant headers. | Semgrep rules; a match outside the code of a critical feature makes the change critical. | CI |
 | **Contracts stay compatible.** | The contract checks of [ADR-0010](../adr/0010-usage-event-contracts.md). | CI |
 | **Constraints.** No AGPL under `/apps` (C-03), every image builds for `arm64` (C-06). | The licence check, the multi-arch build. | CI |
-| **Flags.** Every release flag has an issue, a stage and an expiry ([ADR-0011](../adr/0011-feature-flags.md)). | The flag registry checks. | CI |
+| **Flags.** Every release flag has a feature, a stage and an expiry ([Feature stages](feature-stages.md), "Flags"). | The flag registry checks, once flags exist (HAMSP-63). | CI |
 
 Rules for the rules:
 

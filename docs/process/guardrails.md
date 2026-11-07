@@ -1,6 +1,6 @@
 # Guardrails
 
-Every guardrail of the project, where its rule is written and what checks it today. [Testing](testing.md), [Review](review.md), [Feature stages](feature-stages.md), [ADR-0011](../adr/0011-feature-flags.md) and `AGENTS.md` describe the rules in the present tense; this page says which of them actually run.
+Every guardrail of the project, where its rule is written and what checks it today. [Testing](testing.md), [Review](review.md), [Feature stages](feature-stages.md) and `AGENTS.md` describe the rules in the present tense; this page says which of them actually run.
 
 * **Status** is `runs`, with the workflow, test or tool that runs it, or `missing`, with the issue that adds it.
 * A row links to the rule and does not repeat it.
@@ -50,7 +50,6 @@ Every pull request, every stage ([Feature stages](feature-stages.md), "Gates per
 | Generated Go and TS types match `openapi.yaml` | CI | [ADR-0009](../adr/0009-admin-app-go-bff-react-spa.md) | `admin.yml` | runs |
 | Usage binaries link only their own packages | CI | `apps/usage/README.md` | `usage.yml`: depguard, `scripts/check-linked-deps.sh`, the `images` job | runs |
 | TimescaleDB image works and updates from the previous release | CI | [ADR-0008](../adr/0008-usage-store-on-timescaledb.md) | `timescaledb.yml`, `smoke-test.sh` | runs |
-| Flag-off suite: all tests with every release flag off | CI | [Testing](testing.md) §3 | none | missing, HAMSP-63 |
 | Diff coverage: 80% of changed lines, 90% in critical code | CI | [Testing](testing.md) §6 | none | missing, HAMSP-43 |
 | Package coverage does not drop (ratchet) | CI | [Testing](testing.md) §6 | none | missing, HAMSP-43 |
 | Feature files are valid, the stage is backed by its gates, the map is current | CI | [Feature stages](feature-stages.md), [Features](../features/README.md) | `features.yml`: `featuremap -check` | runs |
@@ -73,28 +72,13 @@ From [Review](review.md), "Architecture fitness functions".
 | Dangerous constructs outside critical code make the change critical | CI | [Review](review.md), [Feature stages](feature-stages.md) | semgrep rules | missing, HAMSP-46 |
 | Contracts stay compatible | CI | [ADR-0010](../adr/0010-usage-event-contracts.md) | `contracts.yml`: JSON Schema examples, `oasdiff` against the base branch | runs |
 
-## Flags
-
-From [ADR-0011](../adr/0011-feature-flags.md) §6 and §7. No flag exists yet; every row waits for HAMSP-63.
-
-| Guardrail | Layer | Rule in | Checked by | Status |
-|---|---|---|---|---|
-| Generated `flags.json` and Go constants are current | CI | ADR-0011 §6 | `flagsgen` | missing, HAMSP-63 |
-| Every `flags.json` passes flagd's schema | CI | ADR-0011 §6 | none | missing, HAMSP-63 |
-| Every release flag has a feature file that names it | CI | ADR-0011 §6 | none | missing, HAMSP-63 |
-| No release flag on a `stable` feature | CI | ADR-0011 §6 | none | missing, HAMSP-63 |
-| `review_by` has not passed | CI | ADR-0011 §6 | none | missing, HAMSP-63 |
-| Every registry flag is used, every used key is in the registry | CI | ADR-0011 §6 | none | missing, HAMSP-63 |
-| Flagged paths are unit-tested with the flag on and off | gate | ADR-0011 §7, [Testing](testing.md) §3 | `feature-verify` (G-01) | missing, HAMSP-63 |
-| kind e2e suite with one alpha and one normal tenant | CI | ADR-0011 §7, [Testing](testing.md) §3 | none | missing, HAMSP-49 |
-
 ## Feature gates
 
 From [Feature stages](feature-stages.md), "Gates per stage". `feature-verify` reports a gate whose tooling does not exist as *not checked*.
 
 | Guardrail | Layer | Rule in | Checked by | Status |
 |---|---|---|---|---|
-| G-01 Flag off is safe | gate | [Feature stages](feature-stages.md) | `feature-verify`; needs the flag-off suite | missing, HAMSP-63 |
+| G-01 Flag off is safe | gate | [Feature stages](feature-stages.md) | `feature-verify`: `n/a` for a feature without a release flag | runs |
 | G-02 Acceptance criteria | gate | [Feature stages](feature-stages.md) | `feature-verify` | runs |
 | G-03 Contracts | gate | [Feature stages](feature-stages.md) | `contracts.yml`, `feature-verify`, the owner (R-2) | runs |
 | G-04 QA checklist | gate | [Testing](testing.md) §4 | `feature-verify`; the items below that need tooling | runs |
@@ -115,7 +99,7 @@ QA checklist items ([Testing](testing.md) §4). `feature-verify` checks each one
 | T-11 Fuzzing | gate | [Testing](testing.md) §4 | Go fuzz targets | missing, HAMSP-47 |
 | T-12 Control canaries | gate | [Testing](testing.md) §4 | a test run with one control disabled | missing, HAMSP-50 |
 
-Mutation testing and load and chaos runs are optional ([Testing](testing.md) §4 and §7) and block nothing, so they have no row.
+Mutation testing and load and chaos runs are optional ([Testing](testing.md) §4 and §7) and block nothing, so they have no row. Neither do release flags: they are optional until a feature needs one ([Feature stages](feature-stages.md), "Flags"), and their checks come with HAMSP-63.
 
 ## Owner reviews
 
