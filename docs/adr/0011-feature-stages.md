@@ -6,8 +6,6 @@ Date: 2026-11-07
 
 Accepted
 
-The rules in detail: [Feature stages](../process/feature-stages.md), [Testing](../process/testing.md), [Review](../process/review.md). The feature file format: [Features](../features/README.md).
-
 ## Context
 
 Agents write most of the code. The owner cannot read every change, and code nobody has read must not look the same as code the owner stands behind.
@@ -21,36 +19,14 @@ What we need:
 
 ## Decision
 
-### 1. Four stages
+1. **Four stages:** `proto`, `alpha`, `beta`, `stable`, named after Kubernetes feature gates. A stage is a statement about the quality of a feature's code at a commit. `stable` means the owner has read the code.
+2. **One file per feature**, keyed by a slug: `docs/features/<slug>.yaml` holds the stage, the code the feature owns and everything that backs the stage. A map of all features is generated from these files.
+3. **A stage is backed by gates.** Each stage requires a set of gates; each gate is set by `feature-verify` or by the owner, and CI rejects a stage its gates do not back.
+4. **The owner reads at fixed points:** the plan before `alpha`, the structure before `beta`, the code before `stable`. Agents, CI and architecture fitness functions check the rest.
+5. **Nothing goes down automatically.** A change to reviewed code is shown to the owner, who accepts it or lowers the stage.
+6. **Critical features** (a bug leaks data between tenants or loses usage) get stricter checks from `alpha` on and go to `stable` first.
 
-| Stage | What it promises | Checked by |
-|---|---|---|
-| `proto` | It compiles and does roughly the right thing. May be thrown away. | Agent: build, lint, unit tests. |
-| `alpha` | Does what the acceptance criteria say. Contracts and schema may still change. | Agent: `feature-verify` is Ready; the owner approved the plan. |
-| `beta` | Does it safely: boundaries, security, end-to-end behaviour are tested. | Agent, every guardrail of the stage; the owner approved the structure. |
-| `stable` | The owner has read the code and stands behind it. | Owner. |
-
-The names follow Kubernetes feature gates. A stage is a statement about the quality of a feature's code at a commit, not about which users can reach it.
-
-### 2. One file per feature
-
-A feature is keyed by a kebab-case slug. `docs/features/<slug>.yaml` holds its stage, the code it owns (`code` globs), its acceptance criteria, the QA checklist with the planned and verified tests, the gates and every `feature-verify` run. A generated map lists all features. Tests name what they verify with a `// Verifies: <slug> AC-n; T-xx` comment.
-
-### 3. A stage is backed by gates
-
-Gates G-01 to G-08 ([Feature stages](../process/feature-stages.md), "Gates per stage") say what each stage needs. Each gate has an entry in the feature file, set by `feature-verify` or by the owner. CI rejects a stage whose required gates are not `pass` or `n/a`. A gate whose tooling does not exist yet is reported as *not checked* and does not block.
-
-### 4. The owner reads at fixed points
-
-The owner approves the plan's integration, contract and end-to-end rows before `alpha` (G-07), the structural change before `beta` (G-08) and the code before `stable` (G-06, with the commit it was read up to). Everything else is checked by CI, architecture fitness functions and `feature-verify` ([Review](../process/review.md)).
-
-### 5. Going down is manual
-
-Every pull request gets a comment listing the features whose code it changes, with their stage and the files changed since the last review. Nothing is lowered automatically: the owner moves G-06 to the new commit or lowers the stage.
-
-### 6. Critical features
-
-A feature whose bug leaks data between tenants or loses usage is `critical: true`, set by the owner. Changes to its code get the critical checklist items already at `alpha`, a higher diff coverage bar, and are first in the queue for `stable`.
+The rules: [Feature stages](../process/feature-stages.md) (stages, gates, critical features), [Testing](../process/testing.md), [Review](../process/review.md), [Features](../features/README.md) (the file format).
 
 ## Considered options
 
@@ -64,6 +40,5 @@ A feature whose bug leaks data between tenants or loses usage is `critical: true
 ## Consequences
 
 * Every feature costs a feature file and a `feature-verify` run per stage. In return, the trust level of any code is visible in the map.
-* Most guardrails the stages rely on do not run yet; their state is in [Guardrails](../process/guardrails.md). Until they run, the gates that need them are *not checked*.
-* `HAMSP-23-platform-skeleton` is merged to `master` before its features have a stage; they get one through `feature-verify`.
+* Many guardrails the stages rely on do not run yet ([Guardrails](../process/guardrails.md)); until they do, the gates that need them are *not checked*.
 * A stage does not hide code from tenants: merged code runs wherever it is deployed, whatever its stage.

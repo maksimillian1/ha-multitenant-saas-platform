@@ -23,13 +23,11 @@ Each feature has a file, `docs/features/<slug>.yaml` ([Features](../features/REA
 
 A stage is a claim, and the feature's gates back it: one entry per gate of the table below, set by `feature-verify` or marked by the owner. A stage is valid when every gate it requires is `pass` or `n/a`, and CI rejects any other. Stages need not be taken one at a time: a small feature can go straight to `beta` when its `beta` gates pass.
 
-The slug is the key. Linear issues are the work on a feature and are linked from its file for people to follow; no gate, skill or CI check depends on Linear.
-
-A change to the code of another feature is a change to that feature too. Every pull request gets a comment listing the features whose code it changes, with their stages; the owner decides what the change means for each (see "Going down").
+A change to the code of another feature is a change to that feature too (see "Going down").
 
 ## Gates per stage
 
-**Baseline, every stage.** Every pull request passes the required CI checks: lint, formatting, type checks, secret scanning, all unit tests, the build for every architecture, the licence check and the dependency and image scanners. CI repeats the pre-commit and pre-push checks, because local hooks can be skipped. The layers are in [Testing](testing.md), section 1. The baseline does not depend on the stage, so it is not in the table.
+**Baseline, every stage.** Every pull request passes the required CI checks of layer L3 ([Testing](testing.md), section 1). The baseline does not depend on the stage, so it is not in the table.
 
 **Gates.** ● required. A blank cell means not required at that stage.
 
@@ -37,14 +35,12 @@ A change to the code of another feature is a change to that feature too. Every p
 |---|---|---|---|---|---|---|
 | G-01 | **Flag off is safe.** For a feature with a release flag: everything passes with the flag off, and the off path is the old behaviour or a refusal. `n/a` for a feature without a flag (see "Flags"). | CI | ● | ● | ● | (no flag) |
 | G-02 | **Acceptance criteria.** Every `AC-n` is traced to a test that ran and passed. | `feature-verify` | | ● | ● | ● |
-| G-03 | **Contracts.** Every input that crosses a service boundary has a schema in `docs/contracts/` and the code passes its examples. The owner approved the schema: its contract rows are part of the approved plan (G-07), and the owner reads the schema diff before merging ([Review](review.md), R-2). | CI, owner | | ● | ● | ● |
+| G-03 | **Contracts.** Every input that crosses a service boundary has a schema in `docs/contracts/` and the code passes its examples. The owner approved the schema ([Review](review.md), R-1 and R-2). | CI, owner | | ● | ● | ● |
 | G-04 | **QA checklist** ([Testing](testing.md), section 4). | `feature-verify` | | `basic` | `full` | `full` |
 | G-05 | **Quality scenarios.** The touched `QS-xx` are listed with their recommended load and chaos runs; each run that happened is recorded. Informational: it never blocks a stage or a release. | `feature-verify` | | listed | listed | recorded or *not run* |
 | G-06 | **Owner review.** The owner has read the code up to a commit, recorded in gate G-06. | Owner | | | | ● |
-| G-07 | **Plan approved.** The owner approved the integration, contract and end-to-end rows of the plan checklist and the touched QS before implementation ([Review](review.md), R-1). | Owner | | ● | ● | ● |
-| G-08 | **Structure approved.** Architecture fitness functions pass, and the owner approved the structural change since the feature started: the generated component views and the c4sync diff, which include the change to the architecture rules ([Review](review.md), R-4). The code is not read at this stage. | CI, owner | | | ● | ● |
-
-What the owner reads at each gate is in [Review](review.md).
+| G-07 | **Plan approved.** The owner approved the plan before implementation ([Review](review.md), R-1). | Owner | | ● | ● | ● |
+| G-08 | **Structure approved.** Architecture fitness functions pass, and the owner approved the structural change since the feature started ([Review](review.md), R-4). The code is not read at this stage. | CI, owner | | | ● | ● |
 
 A gate whose tooling is not built yet does not block. `feature-verify` reports it as *not checked*, and the gap is visible in the feature's QA record.
 
@@ -64,7 +60,7 @@ An issue is Done when the feature reaches the stage the issue names. Stabilizati
 
 **Going down.** A stage is a statement about a commit, not about a feature forever:
 
-* A change to the code of a reviewed feature (its `code` globs) is listed in the pull request comment, with the files changed since its last review. Nothing changes automatically. The owner reads the change and moves gate G-06 to the new commit, or lowers its `stage` by hand.
+* A change to the code of a reviewed feature (its `code` globs) is listed in the pull request comment `touched` ([Features](../features/README.md), "CI"). Nothing changes automatically. The owner reads the change and moves gate G-06 to the new commit, or lowers its `stage` by hand.
 * A guardrail that starts failing for a feature (a new scanner finding, a coverage drop) blocks its next promotion and is fixed before anything else in that feature.
 
 **Decisions are not shipped by agents.** Issues labelled `decision` and ADRs become Accepted only through the owner. An agent may prepare the options and implement after the decision. A feature that depends on an open decision stays at `proto`.
@@ -127,8 +123,4 @@ Without release flags, merged code runs in every environment it is deployed to. 
 
 ## The feature workflow
 
-* `feature-clarify` creates or updates the feature file: slug and acceptance criteria.
-* `feature-plan` adds the code globs, the planned tests and the plan pass of the checklist to the file, and the steps to the issue.
-* `feature-verify` checks the gates of the stage the owner names, reports Ready or Not ready for it, writes the gates and the run into the feature file ([Testing](testing.md), section 8) and regenerates the map.
-* The Linear issue gets the verdict and a link to the feature file. Its status follows `AGENTS.md`.
-* Stabilization is a "Stabilize X" issue assigned to the owner.
+The skills `feature-clarify`, `feature-plan` and `feature-verify` and the issue status: `AGENTS.md`, "Feature workflow". Which skill writes which field of the feature file: [Features](../features/README.md).

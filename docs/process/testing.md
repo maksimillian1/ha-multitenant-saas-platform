@@ -12,11 +12,11 @@ Three rules hold everywhere:
 
 | Layer | Time | What runs | Can be skipped? |
 |---|---|---|---|
-| **L1: pre-commit** | seconds | gofmt, golangci-lint and oxlint on changed files, `tsc`, gitleaks, semgrep on changed files | Yes, with `--no-verify`. |
+| **L1: pre-commit** | seconds | formatting, lint and type checks, secret scanning and security rules, on changed files | Yes, with `--no-verify`. |
 | **L2: pre-push, and the agent before it reports done** ([AGENTS.md](../../AGENTS.md), Guardrails) | about a minute | unit tests of the touched packages, contract tests of the touched contracts | Yes. |
-| **L3: CI, every pull request** | no limit | L1 and L2 again on the whole change; all unit tests with `-race`; build for `amd64` and `arm64`; licence check; govulncheck, trivy, npm audit; the flag-off suite once release flags exist (section 3); diff coverage (section 6) | No. Required checks. |
+| **L3: CI, every pull request** | no limit | L1 and L2 again on the whole change; all unit tests with the race detector; build for `amd64` and `arm64`; licence check; dependency and image vulnerability scanners; the flag-off suite once release flags exist (section 3); diff coverage (section 6) | No. Required checks. |
 
-CI repeats L1 and L2 because local hooks can be skipped. CI is the only layer that enforces anything; L1 and L2 exist to fail early and cheaply. Everything in L3 is the *baseline* of [Feature stages](feature-stages.md): it applies to every change at every stage.
+The tool behind each check, and whether it runs yet: [Guardrails](guardrails.md). CI repeats L1 and L2 because local hooks can be skipped. CI is the only layer that enforces anything; L1 and L2 exist to fail early and cheaply. Everything in L3 is the *baseline* of [Feature stages](feature-stages.md): it applies to every change at every stage.
 
 Heavier tests (end-to-end on kind, fuzzing, control canaries, load, chaos) are not part of every pull request. They run when the checklist asks for them (section 4), through `feature-verify`.
 
@@ -73,7 +73,7 @@ The acceptance criteria themselves are gate G-02, not part of this list.
 One checklist, two passes, with the same `T-xx` IDs.
 
 1. **Plan pass (`feature-plan`).** For each item: *applies*, *does not apply* (one line why) or *unsure*. For items of kind integration, contract and end-to-end that apply, one line on what is tested: the scenario and the components involved. No test names and no unit-level detail. The touched QS are listed; load and chaos runs are not chosen yet.
-2. **Owner review of the plan** (gate G-07). Required for `alpha` and higher. The owner reviews the integration, contract and end-to-end rows and the touched QS, nothing else. Approval is recorded in the feature file as gate G-07 before implementation starts.
+2. **Owner review of the plan** ([Review](review.md), R-1; gate G-07), before implementation starts.
 3. **Verify pass (`feature-verify`).** Adds the detail from the actual change: test names, cases, results. It may add items or cases the diff shows, and it proposes load and chaos runs (section 7), which never block.
 4. **Ratchet.** An item the owner approved as *applies* cannot become `n/a` or be dropped by `feature-verify`. It is reported as a deviation from the plan and needs the owner's approval.
 5. **Gaps are not fixed during verification.** A missing test makes the verdict Not ready; writing it is a separate step.
@@ -127,4 +127,4 @@ The comment names the feature by its slug, not by an issue, so it stays right wh
 
 **Linear:** the issue gets the verdict and a link to the feature file, not a copy of it.
 
-CI checks the records: every test named in a `verified` entry exists and carries a `Verifies:` comment with the feature's slug and the ID, and the map is up to date.
+CI checks the records: `featuremap -check` ([Features](../features/README.md), "CI").
