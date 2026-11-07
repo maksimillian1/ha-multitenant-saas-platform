@@ -33,8 +33,8 @@ func prReport(features []*Feature, repo Repo, base string) (string, error) {
 			continue
 		}
 		t := touched{f: f, files: files, since: "—"}
-		if n := len(f.Reviews); n > 0 {
-			changed, err := repo.ChangedSince(f.Reviews[n-1].Commit)
+		if _, commit := lastReview(f); commit != "" {
+			changed, err := repo.ChangedSince(commit)
 			if err != nil {
 				return "", fmt.Errorf("%s: %w", f.file, err)
 			}
@@ -55,14 +55,15 @@ func prReport(features []*Feature, repo Repo, base string) (string, error) {
 	b.WriteString("| Feature | Stage | Critical | Files in this PR | Last review | Files changed since that review |\n")
 	b.WriteString("|---|---|---|---|---|---|\n")
 	for _, t := range rows {
+		review, _ := lastReview(t.f)
 		crit := ""
 		if t.f.Critical {
 			crit = "yes"
 		}
 		fmt.Fprintf(&b, "| `%s` | %s | %s | %d | %s | %s |\n",
-			t.f.Feature, orDash(t.f.Stage), crit, len(t.files), lastReview(t.f), t.since)
+			t.f.Feature, orDash(t.f.Stage), crit, len(t.files), review, t.since)
 	}
-	b.WriteString("\nNo stage is changed automatically. For a reviewed feature, decide: read the change and add a `reviews` entry with `scope: delta`, or lower its `stage` by hand.\n")
+	b.WriteString("\nNo stage is changed automatically. For a reviewed feature, decide: read the change and move gate G-06 to this commit, or lower its `stage` by hand.\n")
 	for _, t := range rows {
 		fmt.Fprintf(&b, "\n<details><summary><code>%s</code>: %d files</summary>\n\n", t.f.Feature, len(t.files))
 		for _, p := range t.files {

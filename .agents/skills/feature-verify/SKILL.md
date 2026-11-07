@@ -1,6 +1,6 @@
 ---
 name: feature-verify
-description: "Check that a HAMSP feature is ready for its next stage: every acceptance criterion and every QA checklist item of that stage has a test that runs and passes. Writes the result into docs/features/<slug>.yaml, regenerates the feature map and updates QS status in requirements.md. Use when the user asks to verify a feature or an issue (HAMSP-N), or whether a feature is ready."
+description: "Check whether a HAMSP feature is ready for a stage: every acceptance criterion and every QA checklist item of that stage has a test that runs and passes. Writes the result into docs/features/<slug>.yaml, regenerates the feature map and updates QS status in requirements.md. Use when the user asks to verify a feature or an issue (HAMSP-N), or whether a feature is ready."
 ---
 
 # feature-verify
@@ -13,7 +13,7 @@ Input: a feature slug, or an issue ID (`HAMSP-N`) whose feature is found under `
 
 ## 1. Load
 
-1. The feature file `docs/features/<slug>.yaml`: `stage` (the stage to check is the next one above it, `proto` when it has none), `acceptance` with the `planned` tests, the `checklist` plan pass, `quality_scenarios`, `plan_approved`, `structure_approved`, earlier `runs`. If ACs have no `planned` test, build the mapping now from the ACs and the code, and tell the user the plan was missing it.
+1. The feature file `docs/features/<slug>.yaml`: `stage`, `gates`, `acceptance` with the `planned` tests, the `checklist` plan pass, `quality_scenarios`, earlier `runs`. The stage to check is the one the user names; if they name none, ask, and suggest the stage the plan was made for. If ACs have no `planned` test, build the mapping now from the ACs and the code, and tell the user the plan was missing it.
 2. The QS rows the feature touches in `docs/architecture/requirements.md`.
 3. The diff of the branch against the branch it merges into: the integration branch for a sub-issue (`AGENTS.md`), otherwise `master` (`git diff <base>...HEAD --stat`, then the files you need).
 4. The other feature files whose `code` the diff touches. The change is critical when it touches the code of a feature with `critical: true`, or the feature itself is critical. Note every `stable` feature it changes.
@@ -34,19 +34,19 @@ This is the verify pass of the checklist (`docs/process/testing.md`, sections 4 
 
 1. Decide whether it applies, from its "Applies when" column and the actual diff. If it does not, write `n/a` with a one-line reason that names what is absent ("no migration in the diff"). "Not needed" is not a reason.
 2. If it applies, find the tests by their `// Verifies:` comments and read them as in steps 1 and 2 above. Record the test names and the cases they cover. An item that applies and has no test fails with "no test".
-3. **Ratchet.** An item planned as *applies* under `plan_approved` cannot become `n/a` here. Report it as a **deviation** and treat it as failing until the owner approves the change; the approval goes into `deviations` with its date.
+3. **Ratchet.** An item planned as *applies* under an approved plan (G-07 `pass`) cannot become `n/a` here. Report it as a **deviation** and treat it as failing until the owner approves the change; the approval goes into `deviations` with its date.
 4. Items or cases that the diff shows but the plan missed are added, marked as *added by verify*. Missing tests for them fail like any other; do not write them.
-5. When the stage being checked is `alpha` or higher and the file has no `plan_approved`, gate G-07 fails.
+5. When the stage being checked is `alpha` or higher and gate G-07 is not `pass`, report G-07 as failing. Never set G-06, G-07 or G-08 yourself: they are the owner's.
 
 One test may cover several IDs; it is listed under each of them.
 
 ### Gates outside the checklist
 
 - **G-01, flag off:** a feature that changes behaviour has a release flag in the registry that names this feature, and the suite passes with it off. At `alpha` and above, the AC tests also run with it on.
-- **G-03, contracts:** every schema the feature adds or changes is in `docs/contracts/` and its examples pass. Its contract rows are under `plan_approved`; a schema the plan did not mention is a deviation and waits for the owner.
+- **G-03, contracts:** every schema the feature adds or changes is in `docs/contracts/` and its examples pass. Its contract rows are under the approved plan (G-07); a schema the plan did not mention is a deviation and waits for the owner.
 - **G-05, quality scenarios:** propose load and chaos runs for the touched QS from the actual change, using the table in `docs/process/testing.md`, section 7. Load and chaos runs never count toward the verdict: report each as run (with its result) or *not run*.
-- **G-08, structure** (checking `beta` or `stable`): the architecture fitness functions pass, and the change to the architecture rules since the feature started is listed for the owner (`docs/process/review.md`, R-4). Without `structure_approved` the gate fails. A rule change that allows a new dependency on a critical feature is listed at every stage.
-- **Reviewed features touched:** list every feature with a `reviews` entry whose code the diff changes. Do not change their stage: the owner decides (a `reviews` entry with `scope: delta`, or a lower `stage`). This does not fail the verdict for the feature being verified.
+- **G-08, structure** (checking `beta` or `stable`): the architecture fitness functions pass, and the change to the architecture rules since the feature started is listed for the owner (`docs/process/review.md`, R-4). Without G-08 `pass` from the owner the gate fails. A rule change that allows a new dependency on a critical feature is listed at every stage.
+- **Reviewed features touched:** list every feature with a G-06 `pass` whose code the diff changes. Do not change their stage: the owner decides (move G-06 to the new commit, or lower the `stage`). This does not fail the verdict for the feature being verified.
 - A gate whose tooling does not exist yet is *not checked*: say so in the report, and do not count it as passed.
 
 ### Plan and docs
@@ -65,7 +65,7 @@ Run the planned tests and the tests of the checklist items that apply. Derive th
 
 Ask the user before writing:
 
-- **Feature file:** the `verified` entries of each AC, checklist item and QS test; `recommended_runs`; a new entry under `runs` with the date, the commit, the stage checked, the verdict and the failed and not-checked IDs. Earlier runs stay. When the verdict is Ready, set `stage` to the stage checked and clear `plan_approved`, which belonged to that stage.
+- **Feature file:** the `verified` entries of each AC, checklist item and QS test; `recommended_runs`; a new entry under `runs` with the date, the commit, the stage checked, the verdict and the failed and not-checked IDs. Earlier runs stay. **Gates:** for each gate you checked, `{status, by: verify, date, commit}`; `n/a` gets a `note`, G-04 gets its `level`. Leave the owner's gates as they are. When the verdict is Ready, set `stage` to the stage checked; `featuremap` rejects a stage its gates do not back.
 - **Map:** run `go -C tools/featuremap run .` and include `docs/features/README.md` in the same commit.
 - **QS runs:** for each load or chaos run that happened, add a row to `docs/features/qs-runs.md`.
 - **requirements.md:** for each QS-xx whose test ran, set its Status to `Pass (<YYYY-MM-DD>, <slug>)` or `Fail (<YYYY-MM-DD>, <slug>)`. Leave QS rows that did not run unchanged.

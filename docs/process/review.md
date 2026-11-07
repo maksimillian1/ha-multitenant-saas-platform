@@ -8,11 +8,11 @@ Gates are defined in [Feature stages](feature-stages.md); the QA checklist is in
 
 | ID | Review | When | What the owner reads | Gate |
 |---|---|---|---|---|
-| R-1 | **Plan checklist** | Before implementation, when the next stage is `alpha` or higher. | The integration, contract and end-to-end rows of the plan checklist and the touched QS ([Testing](testing.md), section 5). Other details of the plan only when something is unclear. | G-07 |
+| R-1 | **Plan checklist** | Before implementation, for `alpha` and higher. | The integration, contract and end-to-end rows of the plan checklist and the touched QS ([Testing](testing.md), section 5). Other details of the plan only when something is unclear. | G-07 |
 | R-2 | **Contracts** | Every pull request that changes a schema in `docs/contracts/`. | The schema diff, before merging. The owner merges every pull request, so a merged schema has been read. | G-03 |
 | R-3 | **Verify deviations** | After each `feature-verify` run. | Only the deviations from the approved plan and the items `feature-verify` added. | G-04 |
 | R-4 | **Structure** | Before `beta`. | The change to the architecture rules since the feature started (section below), and the component view once it is generated. Not the code. | G-08 |
-| R-5 | **Code** | Before `stable`, and for a later change to the code of a reviewed feature when the owner decides it needs one. | The feature's code, or the delta since its last `reviews` entry, listed in the pull request comment. | G-06 |
+| R-5 | **Code** | Before `stable`, and for a later change to the code of a reviewed feature when the owner decides it needs one. | The feature's code, or the delta since the commit in gate G-06, listed in the pull request comment. | G-06 |
 
 The owner does not read: unit tests, implementation below `stable`, formatting, coverage numbers, scanner output that passed. CI and `feature-verify` check those.
 
@@ -51,4 +51,4 @@ A feature file can name its elements of the C4 model (`c4:`), so the map links a
 
 ## Where reviews are recorded
 
-In the feature file ([Features](../features/README.md)): `plan_approved` (R-1), `structure_approved` (R-4) and `reviews` (R-5). Each `reviews` entry has the date, the commit reviewed up to and its scope: `full`, or `delta` since the previous entry. Every pull request gets a comment listing the features whose code it changes, with their stage and the files changed since their last review, so the owner reads only the delta and decides: a new `reviews` entry, or a lower `stage`. Nothing is lowered automatically.
+In the feature file ([Features](../features/README.md)), as gates marked `by: owner`: G-07 (R-1), G-08 (R-4) and G-06 (R-5), which also holds the commit the code was read up to. Every pull request gets a comment listing the features whose code it changes, with their stage and the files changed since that commit, so the owner reads only the delta and decides: move G-06 to the new commit, or lower the `stage`. Nothing is lowered automatically.

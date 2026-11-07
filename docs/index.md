@@ -22,7 +22,7 @@ Specific technical constraints must be sourced from the specialized files below:
 - [Feature stages](process/feature-stages.md): how a feature goes from `proto` to `stable`, and which gates each stage needs
 - [Testing](process/testing.md): where checks run, the QA checklist, flags in both states, quality scenario runs, where results are kept
 - [Review](process/review.md): what the owner reviews at each gate, and the architecture fitness functions that check the rest
-- [Features](features/README.md): the map of every feature with its stage, gaps and reviews, generated from one file per feature
+- [Features](features/README.md): one file per feature with its stage and the gates behind it; the [feature map](features/map.md) is generated from them
 
 **Override Rule**: Accepted ADRs in [adr/](adr/) hold absolute priority over all other architectural documentation.
 
