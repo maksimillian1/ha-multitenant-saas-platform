@@ -1,0 +1,19 @@
+version: 3
+workdir: .
+exclude:
+  - internal/tools
+allow:
+  depOnAnyVendor: true
+components:
+  cmd:        { in: cmd/** }
+  api:        { in: internal/api }
+  app:        { in: internal/app/** }
+  bus:        { in: internal/bus }
+  store:      { in: internal/store }
+  migrations: { in: internal/migrations }
+deps:
+  cmd:   { anyProjectDeps: true }
+  api:   { mayDependOn: [app] }
+  app:   { mayDependOn: [app, bus] }  # go-arch-lint does not allow imports inside a multi-package component by default
+  bus:   { mayDependOn: [app] }
+  store: { mayDependOn: [app] }

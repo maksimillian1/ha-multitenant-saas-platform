@@ -11,7 +11,7 @@ Gates are defined in [Feature stages](feature-stages.md); the QA checklist is in
 | R-1 | **Plan checklist** | Before implementation, for `alpha` and higher. | The integration, contract and end-to-end rows of the plan checklist and the touched QS ([Testing](testing.md), section 5). Other details of the plan only when something is unclear. | G-07 |
 | R-2 | **Contracts** | Every pull request that changes a schema in `docs/contracts/`. | The schema diff, before merging. The owner merges every pull request, so a merged schema has been read. | G-03 |
 | R-3 | **Verify deviations** | After each `feature-verify` run. | Only the deviations from the approved plan and the items `feature-verify` added. | G-04 |
-| R-4 | **Structure** | Before `beta`. | The change to the architecture rules since the feature started (section below), and the component view once it is generated. Not the code. | G-08 |
+| R-4 | **Structure** | Before `beta`. | The generated component views of the touched services and the c4sync structural diff since the feature started, including the change to the architecture rules (sections below). Not the code. | G-08 |
 | R-5 | **Code** | Before `stable`, and for a later change to the code of a reviewed feature when the owner decides it needs one. | The feature's code, or the delta since the commit in gate G-06, listed in the pull request comment. | G-06 |
 
 The owner does not read: unit tests, implementation below `stable`, formatting, coverage numbers, scanner output that passed. CI and `feature-verify` check those.
@@ -22,7 +22,8 @@ An architecture fitness function is an automated check that the code keeps an ar
 
 | Property | Check | Runs in |
 |---|---|---|
-| **Allowed dependencies.** Each component (a Go package or a group of them) may depend only on the components the rules allow. | A declared component map with allowed edges, checked against the imports (for example go-arch-lint or depguard). Unmapped packages fail. | CI |
+| **Allowed dependencies.** Each component (a Go package or a group of them) may depend only on the components the rules allow. | `.go-arch-lint.yml` in each Go module: the component map and the allowed edges, checked against the imports by `make c4-check` (go-arch-lint through c4sync). Unmapped packages fail. | CI |
+| **Diagrams match the code.** The generated component views in `docs/architecture/c4/generated/` and the Mermaid in the C4 README are up to date. | `make c4-check`, `render.sh --check` (workflow `c4`). | CI |
 | **Stages.** `stable` code does not import code of a lower stage. | depguard rules generated from the `code` globs and stages of the feature files. | CI |
 | **No runtime leak into lower stages.** | The `stable` tests with flags off cover no line below `stable` ([Testing](testing.md), section 3). | CI |
 | **Tenant isolation in the database.** Every multi-tenant table has RLS enabled and forced. | The existing RLS check (QS-01). | CI |
@@ -41,11 +42,11 @@ Rules for the rules:
 
 ## Component view
 
-A C4 component view (level 3) generated from the code makes R-4 faster: the owner looks at a picture of the feature's components and edges instead of reading a rule diff.
+The component views (C4 level 3) are generated from the Go code by [c4sync](../../tools/c4sync/README.md), so for R-4 the owner looks at a picture of the components and edges instead of reading a rule diff.
 
-Structurizr can extract components from Java code only. For Go it needs a small generator: packages and imports from `go list -json`, HTTP routes, Kafka topics and tables from the source, written as a DSL fragment that `docs/architecture/c4/workspace.dsl` includes. The generated fragment is committed, so a pull request shows the structural change as a diff.
-
-Until the generator exists, R-4 reads the rule diff.
+* **What is drawn.** go-arch-lint's component map (`.go-arch-lint.yml`) says which packages form a component. c4sync adds the imports between components, the libraries mapped to workspace elements, and the HTTP routes, Kafka topics and SQL tables it finds in the code. A module with several binaries is drawn as one container per binary.
+* **Where it lives.** The generated DSL is committed in `docs/architecture/c4/generated/`; `workspace.dsl` includes it in the UsageWriteAPI, Usage Writer and ExampleApp containers. The gateway and the admin app have code workspaces only, until ADR-0004 and ADR-0009 are accepted. `make c4` regenerates everything.
+* **What R-4 reads.** On every pull request the `c4` workflow posts the structural diff against the base branch as one comment: new components, edges, external calls, routes, topics and tables, each with `file:line`, components marked `important` first. The views of the changed components are in the run's `c4-diff` artifact. Before `beta` the owner reads the diff since the feature started (`make c4-diff BASE=<checkout of the commit the feature started from>`) and the component views of the touched services.
 
 A feature file can name its elements of the C4 model (`c4:`), so the map links a feature to its place in the diagrams.
 
