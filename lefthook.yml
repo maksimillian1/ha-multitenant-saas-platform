@@ -1,0 +1,47 @@
+# Pre-commit checks (HAMSP-40). CI runs the same linters: .github/workflows/lint.yml
+# for Go and gitleaks, .github/workflows/admin.yml for the SPA.
+#
+# Install once per clone: brew install lefthook golangci-lint gitleaks && lefthook install
+# Each job runs only when matching files are staged.
+pre-commit:
+  parallel: true
+  jobs:
+    # gofmt and goimports, as configured in .golangci.yml; fixes are staged.
+    - name: go-fmt
+      glob: "apps/**/*.go"
+      run: golangci-lint fmt --config .golangci.yml {staged_files}
+      stage_fixed: true
+
+    # Lint findings on the lines changed since HEAD; old findings do not block.
+    # The four modules lint in parallel, hence --allow-parallel-runners.
+    - name: go-lint-gateway
+      root: apps/gateway/
+      glob: "*.go"
+      run: golangci-lint run --config ../../.golangci.yml --allow-parallel-runners --new-from-rev HEAD ./...
+    - name: go-lint-admin
+      root: apps/admin/
+      glob: "*.go"
+      run: golangci-lint run --config ../../.golangci.yml --allow-parallel-runners --new-from-rev HEAD ./...
+    - name: go-lint-exampleapp
+      root: apps/exampleapp/
+      glob: "*.go"
+      run: golangci-lint run --config ../../.golangci.yml --allow-parallel-runners --new-from-rev HEAD ./...
+    # apps/usage also keeps its own depguard boundaries (apps/usage/.golangci.yml).
+    - name: go-lint-usage
+      root: apps/usage/
+      glob: "*.go"
+      run: >-
+        golangci-lint run --config ../../.golangci.yml --allow-parallel-runners --new-from-rev HEAD ./... &&
+        golangci-lint run --allow-parallel-runners --new-from-rev HEAD ./...
+
+    - name: spa-oxlint
+      root: apps/admin/ui/app/
+      glob: "*.{ts,tsx}"
+      run: npx --no-install oxlint {staged_files}
+    - name: spa-tsc
+      root: apps/admin/ui/app/
+      glob: "*.{ts,tsx}"
+      run: npx --no-install tsc -b --noEmit
+
+    - name: gitleaks
+      run: gitleaks git --staged --redact --no-banner
