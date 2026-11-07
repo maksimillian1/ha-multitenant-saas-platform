@@ -34,9 +34,9 @@ func (s *Service) overview(w http.ResponseWriter, r *http.Request, _ core.Sessio
 		return
 	}
 	core.WriteJSON(w, http.StatusOK, Overview{
-		Organizations: int64(orgs.Total),
-		HumanUsers:    int64(humans.Total),
-		MachineUsers:  int64(machines.Total),
-		Projects:      int64(projects.Total),
+		Organizations: total(orgs.Total),
+		HumanUsers:    total(humans.Total),
+		MachineUsers:  total(machines.Total),
+		Projects:      total(projects.Total),
 	})
 }

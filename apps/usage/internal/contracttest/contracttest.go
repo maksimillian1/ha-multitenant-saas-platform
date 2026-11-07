@@ -85,7 +85,7 @@ func Examples(t testing.TB, ch, version string) []json.RawMessage {
 		t.Fatalf("participants.json has no channel %q", ch)
 	}
 	file := filepath.Join(Dir(t), "schemas", fmt.Sprintf("%s.%s.json", c.Schema, version))
-	raw, err := os.ReadFile(file)
+	raw, err := os.ReadFile(file) //nolint:gosec // G304: a schema file of docs/contracts, named by the test.
 	if err != nil {
 		t.Fatal(err)
 	}
