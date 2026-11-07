@@ -64,14 +64,14 @@ From [Review](review.md), "Architecture fitness functions".
 
 | Guardrail | Layer | Rule in | Checked by | Status |
 |---|---|---|---|---|
-| Allowed dependencies between components | CI | [Review](review.md) | `.go-arch-lint.yml` in each Go module, `make c4-check` in `c4.yml` | runs |
+| Allowed dependencies between components | CI | [Review](review.md) | `make c4-check` in `c4.yml`: go-arch-lint through c4sync; unmapped packages fail | runs |
 | Diagrams match the code | CI | [Review](review.md) | `c4.yml`: `make c4-check`, `render.sh --check` | runs |
 | Structural diff of the PR for the owner | CI | [Review](review.md), "Component view" | `c4.yml`, job `diff` | runs |
-| `stable` code does not import code of a lower stage | CI | [Review](review.md), [Feature stages](feature-stages.md) | none | missing, HAMSP-86 |
+| `stable` code does not import code of a lower stage | CI | [Feature stages](feature-stages.md), "Code structure" | none | missing, HAMSP-86 |
 | No runtime leak into lower stages | CI | [Testing](testing.md) §3 | none | missing, HAMSP-86 |
 | RLS enabled and forced on every multi-tenant table (QS-01) | CI | [ADR-0002](../adr/0002-data-isolation-strategy.md), [Review](review.md) | `TestMigrationsLeaveNoUnprotectedTables` and the isolation tests in `apps/exampleapp/store` and `apps/usage/internal/store` (`exampleapp.yml`, `usage.yml`) | runs |
 | Services that trust `x-tenant-id` admit only the API Gateway | CI | [gateway-headers](../contracts/gateway-headers.md), [Review](review.md) | none | missing, HAMSP-70 |
-| Dangerous constructs outside critical code make the change critical | CI | [Review](review.md), [Feature stages](feature-stages.md) | semgrep rules | missing, HAMSP-46 |
+| Dangerous constructs outside critical code make the change critical | CI | [Feature stages](feature-stages.md), "Critical features" | semgrep rules | missing, HAMSP-46 |
 | Contracts stay compatible | CI | [ADR-0010](../adr/0010-usage-event-contracts.md) | `contracts.yml`: JSON Schema examples, `oasdiff` against the base branch | runs |
 
 ## Feature gates

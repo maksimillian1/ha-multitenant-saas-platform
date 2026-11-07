@@ -14,16 +14,12 @@ Linear issues are the work on a feature. The file lists them under `links`, and 
 
 ## Stage and gates
 
-A feature's `stage` is backed by its `gates`: one entry per gate of the table in [Feature stages](../process/feature-stages.md), "Gates per stage". A stage is valid when every gate it requires is `pass` or `n/a`; CI rejects a stage its gates do not back. A feature without a stage has not been brought to any stage yet.
+A feature's `stage` is backed by its `gates` ([Feature stages](../process/feature-stages.md), "Where the stage is kept"). A feature without a stage has not been brought to any stage yet.
 
 Each gate entry says who set it:
 
 * `by: verify`: `feature-verify` ran the checks and recorded the result;
 * `by: owner`: the owner marked it, either an approval only the owner can give (G-06, G-07, G-08) or a gate the owner decided to accept without a run.
-
-Nothing forces a feature through every stage in order. A small feature can be verified straight to `beta` if its `beta` gates pass.
-
-The features of the platform skeleton have no stage yet: `HAMSP-23-platform-skeleton` is merged into `master` before verification ([Roadmap](../roadmap.md)), which is a decision about merging, not a stage.
 
 ## CI
 
@@ -42,7 +38,7 @@ The features of the platform skeleton have no stage yet: `HAMSP-23-platform-skel
 
 It does not run the feature's tests and does not judge whether a feature is ready: that is `feature-verify`, recorded in `runs`.
 
-**`touched`, on pull requests.** Comments on the pull request with a table of the features whose `code` the pull request changes: stage, critical mark, files changed, the last review and the files changed since it. The comment is updated on every push. **No stage is changed automatically.** For a reviewed feature the owner decides: read the change and move gate G-06 to the new commit, or lower `stage` by hand.
+**`touched`, on pull requests.** Comments on the pull request with a table of the features whose `code` the pull request changes: stage, critical mark, files changed, the last review and the files changed since it. The comment is updated on every push. What the owner does with it: [Feature stages](../process/feature-stages.md), "Going down".
 
 ## File format
 

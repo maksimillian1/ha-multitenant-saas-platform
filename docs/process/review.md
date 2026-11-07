@@ -20,18 +20,17 @@ The owner does not read: unit tests, implementation below `stable`, formatting, 
 
 An architecture fitness function is an automated check that the code keeps an architectural property (Ford, Parsons and Kua, *Building Evolutionary Architectures*). With them the owner reviews a rule once instead of reading every change that could break it: after that, CI checks each pull request against the rule.
 
-| Property | Check | Runs in |
-|---|---|---|
-| **Allowed dependencies.** Each component (a Go package or a group of them) may depend only on the components the rules allow. | `.go-arch-lint.yml` in each Go module: the component map and the allowed edges, checked against the imports by `make c4-check` (go-arch-lint through c4sync). Unmapped packages fail. | CI |
-| **Diagrams match the code.** The generated component views in `docs/architecture/c4/generated/` and the Mermaid in the C4 README are up to date. | `make c4-check`, `render.sh --check` (workflow `c4`). | CI |
-| **Stages.** `stable` code does not import code of a lower stage. | depguard rules generated from the `code` globs and stages of the feature files. | CI |
-| **No runtime leak into lower stages.** | The `stable` tests with flags off cover no line below `stable` ([Testing](testing.md), section 3). | CI |
-| **Tenant isolation in the database.** Every multi-tenant table has RLS enabled and forced. | The existing RLS check (QS-01). | CI |
-| **Tenant header.** Every service that trusts `x-tenant-id` has a network policy that admits only the API Gateway. | A check over the manifests in `prototype/k8s/apps` against [gateway-headers](../contracts/gateway-headers.md). | CI |
-| **Dangerous constructs stay in critical features.** Tenant context, raw SQL, JWT parsing, tenant headers. | Semgrep rules; a match outside the code of a critical feature makes the change critical. | CI |
-| **Contracts stay compatible.** | The contract checks of [ADR-0010](../adr/0010-usage-event-contracts.md). | CI |
-| **Constraints.** No AGPL under `/apps` (C-03), every image builds for `arm64` (C-06). | The licence check, the multi-arch build. | CI |
-| **Flags.** Every release flag has a feature, a stage and an expiry ([Feature stages](feature-stages.md), "Flags"). | The flag registry checks, once flags exist (HAMSP-63). | CI |
+The properties. What checks each of them, and whether it runs yet: [Guardrails](guardrails.md), "Architecture fitness functions".
+
+* **Allowed dependencies.** Each component (a Go package or a group of them) may depend only on the components the rules allow; the component map and the allowed edges are in `.go-arch-lint.yml` of each Go module. A package in no component fails.
+* **Diagrams match the code** ("Component view" below).
+* **Stages** ([Feature stages](feature-stages.md), "Code structure") and **no runtime leak into lower stages** ([Testing](testing.md), section 3).
+* **Tenant isolation in the database** ([ADR-0002](../adr/0002-data-isolation-strategy.md)): every multi-tenant table has RLS enabled and forced.
+* **Tenant header** ([gateway-headers](../contracts/gateway-headers.md)): every service that trusts `x-tenant-id` has a network policy that admits only the API Gateway.
+* **Dangerous constructs stay in critical features** ([Feature stages](feature-stages.md), "Critical features").
+* **Contracts stay compatible** ([ADR-0010](../adr/0010-usage-event-contracts.md)).
+* **Constraints** C-03 and C-06 ([requirements](../architecture/requirements.md)).
+* **Flags** ([Feature stages](feature-stages.md), "Flags"), once a feature has one.
 
 Rules for the rules:
 
@@ -52,4 +51,4 @@ A feature file can name its elements of the C4 model (`c4:`), so the map links a
 
 ## Where reviews are recorded
 
-In the feature file ([Features](../features/README.md)), as gates marked `by: owner`: G-07 (R-1), G-08 (R-4) and G-06 (R-5), which also holds the commit the code was read up to. Every pull request gets a comment listing the features whose code it changes, with their stage and the files changed since that commit, so the owner reads only the delta and decides: move G-06 to the new commit, or lower the `stage`. Nothing is lowered automatically.
+In the feature file ([Features](../features/README.md)), as gates marked `by: owner`: G-07 (R-1), G-08 (R-4) and G-06 (R-5), which also holds the commit the code was read up to. A later change to that code: [Feature stages](feature-stages.md), "Going down".
