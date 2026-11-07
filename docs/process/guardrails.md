@@ -114,3 +114,4 @@ From [Review](review.md), "What the owner reviews".
 | R-3 Verify deviations | owner | [Review](review.md) | the owner, from the `feature-verify` report | runs |
 | R-4 Structure | owner | [Review](review.md) | the owner, from the `c4.yml` diff; recorded as G-08 | runs |
 | R-5 Code | owner | [Review](review.md) | the owner, from the `touched` comment; recorded as G-06 | runs |
+| ADRs and `decision` issues become Accepted only through the owner | owner | [Feature stages](feature-stages.md), "Moving between stages" | the owner, who merges every PR | runs |
