@@ -12,18 +12,22 @@ acceptance:
     text: A change to a feature file without regenerating the map fails CI.
     level: integration
     planned: tools/featuremap/featuremap_test.go:TestRun
+    verified: [tools/featuremap/featuremap_test.go:TestRun]
   AC-2:
     text: A feature file fails CI when it has an unknown field, a bad stage, a name that differs from its file name, a stage not backed by a ready verify run, or a stable stage without a review.
     level: unit
     planned: tools/featuremap/featuremap_test.go:TestValidate
+    verified: [tools/featuremap/featuremap_test.go:TestValidate]
   AC-3:
     text: A verified test that does not exist, or has no Verifies comment naming the feature and the ID, fails CI.
     level: unit
     planned: tools/featuremap/featuremap_test.go:TestCheckTest
+    verified: [tools/featuremap/featuremap_test.go:TestCheckTest, tools/featuremap/featuremap_test.go:TestRunRejectsBrokenRecord]
   AC-4:
     text: A pull request that changes the code of a feature gets one comment listing each touched feature with its stage, critical mark, files changed and files changed since its last review. No stage changes automatically.
     level: integration
     planned: tools/featuremap/featuremap_test.go:TestPRReport
+    verified: [tools/featuremap/featuremap_test.go:TestPRReport, tools/featuremap/featuremap_test.go:TestGitRepo]
   AC-5:
     text: The skills feature-clarify, feature-plan and feature-verify read and write the feature file and need nothing from Linear to decide a verdict.
     level: manual
@@ -44,3 +48,9 @@ runs:
     verdict: not-ready
     failed: [AC-1, AC-2, AC-3, AC-4, G-07]
     not_checked: [AC-5]
+  - date: 2026-11-07
+    commit: 5fbb2883
+    stage_checked: alpha
+    verdict: not-ready
+    failed: [G-07]
+    not_checked: [AC-4 comment posted on GitHub, AC-5]
