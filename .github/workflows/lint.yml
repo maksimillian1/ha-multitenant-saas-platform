@@ -65,6 +65,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       GITLEAKS_VERSION: 8.30.1
+      GOLANGCI_LINT_VERSION: 2.15.0
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
@@ -78,19 +79,21 @@ jobs:
           cache-dependency-path: apps/admin/ui/app/package-lock.json
       - run: npm ci
         working-directory: apps/admin/ui/app
-      - uses: golangci/golangci-lint-action@v8
-        with:
-          version: v2.15.0
-          install-only: true
-      - name: Install lefthook and gitleaks
+      - name: Install lefthook, golangci-lint and gitleaks
         run: |
           npm install -g lefthook@2.2.2
           cd "$RUNNER_TEMP"
+          gl=https://github.com/golangci/golangci-lint/releases/download/v${GOLANGCI_LINT_VERSION}
+          curl -sSfLO "$gl/golangci-lint-${GOLANGCI_LINT_VERSION}-linux-amd64.tar.gz"
+          curl -sSfLO "$gl/golangci-lint-${GOLANGCI_LINT_VERSION}-checksums.txt"
+          sha256sum --check --ignore-missing "golangci-lint-${GOLANGCI_LINT_VERSION}-checksums.txt"
+          mkdir -p bin
+          tar -xzf "golangci-lint-${GOLANGCI_LINT_VERSION}-linux-amd64.tar.gz" --strip-components=1 -C bin \
+            "golangci-lint-${GOLANGCI_LINT_VERSION}-linux-amd64/golangci-lint"
           base=https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}
           curl -sSfLO "$base/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
           curl -sSfLO "$base/gitleaks_${GITLEAKS_VERSION}_checksums.txt"
           sha256sum --check --ignore-missing "gitleaks_${GITLEAKS_VERSION}_checksums.txt"
-          mkdir -p bin
           tar -xzf "gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz" -C bin gitleaks
           echo "$RUNNER_TEMP/bin" >> "$GITHUB_PATH"
       - run: tools/hooktest/test.sh
