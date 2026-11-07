@@ -1,0 +1,35 @@
+name: Fixture
+identifierPrefix: fx
+output:
+  components: golden/components.dsl
+  code: golden/code.dsl
+components:
+  app:
+    name: App
+    description: Records events.
+    technology: Go
+  store:
+    name: Store
+    technology: database/sql
+externals:
+  - import: database/sql
+    element: sys.db
+    technology: database/sql
+detectors:
+  http: true
+  topics:
+    element: sys.broker
+    produce:
+      - call: example.com/fixture/internal/bus.Client.Publish
+        arg: 0
+      - field: example.com/fixture/internal/bus.Message.Topic
+    consume:
+      - call: example.com/fixture/internal/bus.Client.Subscribe
+        arg: -1
+  sql:
+    element: sys.db
+    calls:
+      - call: database/sql.DB.*Context
+        arg: 1
+    migrations: [internal/migrations]
+important: [store]
