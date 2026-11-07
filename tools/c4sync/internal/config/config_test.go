@@ -17,6 +17,7 @@ func write(t *testing.T, content string) string {
 }
 
 // AC (HAMSP-74): an unknown key fails with an error naming the line.
+// Verifies: c4-from-code AC-3
 func TestUnknownKeyNamesLine(t *testing.T) {
 	p := write(t, "name: x\noutputs:\n  code: a.dsl\n")
 	_, err := Load(p)
@@ -27,6 +28,7 @@ func TestUnknownKeyNamesLine(t *testing.T) {
 
 // AC (HAMSP-74, HAMSP-77): metadata for a component that go-arch-lint does
 // not define fails with the file and line.
+// Verifies: c4-from-code AC-3
 func TestUnknownComponentNamesLine(t *testing.T) {
 	p := write(t, "name: x\ncomponents:\n  app:\n    name: App\n  ghost:\n    name: Ghost\n")
 	c, err := Load(p)
@@ -82,6 +84,7 @@ func TestSplitSymbol(t *testing.T) {
 }
 
 // An empty file is an error that says so, not a bare EOF.
+// Verifies: c4-from-code AC-3
 func TestEmptyFile(t *testing.T) {
 	_, err := Load(write(t, ""))
 	if err == nil || !strings.Contains(err.Error(), "the file is empty") {

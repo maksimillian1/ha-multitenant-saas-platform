@@ -22,6 +22,7 @@ func base() *model.Model {
 }
 
 // AC (HAMSP-78): identical models give an empty report.
+// Verifies: c4-from-code AC-9
 func TestIdenticalModelsGiveEmptyReport(t *testing.T) {
 	r := Compare(base(), base(), nil)
 	if !r.Empty() {
@@ -35,6 +36,7 @@ func TestIdenticalModelsGiveEmptyReport(t *testing.T) {
 }
 
 // AC (HAMSP-78): models that differ by one relation give a report with exactly that relation.
+// Verifies: c4-from-code AC-9
 func TestOneRelation(t *testing.T) {
 	head := base()
 	head.Relations = append(head.Relations, model.Relation{From: "app", To: "store", Kind: model.Imports,
@@ -53,6 +55,7 @@ func TestOneRelation(t *testing.T) {
 }
 
 // AC (HAMSP-78): a change to an important component is listed before other changes.
+// Verifies: c4-from-code AC-9
 func TestImportantFirst(t *testing.T) {
 	head := base()
 	head.Relations = append(head.Relations,
@@ -76,6 +79,7 @@ func TestImportantFirst(t *testing.T) {
 	}
 }
 
+// Verifies: c4-from-code AC-9
 func TestMovedPackageAndChangedElement(t *testing.T) {
 	b := base()
 	b.CodeElements = []model.CodeElement{{ID: "app.S", Component: "app", Package: "example.com/m/app", Name: "S", Kind: model.Struct, Methods: []string{"A()"}}}
@@ -100,6 +104,7 @@ func TestMovedPackageAndChangedElement(t *testing.T) {
 }
 
 // A new component lists its packages relative to the module.
+// Verifies: c4-from-code AC-9
 func TestAddedComponentUsesRelativePackages(t *testing.T) {
 	head := &model.Model{Module: "example.com/m", Components: []model.Component{
 		{ID: "api", Packages: []string{"example.com/m", "example.com/m/internal/api"}},
@@ -112,6 +117,7 @@ func TestAddedComponentUsesRelativePackages(t *testing.T) {
 
 // All changes of a component sit under one heading, even when only some of
 // them touch an important component.
+// Verifies: c4-from-code AC-9
 func TestOneHeadingPerComponent(t *testing.T) {
 	base := &model.Model{Components: []model.Component{{ID: "store"}, {ID: "event"}}}
 	head := &model.Model{
