@@ -236,38 +236,68 @@ var rank = map[string]int{
 }
 
 // WriteMarkdown prints the report grouped by component, important first.
-// An empty report prints nothing.
+// Each component is a collapsible <details> block, so a long report stays
+// short on a pull request page: important components are open, the others
+// show one line with the number of changes. An empty report prints nothing.
 func (r *Report) WriteMarkdown(w io.Writer) {
 	if r.Empty() {
 		return
 	}
-	fmt.Fprintf(w, "## Structure changes: %s\n", r.Name)
-	important := map[string]bool{}
+	type section struct {
+		name      string
+		important bool
+		changes   []Change
+	}
+	var sections []*section
+	byName := map[string]*section{}
 	for _, c := range r.Changes {
-		if c.Important {
-			important[c.Component] = true
+		s := byName[c.Component]
+		if s == nil {
+			s = &section{name: c.Component}
+			if s.name == "" {
+				s.name = "(no component)"
+			}
+			byName[c.Component] = s
+			sections = append(sections, s)
+		}
+		s.important = s.important || c.Important
+		s.changes = append(s.changes, c)
+	}
+	nImportant := 0
+	for _, s := range sections {
+		if s.important {
+			nImportant++
 		}
 	}
-	group := ""
-	started := false
-	for _, c := range r.Changes {
-		if !started || c.Component != group {
-			g := c.Component
-			if g == "" {
-				g = "(no component)"
-			}
-			if important[c.Component] {
-				g += " (important)"
-			}
-			fmt.Fprintf(w, "\n### %s\n\n", g)
-			group, started = c.Component, true
-		}
-		line := fmt.Sprintf("- %s %s: %s", c.Op, c.Kind, c.Text)
-		if c.Where != "" {
-			line += fmt.Sprintf(" (`%s`)", c.Where)
-		}
-		fmt.Fprintln(w, line)
+
+	fmt.Fprintf(w, "## Structure changes: %s\n\n", r.Name)
+	fmt.Fprintf(w, "%s changed", plural(len(sections), "component"))
+	if nImportant > 0 {
+		fmt.Fprintf(w, ", %d important", nImportant)
 	}
+	fmt.Fprintf(w, "; %s.\n", plural(len(r.Changes), "change"))
+	for _, s := range sections {
+		open, mark := "", ""
+		if s.important {
+			open, mark = " open", " (important)"
+		}
+		fmt.Fprintf(w, "\n<details%s>\n<summary><b>%s</b>%s: %s</summary>\n\n", open, s.name, mark, plural(len(s.changes), "change"))
+		for _, c := range s.changes {
+			line := fmt.Sprintf("- %s %s: %s", c.Op, c.Kind, c.Text)
+			if c.Where != "" {
+				line += fmt.Sprintf(" (`%s`)", c.Where)
+			}
+			fmt.Fprintln(w, line)
+		}
+		fmt.Fprintln(w, "\n</details>")
+	}
+}
+
+func plural(n int, word string) string {
+	if n == 1 {
+		return "1 " + word
+	}
+	return fmt.Sprintf("%d %ss", n, word)
 }
 
 // WriteJSON prints the report for tools.

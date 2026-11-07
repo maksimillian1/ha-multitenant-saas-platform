@@ -244,7 +244,10 @@ Here is the real output for HAMSP-26 "Usage Writer stores each event once" (comm
 ```markdown
 ## Structure changes: Usage
 
-### writer (important)
+2 components changed, 1 important; 9 changes.
+
+<details open>
+<summary><b>writer</b> (important): 7 changes</summary>
 
 - added component: writer (internal/writer)
 - added relation: writer → event (`internal/writer/writer.go:17`)
@@ -254,11 +257,18 @@ Here is the real output for HAMSP-26 "Usage Writer stores each event once" (comm
 - added code element: struct writer.Writer (`internal/writer/writer.go:27`)
 - added code relation: internal/writer.Writer uses internal/store.Writer (`internal/writer/writer.go:29`)
 
-### cmd
+</details>
+
+<details>
+<summary><b>cmd</b>: 2 changes</summary>
 
 - added relation: cmd → writer (`main.go:35`)
 - added interface: cmd serves http GET /healthz (`main.go:197`)
+
+</details>
 ```
+
+Each component is a collapsible `<details>` block, so a long report stays short on a pull request page: important components are open, the others show one line with the number of changes.
 
 Changes are grouped by component. A component whose changes touch an `important` component (here `writer → store`) comes first. `-important a,b` adds names to the list from the config.
 

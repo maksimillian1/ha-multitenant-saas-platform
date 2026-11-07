@@ -129,10 +129,41 @@ func TestOneHeadingPerComponent(t *testing.T) {
 	}
 	var b strings.Builder
 	Compare(base, head, []string{"store"}).WriteMarkdown(&b)
-	if n := strings.Count(b.String(), "### writer"); n != 1 {
+	if n := strings.Count(b.String(), "<b>writer</b>"); n != 1 {
 		t.Fatalf("want one writer heading, got %d:\n%s", n, b.String())
 	}
-	if !strings.Contains(b.String(), "### writer (important)") {
+	if !strings.Contains(b.String(), "<summary><b>writer</b> (important): 3 changes</summary>") {
 		t.Fatalf("writer touches store and must be marked:\n%s", b.String())
+	}
+}
+
+// Each component is a collapsible block: important ones open, the others
+// closed with the number of changes, so a long report stays short on a PR.
+//
+// Verifies: c4-from-code AC-9
+func TestCollapsibleSections(t *testing.T) {
+	comps := []model.Component{{ID: "api"}, {ID: "app"}, {ID: "store"}}
+	base := &model.Model{Components: comps}
+	head := &model.Model{
+		Components: comps,
+		Relations: []model.Relation{
+			{From: "api", To: "app", Kind: model.Imports},
+			{From: "store", To: "app", Kind: model.Imports},
+		},
+	}
+	var b strings.Builder
+	Compare(base, head, []string{"store"}).WriteMarkdown(&b)
+	out := b.String()
+	for _, want := range []string{
+		"2 components changed, 1 important; 2 changes.",
+		"<details open>\n<summary><b>store</b> (important): 1 change</summary>\n\n- added relation",
+		"<details>\n<summary><b>api</b>: 1 change</summary>\n\n- added relation",
+	} {
+		if !strings.Contains(out, want) {
+			t.Errorf("missing %q in:\n%s", want, out)
+		}
+	}
+	if strings.Count(out, "<details") != strings.Count(out, "</details>") {
+		t.Errorf("unbalanced details:\n%s", out)
 	}
 }

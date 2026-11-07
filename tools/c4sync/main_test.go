@@ -253,8 +253,8 @@ func TestDiff(t *testing.T) {
 	if code != 0 {
 		t.Fatalf("exit %d: %s", code, errOut)
 	}
-	storeAt := strings.Index(out, "### store (important)")
-	apiAt := strings.Index(out, "### api")
+	storeAt := strings.Index(out, "<details open>\n<summary><b>store</b> (important)")
+	apiAt := strings.Index(out, "<details>\n<summary><b>api</b>")
 	if storeAt < 0 || apiAt < 0 || storeAt > apiAt {
 		t.Fatalf("store must come first:\n%s", out)
 	}
