@@ -285,6 +285,7 @@ Structurizr has no code-level element type. c4sync models Go types as components
 - **Values built at runtime.** A topic read from an environment variable, or a route built with `fmt.Sprintf`, shows as `? (in FuncName)`. The diagram tells you where to look. It does not guess the value.
 - **SQL is matched with patterns, not parsed.** c4sync finds tables after `FROM`, `JOIN`, `INSERT INTO`, `UPDATE`, `DELETE FROM`, `MERGE INTO`, `COPY`, `CREATE TABLE` and `ALTER TABLE`. A name followed by `(` is a function and shows as `name()`. Postgres built-ins (`pg_*`, `unnest`, `json_*` and others) are skipped. Add your own names to `sql.ignore`.
 - **Detectors cover only calls you list.** A library that c4sync has no matcher for adds no routes, topics or tables. Add a `call` or `field` matcher for it.
+- **Containers are cut by package, not by function.** A binary that imports a package gets everything that package does. If `cmd/writer` imports `internal/kafka` only for its consumer, the Usage Writer fragment still shows the topics that `kafka` produces.
 - **Only Go.** The model does not depend on the language, but there is only a Go extractor.
 
 ## Development
