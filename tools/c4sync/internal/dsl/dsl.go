@@ -371,9 +371,24 @@ func relPackages(module string, pkgs []string) []string {
 	return out
 }
 
-func compIdent(prefix, id string) string { return prefix + "_" + sanitize(id) }
+func compIdent(prefix, id string) string { return prefix + "_" + caseSafe(sanitize(id)) }
 
-func elemIdent(id string) string { return "t_" + sanitize(id) }
+func elemIdent(id string) string { return "t_" + caseSafe(sanitize(id)) }
+
+// caseSafe writes an upper-case letter as "-" and the lower-case letter.
+// Structurizr compares identifiers without regard to case, so Go names that
+// differ only in case (humanUpdate, HumanUpdate) would otherwise clash.
+func caseSafe(s string) string {
+	var b strings.Builder
+	for _, r := range s {
+		if r >= 'A' && r <= 'Z' {
+			b.WriteByte('-')
+			r += 'a' - 'A'
+		}
+		b.WriteRune(r)
+	}
+	return b.String()
+}
 
 func sanitize(s string) string {
 	return strings.Map(func(r rune) rune {
