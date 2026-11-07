@@ -1,0 +1,77 @@
+feature: feature-map
+title: One file per feature, a generated map of all features and a pull request report
+stage: alpha
+critical: false
+code:
+  - tools/featuremap/**
+  - .github/workflows/features.yml
+links:
+  issues: [HAMSP-45]
+
+acceptance:
+  AC-1:
+    text: A change to a feature file without regenerating the map fails CI.
+    level: integration
+    planned: tools/featuremap/featuremap_test.go:TestRun
+    verified: [tools/featuremap/featuremap_test.go:TestRun]
+  AC-2:
+    text: A feature file fails CI when it has an unknown field, a bad stage, a name that differs from its file name, a stage not backed by a ready verify run, or a stable stage without a review.
+    level: unit
+    planned: tools/featuremap/featuremap_test.go:TestValidate
+    verified: [tools/featuremap/featuremap_test.go:TestValidate]
+  AC-3:
+    text: A verified test that does not exist, or has no Verifies comment naming the feature and the ID, fails CI.
+    level: unit
+    planned: tools/featuremap/featuremap_test.go:TestCheckTest
+    verified: [tools/featuremap/featuremap_test.go:TestCheckTest, tools/featuremap/featuremap_test.go:TestRunRejectsBrokenRecord]
+  AC-4:
+    text: A pull request that changes the code of a feature gets one comment listing each touched feature with its stage, critical mark, files changed and files changed since its last review. No stage changes automatically.
+    level: integration
+    planned: tools/featuremap/featuremap_test.go:TestPRReport
+    verified: [tools/featuremap/featuremap_test.go:TestPRReport, tools/featuremap/featuremap_test.go:TestGitRepo]
+  AC-5:
+    text: The skills feature-clarify, feature-plan and feature-verify read and write the feature file and need nothing from Linear to decide a verdict.
+    level: manual
+    planned: "manual: run feature-clarify, feature-plan and feature-verify on one new feature without opening Linear"
+
+checklist:
+  T-01:
+    verified: n/a — repository tooling; it reads no tenant data
+  T-02:
+    verified: n/a — no input crosses a service boundary; feature files are read by one tool in the repo
+  T-08:
+    verified: n/a — no migration in the diff
+
+gates:
+  G-01: {status: n/a, by: verify, date: 2026-11-07, commit: fa33fc3d, note: repository tooling; no runtime behaviour and no release flag}
+  G-02: {status: pass, by: owner, date: 2026-11-07, commit: bb26b272, note: AC-1 to AC-4 pass by verify; AC-5 (manual) accepted by the owner without a run}
+  G-03: {status: n/a, by: verify, date: 2026-11-07, commit: fa33fc3d, note: no schema in docs/contracts}
+  G-04: {status: pass, by: verify, date: 2026-11-07, commit: fa33fc3d, level: basic}
+  G-05: {status: n/a, by: verify, date: 2026-11-07, commit: fa33fc3d, note: no quality scenario touched}
+  G-07: {status: pass, by: owner, date: 2026-11-07, note: "approved for alpha on PR #5"}
+
+runs:
+  - date: 2026-11-07
+    commit: 9f76446e
+    stage_checked: alpha
+    verdict: not-ready
+    failed: [AC-1, AC-2, AC-3, AC-4, G-07]
+    not_checked: [AC-5]
+  - date: 2026-11-07
+    commit: 5fbb2883
+    stage_checked: alpha
+    verdict: not-ready
+    failed: [G-07]
+    not_checked: [AC-4 comment posted on GitHub, AC-5]
+  - date: 2026-11-07
+    commit: fa33fc3d
+    stage_checked: alpha
+    verdict: not-ready
+    failed: [G-07]
+    not_checked: [AC-5]
+  - date: 2026-11-07
+    commit: bb26b272
+    stage_checked: alpha
+    verdict: ready
+    failed: []
+    not_checked: []

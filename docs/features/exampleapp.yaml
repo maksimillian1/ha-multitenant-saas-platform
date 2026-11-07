@@ -1,0 +1,11 @@
+feature: exampleapp
+title: ExampleApp API and health
+critical: false
+code:
+  - apps/exampleapp/items/**
+  - apps/exampleapp/core/**
+  - apps/exampleapp/health/**
+  - apps/exampleapp/main.go
+c4: [exampleApp]
+links:
+  issues: [HAMSP-23]

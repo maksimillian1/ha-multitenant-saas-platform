@@ -1,0 +1,8 @@
+feature: gateway-usage-reporting
+title: The API Gateway reports every API call as a usage event
+critical: false
+code:
+  - apps/gateway/usage/**
+c4: [apiGateway]
+links:
+  issues: [HAMSP-23]
