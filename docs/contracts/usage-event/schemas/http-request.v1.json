@@ -1,0 +1,37 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "POST /v1/events request body",
+  "description": "A batch of usage events. The whole batch is rejected if any event is invalid. At most 1 MB, which is checked by UsageWriteAPI, not by this schema. The examples are what the senders' and UsageWriteAPI's tests run against (README.md).",
+  "type": "object",
+  "required": ["events"],
+  "properties": {
+    "events": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 1000,
+      "items": {"$ref": "event.v1.json"}
+    }
+  },
+  "examples": [
+    {
+      "events": [
+        {
+          "event_id": "0192f6a8-7c1e-7b3a-9c4d-2f1e8a6b5c3d",
+          "event_time": "2026-10-24T20:15:03.123Z",
+          "tenant_id": "396438053259838069",
+          "metric": "api_calls",
+          "quantity": 1,
+          "attributes": {"method": "GET", "path": "/items/42", "status": 200,
+                         "duration_ms": 12, "request_bytes": 0, "response_bytes": 9007199254740993}
+        },
+        {
+          "event_id": "0192f6a8-7c1f-7b3a-9c4d-2f1e8a6b5c3e",
+          "event_time": "2026-10-24T20:15:04Z",
+          "tenant_id": "396438053259838069",
+          "metric": "api_calls",
+          "quantity": 1
+        }
+      ]
+    }
+  ]
+}

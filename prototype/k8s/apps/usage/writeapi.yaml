@@ -1,0 +1,58 @@
+# UsageWriteAPI (docs/contracts/usage-event): 202 only after Kafka confirmed the events.
+# Wave 2, after writer: a new event format reaches Kafka only once the writer
+# that reads it runs. It has no database credentials.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: usage-writeapi
+  namespace: usage
+  annotations:
+    argocd.argoproj.io/sync-wave: "2"
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: usage-writeapi
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: usage-writeapi
+    spec:
+      serviceAccountName: usage-writeapi
+      automountServiceAccountToken: false
+      containers:
+        - name: writeapi
+          image: hamsp/usage-writeapi:dev
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 8080
+          env:
+            - name: KAFKA_BROKERS
+              value: usage-kafka-kafka-bootstrap.kafka.svc:9092
+          readinessProbe:
+            httpGet: {path: /readyz, port: http}
+            periodSeconds: 5
+          livenessProbe:
+            httpGet: {path: /healthz, port: http}
+            periodSeconds: 10
+          resources:
+            requests: {cpu: 50m, memory: 32Mi}
+            limits: {memory: 128Mi}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: {drop: ["ALL"]}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: usage-writeapi
+  namespace: usage
+spec:
+  selector:
+    app.kubernetes.io/name: usage-writeapi
+  ports:
+    - name: http
+      port: 8080
+      targetPort: http

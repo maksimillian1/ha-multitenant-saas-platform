@@ -1,0 +1,8 @@
+feature: gateway-auth
+title: JWT validation and tenant context in the API Gateway
+critical: true
+code:
+  - apps/gateway/auth/**
+c4: [apiGateway]
+links:
+  issues: [HAMSP-23]

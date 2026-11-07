@@ -39,13 +39,13 @@ workspace "HAMSP" "High-Availability Multi-Tenant SaaS Platform" {
 
             usageWriteApi = container "UsageWriteAPI" "Accepts usage events from the API Gateway and agent workloads, enforces per-tenant rate limits, acknowledges events once they are in Kafka (FR-05, QS-07, QS-08, QS-09)." "Go"
             egressExporter = container "Egress Exporter" "Turns network flows into egress usage per tenant (FR-05)." "TBD (HAMSP-19)" "Placeholder"
-            usageWriter = container "Usage Writer" "Consumes usage events, drops duplicates by event_id, writes them in batches (QS-06, QS-08, QS-09, HAMSP-7)." "TBD: own consumer or store connector (HAMSP-14)" "Placeholder"
+            usageWriter = container "Usage Writer" "Consumes usage events, drops duplicates by event_id, writes them in batches (QS-06, QS-08, QS-09, HAMSP-7)." "Go"
             meteringQuery = container "Metering Query Service" "Serves usage per tenant for reading (FR-05)." "Go"
             billing = container "Billing Service" "Invoices tenants by usage or subscription (FR-06)." "Go" "Planned"
 
             postgres = container "PostgreSQL" "Tenant and application data with RLS; separate database for Zitadel (ADR-0002, ADR-0003)." "CloudNativePG" "Database"
-            kafka = container "Kafka" "Usage events, partitioned by tenant_id (ADR-0001)." "Apache Kafka" "Queue"
-            usageStore = container "Usage Analytics Store" "Usage events per tenant, kept 13 months." "TBD (HAMSP-14)" "Database,Placeholder"
+            kafka = container "Kafka" "Usage events, partitioned by tenant_id (ADR-0001)." "Apache Kafka (Strimzi)" "Queue"
+            usageStore = container "Usage Store" "Usage events per tenant, kept 13 months: hot and warm tiers in one hypertable, hourly aggregate. Platform-only (ADR-0006, ADR-0008)." "TimescaleDB on its own CNPG cluster; cold tier in S3 in v2" "Database"
             rateLimitStore = container "Rate Limit Store" "Shared per-tenant rate limit and quota counters (FR-07). Quota counters can be rebuilt from the usage store." "Redis, fit checked in HAMSP-15" "Database"
         }
 
@@ -97,6 +97,19 @@ workspace "HAMSP" "High-Availability Multi-Tenant SaaS Platform" {
         hamsp.meteringQuery -> hamsp.usageStore "Reads usage per tenant"
         hamsp.billing -> hamsp.meteringQuery "Reads usage for invoices" "HTTPS" "Planned"
         hamsp.billing -> payments "Reports usage for billing" "HTTPS" "Planned"
+
+        # Components (L3), generated from the Go code by c4sync: run `make c4`,
+        # do not edit generated/. They come last because they point at the
+        # containers above (tools/c4sync/README.md).
+        !element hamsp.usageWriteApi {
+            !include generated/usage.writeapi.components.dsl
+        }
+        !element hamsp.usageWriter {
+            !include generated/usage.writer.components.dsl
+        }
+        !element hamsp.exampleApp {
+            !include generated/exampleapp.components.dsl
+        }
     }
 
     views {
@@ -121,6 +134,21 @@ workspace "HAMSP" "High-Availability Multi-Tenant SaaS Platform" {
             autoLayout lr
         }
 
+        component hamsp.usageWriteApi "UsageWriteAPIComponents" "L3: components of UsageWriteAPI, generated from apps/usage/cmd/writeapi." {
+            include *
+            autoLayout lr
+        }
+
+        component hamsp.usageWriter "UsageWriterComponents" "L3: components of Usage Writer, generated from apps/usage/cmd/writer." {
+            include *
+            autoLayout lr
+        }
+
+        component hamsp.exampleApp "ExampleAppComponents" "L3: components of ExampleApp, generated from apps/exampleapp." {
+            include *
+            autoLayout lr
+        }
+
         styles {
             element "Element" {
                 color #ffffff
@@ -134,6 +162,10 @@ workspace "HAMSP" "High-Availability Multi-Tenant SaaS Platform" {
             }
             element "Container" {
                 background #438dd5
+            }
+            element "Component" {
+                background #85bbf0
+                color #000000
             }
             element "Web Browser" {
                 shape WebBrowser

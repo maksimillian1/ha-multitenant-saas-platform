@@ -1,0 +1,43 @@
+# C4 metadata for exampleapp. Generate with `make c4`; see tools/c4sync/README.md.
+name: ExampleApp
+identifierPrefix: exampleapp
+output:
+  components: ../../docs/architecture/c4/generated/exampleapp.components.dsl
+  code: ../../docs/architecture/c4/generated/exampleapp.code.dsl
+components:
+  main:
+    name: main
+    description: Reads the configuration, wires the components and runs the server.
+    technology: Go
+  items:
+    name: Items API
+    description: CRUD for a tenant's items over HTTP.
+    technology: Go, net/http
+  store:
+    name: Store
+    description: Reads and writes items as the tenant, under RLS.
+    technology: pgx
+  health:
+    name: Health
+    description: Liveness and readiness endpoints.
+  core:
+    name: Core
+    description: Tenant context, errors, configuration.
+externals:
+  - import: github.com/jackc/pgx
+    element: hamsp.postgres
+    technology: pgx
+detectors:
+  http: true
+  sql:
+    element: hamsp.postgres
+    calls:
+      - call: github.com/jackc/pgx/v5.*.Exec
+        arg: 1
+      - call: github.com/jackc/pgx/v5.*.Query
+        arg: 1
+      - call: github.com/jackc/pgx/v5.*.QueryRow
+        arg: 1
+      - call: github.com/jackc/pgx/v5/pgxpool.*.Exec
+        arg: 1
+    ignore: [set_config]
