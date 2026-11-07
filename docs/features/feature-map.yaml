@@ -1,5 +1,6 @@
 feature: feature-map
 title: One file per feature, a generated map of all features and a pull request report
+stage: alpha
 critical: false
 code:
   - tools/featuremap/**
@@ -43,10 +44,11 @@ checklist:
 
 gates:
   G-01: {status: n/a, by: verify, date: 2026-11-07, commit: fa33fc3d, note: repository tooling; no runtime behaviour and no release flag}
-  G-02: {status: not-checked, by: verify, date: 2026-11-07, commit: fa33fc3d, note: AC-1 to AC-4 pass; AC-5 is manual and was not run}
+  G-02: {status: pass, by: owner, date: 2026-11-07, commit: bb26b272, note: AC-1 to AC-4 pass by verify; AC-5 (manual) accepted by the owner without a run}
   G-03: {status: n/a, by: verify, date: 2026-11-07, commit: fa33fc3d, note: no schema in docs/contracts}
   G-04: {status: pass, by: verify, date: 2026-11-07, commit: fa33fc3d, level: basic}
   G-05: {status: n/a, by: verify, date: 2026-11-07, commit: fa33fc3d, note: no quality scenario touched}
+  G-07: {status: pass, by: owner, date: 2026-11-07, note: "approved for alpha on PR #5"}
 
 runs:
   - date: 2026-11-07
@@ -67,3 +69,9 @@ runs:
     verdict: not-ready
     failed: [G-07]
     not_checked: [AC-5]
+  - date: 2026-11-07
+    commit: bb26b272
+    stage_checked: alpha
+    verdict: ready
+    failed: []
+    not_checked: []
