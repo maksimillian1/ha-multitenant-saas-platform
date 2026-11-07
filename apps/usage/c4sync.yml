@@ -1,0 +1,76 @@
+# C4 metadata for the usage module. Generate with `make c4`; see tools/c4sync/README.md.
+name: Usage
+identifierPrefix: usage
+output:
+  code: ../../docs/architecture/c4/generated/usage.code.dsl
+containers:
+  - name: UsageWriteAPI
+    main: cmd/writeapi
+    output: ../../docs/architecture/c4/generated/usage.writeapi.dsl
+    identifierPrefix: usage_writeapi
+  - name: Usage Writer
+    main: cmd/writer
+    output: ../../docs/architecture/c4/generated/usage.writer.dsl
+    identifierPrefix: usage_writer
+components:
+  cmd:
+    name: main
+    description: Reads the configuration, wires the components and runs the server.
+    technology: Go
+  writeapi:
+    name: Write API
+    description: Accepts usage events over HTTP, validates them, acks once they are in Kafka.
+    technology: Go, net/http
+  writer:
+    name: Writer
+    description: Consumes usage events, drops duplicates, writes batches.
+    technology: Go
+  kafka:
+    name: Kafka client
+    description: Produces and consumes usage events.
+    technology: franz-go
+  store:
+    name: Store
+    description: Writes usage events to the usage store.
+    technology: pgx
+  httpx:
+    name: HTTP helpers
+    technology: net/http
+  health:
+    name: Health
+    description: Liveness and readiness endpoints.
+  core:
+    name: Core
+    description: Usage event model, validation, configuration.
+externals:
+  - import: github.com/twmb/franz-go
+    element: hamsp.kafka
+    technology: franz-go
+  - import: github.com/jackc/pgx
+    element: hamsp.usageStore
+    technology: pgx
+detectors:
+  http: true
+  topics:
+    element: hamsp.kafka
+    produce:
+      - call: github.com/twmb/franz-go/pkg/kgo.DefaultProduceTopic
+        arg: 0
+      - field: github.com/twmb/franz-go/pkg/kgo.Record.Topic
+    consume:
+      - call: github.com/twmb/franz-go/pkg/kgo.ConsumeTopics
+        arg: -1
+  sql:
+    element: hamsp.usageStore
+    calls:
+      - call: github.com/jackc/pgx/v5.*.Exec
+        arg: 1
+      - call: github.com/jackc/pgx/v5.*.Query
+        arg: 1
+      - call: github.com/jackc/pgx/v5.*.QueryRow
+        arg: 1
+      - call: github.com/jackc/pgx/v5/pgxpool.*.Exec
+        arg: 1
+    migrations: [internal/migrations]
+    ignore: [aclexplode]
+important: [store]

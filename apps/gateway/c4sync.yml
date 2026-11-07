@@ -1,0 +1,8 @@
+# C4 metadata for the gateway. Only the code workspace is generated: the
+# component fragment goes into workspace.dsl once ADR-0004 is accepted.
+name: API Gateway
+identifierPrefix: gateway
+output:
+  code: ../../docs/architecture/c4/generated/gateway.code.dsl
+detectors:
+  http: true

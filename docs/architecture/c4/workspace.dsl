@@ -97,6 +97,19 @@ workspace "HAMSP" "High-Availability Multi-Tenant SaaS Platform" {
         hamsp.meteringQuery -> hamsp.usageStore "Reads usage per tenant"
         hamsp.billing -> hamsp.meteringQuery "Reads usage for invoices" "HTTPS" "Planned"
         hamsp.billing -> payments "Reports usage for billing" "HTTPS" "Planned"
+
+        # Components (L3), generated from the Go code by c4sync: run `make c4`,
+        # do not edit generated/. They come last because they point at the
+        # containers above (tools/c4sync/README.md).
+        !element hamsp.usageWriteApi {
+            !include generated/usage.writeapi.dsl
+        }
+        !element hamsp.usageWriter {
+            !include generated/usage.writer.dsl
+        }
+        !element hamsp.exampleApp {
+            !include generated/exampleapp.components.dsl
+        }
     }
 
     views {
@@ -118,6 +131,21 @@ workspace "HAMSP" "High-Availability Multi-Tenant SaaS Platform" {
             include hamsp.apiGateway hamsp.usageWriteApi hamsp.kafka hamsp.usageWriter
             include hamsp.usageStore hamsp.rateLimitStore
             include hamsp.meteringQuery hamsp.billing payments
+            autoLayout lr
+        }
+
+        component hamsp.usageWriteApi "UsageWriteAPIComponents" "L3: components of UsageWriteAPI, generated from apps/usage/cmd/writeapi." {
+            include *
+            autoLayout lr
+        }
+
+        component hamsp.usageWriter "UsageWriterComponents" "L3: components of Usage Writer, generated from apps/usage/cmd/writer." {
+            include *
+            autoLayout lr
+        }
+
+        component hamsp.exampleApp "ExampleAppComponents" "L3: components of ExampleApp, generated from apps/exampleapp." {
+            include *
             autoLayout lr
         }
 
