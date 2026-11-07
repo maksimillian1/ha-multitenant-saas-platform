@@ -47,7 +47,7 @@ Unit tests set flags with the in-memory provider from `libs/flags`, as a table o
 
 ## 4. QA checklist
 
-Gate G-04. `basic` is required at `alpha`, `full` at `beta` and `stable`. Items marked *critical* are required at `basic` already when the change touches a `critical` zone of the review map. **Kind** decides what the owner reviews in the plan (section 5): integration, contract and end-to-end rows.
+Gate G-04. `basic` is required at `alpha`, `full` at `beta` and `stable`. Items marked *critical* are required at `basic` already when the change touches the code of a critical feature ([Feature stages](feature-stages.md), "Critical features"). **Kind** decides what the owner reviews in the plan (section 5): integration, contract and end-to-end rows.
 
 | ID | Check | Kind | Applies when | basic | full |
 |---|---|---|---|---|---|
@@ -60,13 +60,13 @@ Gate G-04. `basic` is required at `alpha`, `full` at `beta` and `stable`. Items 
 | T-07 | **Flag rollback.** Section 3. | integration | The feature writes data. | | ● |
 | T-08 | **Migrations.** Applied to a database with data; additive only below `stable`; RLS forced on new tenant tables. | integration | The feature has a migration. | ● | ● |
 | T-09 | **End-to-end.** The main flow on kind, through the API Gateway with real tokens; Playwright for admin app pages. | end-to-end | The feature is reachable from outside. | | ● |
-| T-10 | **Diff coverage.** At least 80% of changed lines, 90% in `critical` zones (section 6). | metric | Always. | | ● |
+| T-10 | **Diff coverage.** At least 80% of changed lines, 90% in the code of critical features (section 6). | metric | Always. | | ● |
 | T-11 | **Fuzzing.** A fuzz target for each new decoder or parser of untrusted input, run for a fixed time. | fuzz | The feature parses untrusted input. | *critical* | ● |
 | T-12 | **Control canary.** Each `critical` control the feature adds or changes has a test that is shown to fail when the control is removed: the cross-tenant test fails with the RLS policy dropped, the token test fails with signature checking off, the network test fails without the policy. | integration | The change adds or changes a `critical` control. | *critical* | ● |
 
 The acceptance criteria themselves are gate G-02, not part of this list.
 
-**Why a control canary and not general mutation testing.** Mutation testing changes code on purpose and expects a test to fail; it shows tests that run code without checking it. Run over a whole package it needs one test run per mutant, which only fast unit tests can afford, and Go mutators do not touch where most of our controls live: RLS policies in SQL, network policies in YAML, Kafka settings. The control canary is the same idea, applied once, by hand, where it matters: one deliberate break per critical control, at the integration level. General mutation testing stays optional, for pure Go logic in `critical` zones such as the deduplication key or claim parsing.
+**Why a control canary and not general mutation testing.** Mutation testing changes code on purpose and expects a test to fail; it shows tests that run code without checking it. Run over a whole package it needs one test run per mutant, which only fast unit tests can afford, and Go mutators do not touch where most of our controls live: RLS policies in SQL, network policies in YAML, Kafka settings. The control canary is the same idea, applied once, by hand, where it matters: one deliberate break per critical control, at the integration level. General mutation testing stays optional, for pure Go logic in critical features such as the deduplication key or claim parsing.
 
 ## 5. Checklist lifecycle
 
@@ -100,6 +100,7 @@ Which runs are recommended for a feature, by what it changes:
 | Rate limits or quotas | QS-03, QS-15, QS-16 |
 | The usage pipeline: UsageWriteAPI, Kafka, Usage Writer | QS-07, QS-08, QS-09, QS-17 |
 | The main database: schema, queries, CNPG settings | QS-04 (failover), QS-12 (long query), QS-13 (restore) |
+| Reads from the usage store | QS-01 (cross-tenant read), QS-12 (long query) |
 | Authentication or Zitadel | QS-11 |
 | Tenant lifecycle | QS-18 |
 | Network policies or tenant namespaces | QS-02 |
@@ -114,46 +115,16 @@ In the repo, next to the code, not in a separate test management tool such as Te
 **In the tests: what each test verifies.** A comment above the test function:
 
 ```go
-// Verifies: HAMSP-52 AC-2; T-01
+// Verifies: tenant-suspend AC-2; T-01
 func TestSuspendedTenantGets403(t *testing.T) { ... }
 ```
 
-The comment moves with the test when it is renamed or moved. It is the source of the trace.
+The comment names the feature by its slug, not by an issue, so it stays right when a later issue works on the same feature. It moves with the test when the test is renamed or moved, and it is the source of the trace.
 
-**`qa/features/HAMSP-N.yaml`: the verified state of one feature.** Written by `feature-verify` after each run:
+**`docs/features/<slug>.yaml`: the state of one feature.** Its acceptance criteria and checklist with both passes (`planned`, `verified`), the touched QS and the proposed runs, the owner's approvals and every `feature-verify` run. The format and who writes which field: [Features](../features/README.md). The map of all features in that folder is generated from these files.
 
-```yaml
-issue: HAMSP-52
-target_stage: alpha
-flag: tenant-suspend
-plan_approved: 2026-11-12          # gate G-07
-checklist:                          # level: basic
-  T-01:
-    planned: applies — a token of tenant B on a suspended tenant A's record; gateway and ExampleApp
-    verified: [apps/gateway/suspend_test.go:TestSuspendedTenantForeignToken]
-  T-02:
-    planned: does not apply — no new contract
-    verified: n/a — the gateway answers 403 with the existing error body
-  T-08:
-    planned: does not apply — no migration
-    verified: n/a — no migration in the diff
-acceptance:
-  AC-1: [apps/gateway/suspend_test.go:TestSuspendedTenantGets403]
-quality_scenarios:
-  touched: [QS-03]
-  recommended_runs: [QS-03 on kind, k6 noisy tenant]
-deviations: []                      # planned "applies" that became n/a, with the owner's approval
-runs:
-  - date: 2026-11-20
-    commit: 1a2b3c4
-    stage_checked: alpha
-    verdict: ready
-    failed: []
-    not_run: []
-```
+**`docs/features/qs-runs.md`: every load or chaos run.** One row per run: date, commit, environment, QS, result, the feature it was run for, and a link to the report (k6 summary, Chaos Mesh log).
 
-**`qa/qs-runs.md`: every load or chaos run.** One row per run: date, commit, environment, QS, result, the issue it was run for, and a link to the report (k6 summary, Chaos Mesh log).
+**Linear:** the issue gets the verdict and a link to the feature file, not a copy of it.
 
-**Linear:** the issue gets the verdict and a link to the QA record, not a copy of it.
-
-CI checks the records: every test named in a `qa/features/` file exists and carries a matching `Verifies:` comment, and every item of the target stage's level has tests or `n/a` with a reason.
+CI checks the records: every test named in a `verified` entry exists and carries a `Verifies:` comment with the feature's slug and the ID, and the map is up to date.

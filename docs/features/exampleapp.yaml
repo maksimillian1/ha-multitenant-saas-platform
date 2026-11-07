@@ -1,0 +1,13 @@
+feature: exampleapp
+title: ExampleApp API and health
+target: beta
+stage: beta  # merged at beta with HAMSP-23, before review (docs/roadmap.md)
+critical: false
+code:
+  - apps/exampleapp/items/**
+  - apps/exampleapp/core/**
+  - apps/exampleapp/health/**
+  - apps/exampleapp/main.go
+c4: [exampleApp]
+links:
+  issues: [HAMSP-23]

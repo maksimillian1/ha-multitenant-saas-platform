@@ -1,0 +1,10 @@
+feature: gateway-usage-reporting
+title: The API Gateway reports every API call as a usage event
+target: beta
+stage: beta  # merged at beta with HAMSP-23, before review (docs/roadmap.md)
+critical: false
+code:
+  - apps/gateway/usage/**
+c4: [apiGateway]
+links:
+  issues: [HAMSP-23]
