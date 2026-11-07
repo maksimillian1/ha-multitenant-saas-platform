@@ -41,6 +41,13 @@ checklist:
   T-08:
     verified: n/a — no migration in the diff
 
+gates:
+  G-01: {status: n/a, by: verify, date: 2026-11-07, commit: fa33fc3d, note: repository tooling; no runtime behaviour and no release flag}
+  G-02: {status: not-checked, by: verify, date: 2026-11-07, commit: fa33fc3d, note: AC-1 to AC-4 pass; AC-5 is manual and was not run}
+  G-03: {status: n/a, by: verify, date: 2026-11-07, commit: fa33fc3d, note: no schema in docs/contracts}
+  G-04: {status: pass, by: verify, date: 2026-11-07, commit: fa33fc3d, level: basic}
+  G-05: {status: n/a, by: verify, date: 2026-11-07, commit: fa33fc3d, note: no quality scenario touched}
+
 runs:
   - date: 2026-11-07
     commit: 9f76446e
@@ -54,3 +61,9 @@ runs:
     verdict: not-ready
     failed: [G-07]
     not_checked: [AC-4 comment posted on GitHub, AC-5]
+  - date: 2026-11-07
+    commit: fa33fc3d
+    stage_checked: alpha
+    verdict: not-ready
+    failed: [G-07]
+    not_checked: [AC-5]
