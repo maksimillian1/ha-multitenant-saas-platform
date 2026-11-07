@@ -1,0 +1,82 @@
+feature: c4-from-code
+title: C3 and C4 diagrams generated from Go code, checked in CI and diffed on pull requests
+critical: false
+code:
+  - tools/c4sync/**
+  - apps/*/.go-arch-lint.yml
+  - apps/*/c4sync.yml
+  - docs/architecture/c4/generated/**
+  - docs/architecture/c4/render.sh
+  - .github/workflows/c4.yml
+  - Makefile
+c4: [usageWriteApi, usageWriter, exampleApp]
+links:
+  issues: [HAMSP-73, HAMSP-74, HAMSP-75, HAMSP-76, HAMSP-77, HAMSP-78, HAMSP-79, HAMSP-80, HAMSP-81]
+
+acceptance:
+  AC-1:
+    text: Generating from the same code and config gives byte-identical DSL; the fixture output matches its golden files.
+    level: unit
+    planned: tools/c4sync/main_test.go:TestGenerateMatchesGolden
+  AC-2:
+    text: The C3 fragment included in a workspace, the code workspace and the diff views workspace pass structurizr validate and export to Mermaid.
+    level: integration
+    planned: tools/c4sync/main_test.go:TestStructurizrValidates
+  AC-3:
+    text: A c4sync.yml with an unknown key, a component that .go-arch-lint.yml does not define, or an empty file fails with an error naming the file and line.
+    level: unit
+    planned: tools/c4sync/internal/config/config_test.go:TestUnknownKeyNamesLine
+  AC-4:
+    text: Components and their packages come from go-arch-lint; a package outside every component is named as unmapped, and check fails on it. A component declared in .go-arch-lint.yml without packages yet is not an error.
+    level: integration
+    planned: tools/c4sync/main_test.go:TestMappingAndUnmapped
+  AC-5:
+    text: A relation between components lists every importing file and line; an import cycle gives two relations; a third-party library mapped in c4sync.yml gives a relation to its external element.
+    level: integration
+    planned: tools/c4sync/main_test.go:TestModelFacts
+  AC-6:
+    text: In the code workspace, a type that implements an interface of another package is its own element with an implements relation.
+    level: integration
+    planned: tools/c4sync/main_test.go:TestModelFacts
+  AC-7:
+    text: Every HTTP route goes to the component that registers it; a topic from a constant is found and one built at runtime is listed as unresolved; a table used in a query and created in a migration appears once.
+    level: integration
+    planned: tools/c4sync/main_test.go:TestModelFacts
+  AC-8:
+    text: check fails with its own exit codes on stale output (showing the changed relation) and on an import that .go-arch-lint.yml forbids (with the importing file and line); on unchanged code it passes and prints nothing.
+    level: integration
+    planned: tools/c4sync/main_test.go:TestCheckStaleAndRuleViolation
+  AC-9:
+    text: diff of two trees reports exactly the changed relations, lists changes of important components first, gives an empty report for identical models, and writes JSON and a views workspace.
+    level: integration
+    planned: tools/c4sync/main_test.go:TestDiff
+  AC-10:
+    text: Each configured container (binary) gets its own C3 fragment, cut to the packages its main package imports; a main package that does not exist is an error.
+    level: integration
+    planned: tools/c4sync/main_test.go:TestContainers
+  AC-11:
+    text: Two types whose names differ only in case get different Structurizr identifiers.
+    level: unit
+    planned: tools/c4sync/internal/dsl/dsl_test.go:TestCaseSafeIdentifiers
+  AC-12:
+    text: In this repository, make c4-check passes for usage, exampleapp, gateway and admin, generating again changes nothing, and render.sh --check passes; the c4 workflow runs all three on every pull request.
+    level: integration
+    planned: "manual: run make c4-check, make c4-generate && git diff --exit-code -- docs/architecture/c4/generated, docs/architecture/c4/render.sh --check; read the check job of the c4 workflow on the pull request. A Make target and a CI job cannot carry a Verifies comment."
+  AC-13:
+    text: A pull request with a structural change gets one c4sync comment, updated on every push and deleted when the change is gone, plus the Job Summary and a c4-diff artifact.
+    level: integration
+    planned: "manual: on a pull request that adds an import between two components, check the comment, push again and see the same comment updated, revert and see it deleted. Needs GitHub; no local test can post a comment."
+
+checklist:
+  T-01:
+    planned: does not apply — repository tooling; reads Go source, no tenant data
+  T-02:
+    planned: does not apply — no input crosses a service boundary; c4sync.yml and go-arch-lint output are read by one tool in the repo
+  T-08:
+    planned: does not apply — no migration
+
+quality_scenarios:
+  touched: []
+
+gates:
+  G-07: {status: not-checked, by: owner, date: 2026-11-07, note: plan for alpha waits for approval}
