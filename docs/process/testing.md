@@ -73,7 +73,7 @@ The acceptance criteria themselves are gate G-02, not part of this list.
 One checklist, two passes, with the same `T-xx` IDs.
 
 1. **Plan pass (`feature-plan`).** For each item: *applies*, *does not apply* (one line why) or *unsure*. For items of kind integration, contract and end-to-end that apply, one line on what is tested: the scenario and the components involved. No test names and no unit-level detail. The touched QS are listed; load and chaos runs are not chosen yet.
-2. **Owner review of the plan** (gate G-07). Required when the next stage is `alpha` or higher. The owner reviews the integration, contract and end-to-end rows and the touched QS, nothing else. Approval is recorded in the feature file (`plan_approved`) before implementation starts.
+2. **Owner review of the plan** (gate G-07). Required for `alpha` and higher. The owner reviews the integration, contract and end-to-end rows and the touched QS, nothing else. Approval is recorded in the feature file as gate G-07 before implementation starts.
 3. **Verify pass (`feature-verify`).** Adds the detail from the actual change: test names, cases, results. It may add items or cases the diff shows, and it proposes load and chaos runs (section 7), which never block.
 4. **Ratchet.** An item the owner approved as *applies* cannot become `n/a` or be dropped by `feature-verify`. It is reported as a deviation from the plan and needs the owner's approval.
 5. **Gaps are not fixed during verification.** A missing test makes the verdict Not ready; writing it is a separate step.
@@ -121,7 +121,7 @@ func TestSuspendedTenantGets403(t *testing.T) { ... }
 
 The comment names the feature by its slug, not by an issue, so it stays right when a later issue works on the same feature. It moves with the test when the test is renamed or moved, and it is the source of the trace.
 
-**`docs/features/<slug>.yaml`: the state of one feature.** Its acceptance criteria and checklist with both passes (`planned`, `verified`), the touched QS and the proposed runs, the owner's approvals and every `feature-verify` run. The format and who writes which field: [Features](../features/README.md). The map of all features in that folder is generated from these files.
+**`docs/features/<slug>.yaml`: the state of one feature.** Its acceptance criteria and checklist with both passes (`planned`, `verified`), the touched QS and the proposed runs, the gates behind its stage and every `feature-verify` run. The format and who writes which field: [Features](../features/README.md). The [feature map](../features/map.md) is generated from these files.
 
 **`docs/features/qs-runs.md`: every load or chaos run.** One row per run: date, commit, environment, QS, result, the feature it was run for, and a link to the report (k6 summary, Chaos Mesh log).
 

@@ -1,6 +1,6 @@
 // Command featuremap validates the feature files in docs/features, writes
-// the map of all features into docs/features/README.md, and lists the
-// features a pull request touches.
+// the map of all features into docs/features/map.md, and lists the features
+// a pull request touches.
 //
 //	go -C tools/featuremap run .                     # validate and write the map
 //	go -C tools/featuremap run . -check              # validate; fail if the map is out of date
@@ -20,7 +20,7 @@ import (
 
 const (
 	featuresDir = "docs/features"
-	readme      = "docs/features/README.md"
+	mapFile     = "docs/features/map.md"
 )
 
 func main() {
@@ -68,22 +68,19 @@ func run(root string, repo Repo, check bool) error {
 		return errors.Join(errs...)
 	}
 
-	path := filepath.Join(root, readme)
-	doc, err := os.ReadFile(path)
-	if err != nil {
+	path := filepath.Join(root, mapFile)
+	want := renderMap(features)
+	have, err := os.ReadFile(path)
+	if err != nil && !os.IsNotExist(err) {
 		return err
 	}
-	updated, err := replaceBlock(string(doc), renderTable(features))
-	if err != nil {
-		return fmt.Errorf("%s: %w", readme, err)
-	}
-	if updated == string(doc) {
+	if string(have) == want {
 		return nil
 	}
 	if check {
-		return fmt.Errorf("%s is out of date: run `go -C tools/featuremap run .` and commit it", readme)
+		return fmt.Errorf("%s is out of date: run `go -C tools/featuremap run .` and commit it", mapFile)
 	}
-	return os.WriteFile(path, []byte(updated), 0o644)
+	return os.WriteFile(path, []byte(want), 0o644)
 }
 
 func report(root string, repo Repo, base string, w io.Writer) error {

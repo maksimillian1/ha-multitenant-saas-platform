@@ -28,9 +28,7 @@ type Feature struct {
 	Acceptance        map[string]AC       `yaml:"acceptance"`
 	Checklist         map[string]Item     `yaml:"checklist"`
 	QualityScenarios  QualityScenarios    `yaml:"quality_scenarios"`
-	PlanApproved      string              `yaml:"plan_approved"`
-	StructureApproved string              `yaml:"structure_approved"`
-	Reviews           []Review            `yaml:"reviews"`
+	Gates             map[string]Gate     `yaml:"gates"`
 	Deviations        []map[string]string `yaml:"deviations"`
 	Runs              []Run               `yaml:"runs"`
 
@@ -57,12 +55,6 @@ type QualityScenarios struct {
 	Touched         []string        `yaml:"touched"`
 	Tests           map[string]Item `yaml:"tests"`
 	RecommendedRuns []string        `yaml:"recommended_runs"`
-}
-
-type Review struct {
-	Date   string `yaml:"date"`
-	Commit string `yaml:"commit"`
-	Scope  string `yaml:"scope"`
 }
 
 type Run struct {
@@ -159,11 +151,6 @@ func (f *Feature) validate() []error {
 	}
 	if _, ok := stages[f.Stage]; f.Stage != "" && !ok {
 		bad("stage %q must be proto, alpha, beta or stable", f.Stage)
-	} else if f.Stage != "" && stages[f.Stage] > f.highestReady() {
-		bad("stage %s is not backed by a ready verify run for %s or higher", f.Stage, f.Stage)
-	}
-	if f.Stage == "stable" && len(f.Reviews) == 0 {
-		bad("stage is stable but reviews is empty (gate G-06)")
 	}
 	if stages[f.Stage] >= stages["alpha"] && len(f.Code) == 0 {
 		bad("stage %s needs code globs", f.Stage)
@@ -207,22 +194,7 @@ func (f *Feature) validate() []error {
 			bad("quality_scenarios.tests: %q is not QS-xx", id)
 		}
 	}
-	for name, d := range map[string]string{"plan_approved": f.PlanApproved, "structure_approved": f.StructureApproved} {
-		if d != "" && !dateRe.MatchString(d) {
-			bad("%s %q is not YYYY-MM-DD", name, d)
-		}
-	}
-	for i, r := range f.Reviews {
-		if !dateRe.MatchString(r.Date) {
-			bad("reviews[%d]: date %q is not YYYY-MM-DD", i, r.Date)
-		}
-		if !commitRe.MatchString(r.Commit) {
-			bad("reviews[%d]: commit %q is not a commit hash", i, r.Commit)
-		}
-		if r.Scope != "full" && r.Scope != "delta" {
-			bad("reviews[%d]: scope %q must be full or delta", i, r.Scope)
-		}
-	}
+	f.validateGates(bad)
 	for i, r := range f.Runs {
 		if !dateRe.MatchString(r.Date) {
 			bad("runs[%d]: date %q is not YYYY-MM-DD", i, r.Date)
@@ -238,17 +210,6 @@ func (f *Feature) validate() []error {
 		}
 	}
 	return errs
-}
-
-// highestReady is the highest stage a verify run reported Ready for, or 0.
-func (f *Feature) highestReady() int {
-	best := 0
-	for _, r := range f.Runs {
-		if r.Verdict == "ready" && stages[r.StageChecked] > best {
-			best = stages[r.StageChecked]
-		}
-	}
-	return best
 }
 
 // verifiedTests lists every test the file claims, with the ID it verifies.

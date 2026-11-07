@@ -127,10 +127,20 @@ func writeFeature(t *testing.T, root, slug, body string) {
 	}
 }
 
-const readyAlpha = "runs:\n  - {date: 2026-11-07, commit: abcdef12, stage_checked: alpha, verdict: ready}\n"
+// alphaGates meets every gate alpha needs.
+const alphaGates = `gates:
+  G-01: {status: pass, by: verify, date: 2026-11-07, commit: abcdef12}
+  G-02: {status: pass, by: verify, date: 2026-11-07, commit: abcdef12}
+  G-03: {status: n/a, by: verify, date: 2026-11-07, note: no schema}
+  G-04: {status: pass, by: verify, date: 2026-11-07, level: basic}
+  G-07: {status: pass, by: owner, date: 2026-11-01}
+`
+
+const g08 = "  G-08: {status: pass, by: owner, date: 2026-11-02}\n"
 
 // Verifies: feature-map AC-2
 func TestValidate(t *testing.T) {
+	full := strings.Replace(alphaGates, "level: basic", "level: full", 1)
 	cases := []struct {
 		name, slug, body, wantErr string
 	}{
@@ -138,17 +148,22 @@ func TestValidate(t *testing.T) {
 		{"no title", "a", "feature: a\n", "title is missing"},
 		{"unknown field", "a", "feature: a\ntitle: X\ntarget: beta\n", "field target not found"},
 		{"bad stage", "a", "feature: a\ntitle: X\nstage: gamma\n", `stage "gamma" must be proto, alpha, beta or stable`},
-		{"stage without a run", "a", "feature: a\ntitle: X\nstage: alpha\ncode: [x/**]\n", "not backed by a ready verify run"},
-		{"stage above its runs", "a", "feature: a\ntitle: X\nstage: beta\ncode: [x/**]\n" + readyAlpha, "not backed by a ready verify run"},
-		{"stage after a not-ready run", "a", "feature: a\ntitle: X\nstage: alpha\ncode: [x/**]\nruns:\n  - {date: 2026-11-07, commit: abcdef12, stage_checked: alpha, verdict: not-ready}\n", "not backed by a ready verify run"},
-		{"stable without review", "a", "feature: a\ntitle: X\nstage: stable\ncode: [x/**]\nruns:\n  - {date: 2026-11-07, commit: abcdef12, stage_checked: stable, verdict: ready}\n", "reviews is empty"},
-		{"stage without code", "a", "feature: a\ntitle: X\nstage: alpha\n" + readyAlpha, "needs code globs"},
+		{"stage without gates", "a", "feature: a\ntitle: X\nstage: alpha\ncode: [x/**]\n", "stage alpha is not backed by its gates: G-01 not recorded; G-02 not recorded"},
+		{"failed gate", "a", "feature: a\ntitle: X\nstage: alpha\ncode: [x/**]\n" + strings.Replace(alphaGates, "G-02: {status: pass", "G-02: {status: fail", 1), "G-02 is fail"},
+		{"basic checklist for beta", "a", "feature: a\ntitle: X\nstage: beta\ncode: [x/**]\n" + alphaGates + g08, "G-04 is basic, needs full"},
+		{"stable without a review", "a", "feature: a\ntitle: X\nstage: stable\ncode: [x/**]\n" + full + g08, "G-06 not recorded"},
+		{"review without a commit", "a", "feature: a\ntitle: X\ngates:\n  G-06: {status: pass, by: owner, date: 2027-01-01}\n", "a review needs the commit"},
+		{"n/a without a reason", "a", "feature: a\ntitle: X\ngates:\n  G-03: {status: n/a, by: verify, date: 2026-11-07}\n", "n/a needs a note"},
+		{"unknown gate", "a", "feature: a\ntitle: X\ngates:\n  G-09: {status: pass, by: owner, date: 2026-11-07}\n", "not G-01 to G-08"},
+		{"bad gate status", "a", "feature: a\ntitle: X\ngates:\n  G-01: {status: ok, by: owner, date: 2026-11-07}\n", "must be pass, fail, n/a or not-checked"},
+		{"bad gate author", "a", "feature: a\ntitle: X\ngates:\n  G-01: {status: pass, by: agent, date: 2026-11-07}\n", "must be verify or owner"},
+		{"stage without code", "a", "feature: a\ntitle: X\nstage: alpha\n" + alphaGates, "needs code globs"},
 		{"bad checklist item", "a", "feature: a\ntitle: X\nchecklist:\n  T-13:\n    planned: applies\n", "T-01 to T-12"},
 		{"acceptance n/a", "a", "feature: a\ntitle: X\nacceptance:\n  AC-1:\n    text: x\n    verified: n/a — no\n", "cannot be n/a"},
 		{"bad verified", "a", "feature: a\ntitle: X\nchecklist:\n  T-01:\n    verified: done\n", "list of tests"},
-		{"bad review commit", "a", "feature: a\ntitle: X\nreviews:\n  - {date: 2027-01-01, commit: zz, scope: full}\n", "not a commit hash"},
-		{"lowered by hand after a stable run", "a", "feature: a\ntitle: X\nstage: beta\ncode: [x/**]\nruns:\n  - {date: 2026-11-07, commit: abcdef12, stage_checked: stable, verdict: ready}\n", ""},
-		{"valid", "a", "feature: a\ntitle: X\nstage: alpha\ncode: [x/**]\nplan_approved: 2026-11-01\n" + readyAlpha, ""},
+		{"alpha by verify and owner", "a", "feature: a\ntitle: X\nstage: alpha\ncode: [x/**]\n" + alphaGates, ""},
+		{"beta straight away", "a", "feature: a\ntitle: X\nstage: beta\ncode: [x/**]\n" + full + g08, ""},
+		{"a gate marked by the owner alone", "a", "feature: a\ntitle: X\nstage: proto\ncode: [x/**]\ngates:\n  G-01: {status: pass, by: owner, date: 2026-11-07}\n", ""},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
@@ -176,30 +191,31 @@ func TestValidate(t *testing.T) {
 	}
 }
 
-const readmeDoc = "# Features\n\nText.\n\n" + startMarker + "\nold\n" + endMarker + "\n\nMore text.\n"
-
 func setupRoot(t *testing.T) string {
 	t.Helper()
 	root := t.TempDir()
 	if err := os.MkdirAll(filepath.Join(root, featuresDir), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(root, readme), []byte(readmeDoc), 0o644); err != nil {
-		t.Fatal(err)
-	}
 	return root
 }
 
 const gatewayAuth = `feature: gateway-auth
-title: JWT validation | tenant context
+title: JWT validation and tenant context
 stage: stable
 critical: true
 code: ["apps/gateway/auth/**"]
 links: {issues: [HAMSP-23]}
-reviews:
-  - {date: 2027-02-01, commit: aaaaaaa1, scope: full}
+gates:
+  G-02: {status: pass, by: verify, date: 2027-01-20, commit: bbbbbbb2}
+  G-03: {status: n/a, by: verify, date: 2027-01-20, note: no schema}
+  G-04: {status: pass, by: verify, date: 2027-01-20, level: full}
+  G-05: {status: not-checked, by: verify, date: 2027-01-20}
+  G-06: {status: pass, by: owner, date: 2027-02-01, commit: aaaaaaa1}
+  G-07: {status: pass, by: owner, date: 2027-01-02}
+  G-08: {status: pass, by: owner, date: 2027-01-03}
 runs:
-  - {date: 2027-01-20, commit: bbbbbbb2, stage_checked: stable, verdict: ready, failed: [], not_checked: [T-12]}
+  - {date: 2027-01-20, commit: bbbbbbb2, stage_checked: stable, verdict: ready}
 `
 
 const tenantSuspend = `feature: tenant-suspend
@@ -210,6 +226,8 @@ acceptance:
     level: integration
     planned: apps/gateway/suspend/suspend_test.go:TestSuspendedTenantGets403
     verified: [apps/gateway/suspend/suspend_test.go:TestSuspendedTenantGets403]
+gates:
+  G-07: {status: fail, by: verify, date: 2026-11-20}
 runs:
   - {date: 2026-11-20, commit: ccccccc3, stage_checked: alpha, verdict: not-ready, failed: [G-07]}
 `
@@ -224,8 +242,8 @@ func TestRun(t *testing.T) {
 			"apps/gateway/auth/auth.go":            "package auth",
 			"apps/gateway/suspend/suspend_test.go": testFile,
 		},
-		// The map must not depend on git: a change to stable code does not
-		// change the map.
+		// The map must not depend on git: a change to reviewed code does
+		// not change the map.
 		changed: map[string][]string{"aaaaaaa1": {"apps/gateway/auth/auth.go"}},
 	}
 
@@ -239,24 +257,21 @@ func TestRun(t *testing.T) {
 		t.Fatalf("check after writing: %v", err)
 	}
 
-	doc, _ := os.ReadFile(filepath.Join(root, readme))
+	doc, _ := os.ReadFile(filepath.Join(root, mapFile))
 	got := string(doc)
 	for _, want := range []string{
-		"# Features\n\nText.\n\n" + startMarker + "\n| Feature | Title | Stage | Last verify | Gaps | Last review | Issues |",
-		"| [`gateway-auth`](gateway-auth.yaml) **critical** | JWT validation \\| tenant context | stable | 2027-01-20 ready for stable | not checked: T-12 | 2027-02-01 at aaaaaaa | HAMSP-23 |",
-		"| [`tenant-suspend`](tenant-suspend.yaml) | Suspend a tenant | — | 2026-11-20 not-ready for alpha | failed: G-07 | — |  |",
-		endMarker + "\n\nMore text.\n",
+		"<!-- Generated by tools/featuremap",
+		"| Feature | Stage | G-01 | G-02 | G-03 | G-04 | G-05 | G-06 | G-07 | G-08 | Last verify | Issues |",
+		"| [`gateway-auth`](gateway-auth.yaml) **critical** | stable |  | ✓ | n/a | ✓ full | ? | ✓ (owner) | ✓ (owner) | ✓ (owner) | 2027-01-20 ready for stable | HAMSP-23 |",
+		"| [`tenant-suspend`](tenant-suspend.yaml) | — |  |  |  |  |  |  | ✗ |  | 2026-11-20 not-ready for alpha |  |",
 	} {
 		if !strings.Contains(got, want) {
 			t.Errorf("map lacks\n%s\n\ngot:\n%s", want, got)
 		}
 	}
-	if strings.Contains(got, "old") {
-		t.Error("the old block was kept")
-	}
 
 	// A feature file changes: the committed map is now out of date.
-	writeFeature(t, root, "tenant-suspend", strings.Replace(tenantSuspend, "Suspend a tenant", "Suspend tenants", 1))
+	writeFeature(t, root, "tenant-suspend", strings.Replace(tenantSuspend, "status: fail", "status: pass", 1))
 	if err := run(root, repo, true); err == nil || !strings.Contains(err.Error(), "out of date") {
 		t.Fatalf("check after a feature file changed: got %v, want out of date", err)
 	}
@@ -265,16 +280,7 @@ func TestRun(t *testing.T) {
 // Verifies: feature-map AC-3
 func TestRunRejectsBrokenRecord(t *testing.T) {
 	root := setupRoot(t)
-	writeFeature(t, root, "a", `feature: a
-title: A
-stage: alpha
-code: ["apps/a/**"]
-checklist:
-  T-01:
-    verified: [apps/a/a_test.go:TestCross]
-runs:
-  - {date: 2026-11-07, commit: abcdef12, stage_checked: alpha, verdict: ready}
-`)
+	writeFeature(t, root, "a", "feature: a\ntitle: A\nstage: alpha\ncode: [\"apps/a/**\"]\nchecklist:\n  T-01:\n    verified: [apps/a/a_test.go:TestCross]\n"+alphaGates)
 	repo := fakeRepo{files: map[string]string{"apps/b/b.go": ""}}
 	err := run(root, repo, false)
 	if err == nil {
@@ -285,8 +291,7 @@ runs:
 			t.Errorf("errors lack %q:\n%v", want, err)
 		}
 	}
-	doc, _ := os.ReadFile(filepath.Join(root, readme))
-	if string(doc) != readmeDoc {
+	if _, err := os.Stat(filepath.Join(root, mapFile)); !os.IsNotExist(err) {
 		t.Error("the map was written despite errors")
 	}
 }
