@@ -4,7 +4,7 @@ Agents write most of the code. A feature therefore ships in stages: first it is 
 
 The term is **stage**, as in Kubernetes feature gates (`alpha`, `beta`, `stable`). The roadmap's *phases* are something else: the order in which the work is done ([Roadmap](../roadmap.md)).
 
-Feature flags that switch features on and off by stage: [ADR-0011](../adr/0011-feature-flags.md).
+Feature flags that switch features on and off by stage: [ADR-0011](../adr/0011-feature-flags.md). A release flag is optional; see "Flags" below.
 
 ## Stages
 
@@ -15,7 +15,9 @@ Feature flags that switch features on and off by stage: [ADR-0011](../adr/0011-f
 | `beta` | Does it safely: boundaries, security, end-to-end behaviour are tested. Ready to be read. | Agent, plus every guardrail of its stage. | On. | kind and EKS staging. |
 | `stable` | The owner has read it and stands behind it. | Owner: gate G-06 in the feature file. | Removed. | Everywhere. |
 
-`HAMSP-23-platform-skeleton` is merged to `master` before its features are verified or reviewed; they get a stage one by one, through `feature-verify`. Features below `beta` may be in `master` with their flag off.
+`HAMSP-23-platform-skeleton` is merged to `master` before its features are verified or reviewed; they get a stage one by one, through `feature-verify`. Features below `beta` may be in `master`; one that has a release flag keeps it off.
+
+The "Release flag" and "On where" columns apply to a feature that has a release flag. A feature without one is on wherever its code is deployed; its stage says only how far it has been checked.
 
 ## Where the stage is kept
 
@@ -35,7 +37,7 @@ A change to the code of another feature is a change to that feature too. Every p
 
 | ID | Gate | Checked by | `proto` | `alpha` | `beta` | `stable` |
 |---|---|---|---|---|---|---|
-| G-01 | **Flag off is safe.** Everything passes with the release flag off, and the off path is the old behaviour or a refusal. | CI | ● | ● | ● | (no flag) |
+| G-01 | **Flag off is safe.** Everything passes with the release flag off, and the off path is the old behaviour or a refusal. `n/a` for a feature without a release flag. | CI | ● | ● | ● | (no flag) |
 | G-02 | **Acceptance criteria.** Every `AC-n` is traced to a test that ran and passed. | `feature-verify` | | ● | ● | ● |
 | G-03 | **Contracts.** Every input that crosses a service boundary has a schema in `docs/contracts/` and the code passes its examples. The owner approved the schema: its contract rows are part of the approved plan (G-07), and the owner reads the schema diff before merging ([Review](review.md), R-2). | CI, owner | | ● | ● | ● |
 | G-04 | **QA checklist** ([Testing](testing.md), section 4). | `feature-verify` | | `basic` | `full` | `full` |
@@ -52,10 +54,10 @@ A gate whose tooling is not built yet does not block. `feature-verify` reports i
 
 | Transition | Who | What it takes |
 |---|---|---|
-| none → `proto` | Agent | A feature file. A release flag in the registry. |
+| none → `proto` | Agent | A feature file. A release flag in the registry, if the feature has one. |
 | up to `alpha` | Agent, owner | The `alpha` gates pass: `feature-verify` and the owner's plan approval (G-07). The decisions it depends on are Accepted. |
 | up to `beta` | Agent, owner | The `beta` gates pass, including the owner's structure approval (G-08). |
-| `beta` → `stable` | Owner | A "Stabilize X" issue assigned to the owner. Review recorded in gate G-06, release flag and the old code path removed. |
+| `beta` → `stable` | Owner | A "Stabilize X" issue assigned to the owner. Review recorded in gate G-06; the release flag and the old code path, if any, removed. |
 | any → lower | Owner | See below. |
 
 **A higher stage later.** `feature-plan` adds what the higher level needs (`basic` → `full` checklist, G-08) and sets G-07 back to `not-checked` until the owner approves that delta.
@@ -85,6 +87,7 @@ A change is *critical* when it touches the code of a critical feature, whichever
 
 [ADR-0011](../adr/0011-feature-flags.md) has the implementation. The rules that matter for stages:
 
+* **A release flag is optional.** `feature-plan` decides per feature and records it in the `flag` field of the feature file. Take one when the feature changes a path tenants already use, or must stay hidden from tenants until a higher stage. Without a flag the feature is on wherever its code is deployed, G-01 is `n/a` and the flag tests below do not apply; code structure and migrations follow the same rules as with a flag.
 * **Three kinds of flags, never mixed:**
   * **release** flags follow a feature's stage and are removed at `stable`;
   * **ops** flags are kill switches and stay; their code is reviewed like any `stable` code;
