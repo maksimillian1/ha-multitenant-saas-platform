@@ -26,12 +26,15 @@ type Config struct {
 	ArchFile string `yaml:"archFile"`
 	// IdentifierPrefix starts every generated DSL identifier, so fragments of
 	// several services can live in one workspace. Default "c".
-	IdentifierPrefix string               `yaml:"identifierPrefix"`
-	Output           Output               `yaml:"output"`
-	Code             Code                 `yaml:"code"`
-	Components       map[string]Component `yaml:"components"`
-	Externals        []External           `yaml:"externals"`
-	Detectors        Detectors            `yaml:"detectors"`
+	IdentifierPrefix string `yaml:"identifierPrefix"`
+	Output           Output `yaml:"output"`
+	// Containers split a module that builds several binaries: each gets a C3
+	// fragment with only the components its main package imports.
+	Containers []Container          `yaml:"containers"`
+	Code       Code                 `yaml:"code"`
+	Components map[string]Component `yaml:"components"`
+	Externals  []External           `yaml:"externals"`
+	Detectors  Detectors            `yaml:"detectors"`
 	// Important components are listed first by diff.
 	Important []string `yaml:"important"`
 
@@ -44,6 +47,17 @@ type Config struct {
 type Output struct {
 	Components string `yaml:"components"` // C3 fragment to !include inside a container
 	Code       string `yaml:"code"`       // standalone code-level workspace
+}
+
+// Container is one binary of the module, drawn as one C4 container.
+type Container struct {
+	Name string `yaml:"name"` // used in the fragment header and the default prefix
+	// Main is the main package, relative to the module root, e.g. "cmd/writer".
+	Main string `yaml:"main"`
+	// Output is the C3 fragment of this container.
+	Output string `yaml:"output"`
+	// IdentifierPrefix defaults to "<identifierPrefix>_<name in lower case>".
+	IdentifierPrefix string `yaml:"identifierPrefix"`
 }
 
 // Code limits the code-level views.
@@ -182,6 +196,16 @@ func (c *Config) validate() error {
 				}
 			}
 		}
+	}
+	seen := map[string]bool{}
+	for i, ct := range c.Containers {
+		if ct.Name == "" || ct.Main == "" || ct.Output == "" {
+			errs = append(errs, fmt.Sprintf("containers[%d]: name, main and output are required", i))
+		}
+		if seen[ct.Name] {
+			errs = append(errs, fmt.Sprintf("containers[%d]: duplicate name %q", i, ct.Name))
+		}
+		seen[ct.Name] = true
 	}
 	if t := c.Detectors.Topics; t != nil {
 		check("detectors.topics.produce", t.Produce)

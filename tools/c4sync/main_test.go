@@ -46,8 +46,8 @@ func TestGenerateMatchesGolden(t *testing.T) {
 	cfgPath := filepath.Join(testutil.Fixture(t), "c4sync.yml")
 	first := build(t, cfgPath)
 	second := build(t, cfgPath)
-	if len(first.Files) != 2 {
-		t.Fatalf("want 2 files, got %d", len(first.Files))
+	if len(first.Files) != 4 {
+		t.Fatalf("want 4 files, got %d", len(first.Files))
 	}
 	for path, content := range first.Files {
 		if second.Files[path] != content {
@@ -215,7 +215,7 @@ func TestUnknownComponentInConfig(t *testing.T) {
 	cfg := filepath.Join(dir, "c4sync.yml")
 	testutil.Replace(t, cfg, "  store:\n    name: Store\n", "  store:\n    name: Store\n  ghost:\n    name: Ghost\n")
 	code, _, errOut := c4sync(t, "check", "-config", cfg)
-	if code != check.Error || !strings.Contains(errOut, cfg+":13:") || !strings.Contains(errOut, `"ghost"`) {
+	if code != check.Error || !strings.Contains(errOut, cfg+":20:") || !strings.Contains(errOut, `"ghost"`) {
 		t.Fatalf("exit %d\n%s", code, errOut)
 	}
 }
@@ -317,5 +317,48 @@ func TestDeclaredComponentWithoutPackages(t *testing.T) {
 	res := build(t, filepath.Join(dir, "c4sync.yml"))
 	if res.Model.Component("billing") != nil {
 		t.Fatalf("billing has no packages and must not be drawn")
+	}
+}
+
+// AC (HAMSP-80): a module with several binaries gets one fragment per binary,
+// with only the components that binary imports.
+func TestContainers(t *testing.T) {
+	res := build(t, filepath.Join(testutil.Fixture(t), "c4sync.yml"))
+	ids := func(name string) string {
+		var out []string
+		for _, c := range res.Containers[name].Components {
+			out = append(out, c.ID)
+		}
+		return strings.Join(out, " ")
+	}
+	if got := ids("Server"); got != "api app bus cmd store" {
+		t.Errorf("Server components: %s", got)
+	}
+	if got := ids("Migrate"); got != "cmd migrations" {
+		t.Errorf("Migrate components: %s", got)
+	}
+	for _, c := range res.Containers["Server"].Components {
+		if c.ID == "cmd" && strings.Join(c.Packages, " ") != "example.com/fixture/cmd/server" {
+			t.Errorf("Server cmd packages: %v", c.Packages)
+		}
+	}
+	server := res.Files[filepath.Join(testutil.Fixture(t), "golden/server.dsl")]
+	if !strings.Contains(server, "fx_server_cmd -> fx_server_api") || strings.Contains(server, "migrations") {
+		t.Errorf("server fragment:\n%s", server)
+	}
+	for _, i := range res.Containers["Migrate"].Interfaces {
+		if i.Component != "migrations" {
+			t.Errorf("Migrate has interface of %s", i.Component)
+		}
+	}
+}
+
+// AC (HAMSP-80): a main package that does not exist is an error.
+func TestContainerMainNotFound(t *testing.T) {
+	dir := testutil.CopyFixture(t)
+	testutil.Replace(t, filepath.Join(dir, "c4sync.yml"), "main: cmd/migrate", "main: cmd/nothing")
+	code, _, errOut := c4sync(t, "check", "-config", filepath.Join(dir, "c4sync.yml"))
+	if code != check.Error || !strings.Contains(errOut, "container Migrate") {
+		t.Fatalf("exit %d: %s", code, errOut)
 	}
 }

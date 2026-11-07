@@ -434,3 +434,34 @@ func recvName(e ast.Expr) string {
 	}
 	return "?"
 }
+
+// Reachable returns the module packages that the package at rel (relative to
+// the module root, e.g. "cmd/writer") imports directly or transitively,
+// including itself.
+func (p *Program) Reachable(rel string) (map[string]bool, error) {
+	byPath := map[string]*packages.Package{}
+	for _, pkg := range p.Packages {
+		byPath[pkg.PkgPath] = pkg
+	}
+	start := p.Module
+	if rel = strings.Trim(filepath.ToSlash(rel), "/"); rel != "" && rel != "." {
+		start = p.Module + "/" + rel
+	}
+	if byPath[start] == nil {
+		return nil, fmt.Errorf("main package %s not found in %s", start, p.Root)
+	}
+	out := map[string]bool{}
+	var walk func(string)
+	walk = func(path string) {
+		pkg := byPath[path]
+		if pkg == nil || out[path] {
+			return
+		}
+		out[path] = true
+		for imp := range pkg.Imports {
+			walk(imp)
+		}
+	}
+	walk(start)
+	return out, nil
+}
