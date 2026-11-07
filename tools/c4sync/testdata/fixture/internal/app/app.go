@@ -34,3 +34,9 @@ type base struct{}
 
 // Admin embeds an unexported struct.
 type Admin struct{ base }
+
+// pageSize and PageSize differ only in case; their DSL identifiers must not clash.
+type pageSize int
+
+// PageSize is the default page size.
+type PageSize int
