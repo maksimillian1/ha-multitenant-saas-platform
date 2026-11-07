@@ -4,6 +4,8 @@ What the owner reads, when, and what automated checks cover instead. The owner's
 
 Gates are defined in [Feature stages](feature-stages.md); the QA checklist is in [Testing](testing.md).
 
+This page describes the target. Which of the checks below run today and which are still missing: [Guardrails](guardrails.md).
+
 ## What the owner reviews
 
 | ID | Review | When | What the owner reads | Gate |
