@@ -6,11 +6,12 @@
 pre-commit:
   parallel: true
   jobs:
-    # gofmt and goimports, as configured in .golangci.yml; fixes are staged.
+    # gofmt and goimports, as configured in .golangci.yml. Check only: the hook
+    # shows the diff and fails; it never changes or stages files itself.
     - name: go-fmt
       glob: "apps/**/*.go"
-      run: golangci-lint fmt --config .golangci.yml {staged_files}
-      stage_fixed: true
+      run: golangci-lint fmt --config .golangci.yml --diff {staged_files}
+      fail_text: "Not formatted. Run: golangci-lint fmt --config .golangci.yml <files>, then git add."
 
     # Lint findings on the lines changed since HEAD; old findings do not block.
     # The four modules lint in parallel, hence --allow-parallel-runners.
