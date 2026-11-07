@@ -1,0 +1,106 @@
+name: c4
+
+# C4 diagrams generated from the Go code (HAMSP-79, tools/c4sync/README.md).
+# check: the committed diagrams match the code, every package belongs to a
+#        component, the go-arch-lint rules hold, and the Mermaid in
+#        docs/architecture/c4/README.md matches workspace.dsl.
+# diff:  on a pull request, the structural changes against the base branch,
+#        as one PR comment (updated on every push), the Job Summary and an
+#        artifact with the views workspaces. R-4 and G-08 read it.
+
+on:
+  pull_request:
+    paths:
+      - "apps/**"
+      - "tools/c4sync/**"
+      - "docs/architecture/c4/**"
+      - "Makefile"
+      - ".github/workflows/c4.yml"
+  push:
+    branches: [master]
+    paths:
+      - "apps/**"
+      - "tools/c4sync/**"
+      - "docs/architecture/c4/**"
+      - "Makefile"
+      - ".github/workflows/c4.yml"
+
+env:
+  # Structurizr 2026.09.19, pinned by digest: Docker checks the image against it.
+  STRUCTURIZR_IMAGE: structurizr/structurizr:2026.09.19@sha256:721136283c2f9cf1ba69037bc9de136c579d66fdcb2d771cb60546ec68def1a5
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: tools/c4sync/go.mod
+          cache-dependency-path: |
+            tools/c4sync/go.sum
+            apps/*/go.sum
+      - name: Test c4sync
+        run: go -C tools/c4sync test ./...
+      - name: Stale diagrams, unmapped packages, go-arch-lint rules
+        run: make c4-check
+      - name: Generating again changes nothing
+        run: make c4-generate && git diff --exit-code -- docs/architecture/c4/generated
+      - name: Structurizr validates, README diagrams are up to date
+        run: docs/architecture/c4/render.sh --check
+
+  diff:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: tools/c4sync/go.mod
+          cache-dependency-path: |
+            tools/c4sync/go.sum
+            apps/*/go.sum
+      - name: Structural changes against the base branch
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          git worktree add "$RUNNER_TEMP/base" "$BASE_SHA"
+          make c4-diff BASE="$RUNNER_TEMP/base"
+          if [ -s bin/c4-diff/report.md ]; then
+            cat bin/c4-diff/report.md >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "No structural changes." >> "$GITHUB_STEP_SUMMARY"
+          fi
+      - uses: actions/upload-artifact@v4
+        if: hashFiles('bin/c4-diff/*.views.dsl') != ''
+        with:
+          name: c4-diff
+          path: bin/c4-diff/
+      - name: PR comment
+        # A fork PR gets a read-only token: it has the Job Summary only.
+        if: github.event.pull_request.head.repo.full_name == github.repository
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const marker = '<!-- c4sync-diff -->';
+            const report = fs.readFileSync('bin/c4-diff/report.md', 'utf8').trim();
+            const issue_number = context.payload.pull_request.number;
+            const { owner, repo } = context.repo;
+            const comments = await github.paginate(github.rest.issues.listComments, { owner, repo, issue_number });
+            const old = comments.find(c => c.body.startsWith(marker));
+            if (!report) {
+              if (old) await github.rest.issues.deleteComment({ owner, repo, comment_id: old.id });
+              return;
+            }
+            const run = `${context.serverUrl}/${owner}/${repo}/actions/runs/${context.runId}`;
+            const body = `${marker}\n${report}\n\nViews workspaces: the \`c4-diff\` artifact of [this run](${run}). Render them with Structurizr \`export -format mermaid\`.`;
+            if (old) await github.rest.issues.updateComment({ owner, repo, comment_id: old.id, body });
+            else await github.rest.issues.createComment({ owner, repo, issue_number, body });
