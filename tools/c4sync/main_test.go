@@ -42,6 +42,7 @@ func build(t *testing.T, cfgPath string) *pipeline.Result {
 
 // AC (HAMSP-74, HAMSP-75): the fixture gives the golden files, and the same
 // input always gives byte-identical output.
+// Verifies: c4-from-code AC-1
 func TestGenerateMatchesGolden(t *testing.T) {
 	cfgPath := filepath.Join(testutil.Fixture(t), "c4sync.yml")
 	first := build(t, cfgPath)
@@ -69,6 +70,7 @@ func TestGenerateMatchesGolden(t *testing.T) {
 
 // AC (HAMSP-74): the mapping comes from go-arch-lint; a package outside every
 // component is listed as unmapped.
+// Verifies: c4-from-code AC-4
 func TestMappingAndUnmapped(t *testing.T) {
 	dir := testutil.CopyFixture(t)
 	res := build(t, filepath.Join(dir, "c4sync.yml"))
@@ -91,6 +93,7 @@ func TestMappingAndUnmapped(t *testing.T) {
 }
 
 // AC (HAMSP-75, HAMSP-76): what the extractor and the detectors find in the fixture.
+// Verifies: c4-from-code AC-5, AC-6, AC-7
 func TestModelFacts(t *testing.T) {
 	m := build(t, filepath.Join(testutil.Fixture(t), "c4sync.yml")).Model
 
@@ -163,6 +166,7 @@ func TestModelFacts(t *testing.T) {
 }
 
 // AC (HAMSP-77): on an unchanged fixture, check passes and prints nothing.
+// Verifies: c4-from-code AC-8
 func TestCheckPassesOnFixture(t *testing.T) {
 	code, out, errOut := c4sync(t, "check", "-config", filepath.Join(testutil.Fixture(t), "c4sync.yml"))
 	if code != check.OK || out != "" {
@@ -173,6 +177,7 @@ func TestCheckPassesOnFixture(t *testing.T) {
 // AC (HAMSP-77): a new import between two components, without regenerating,
 // fails as stale and shows the new relation; the import breaks a go-arch-lint
 // rule too, which is reported with file and line.
+// Verifies: c4-from-code AC-8
 func TestCheckStaleAndRuleViolation(t *testing.T) {
 	dir := testutil.CopyFixture(t)
 	testutil.Replace(t, filepath.Join(dir, "internal/api/api.go"),
@@ -199,6 +204,7 @@ func TestCheckStaleAndRuleViolation(t *testing.T) {
 }
 
 // AC (HAMSP-77): only stale output gives exit code 2.
+// Verifies: c4-from-code AC-8
 func TestCheckOnlyStale(t *testing.T) {
 	dir := testutil.CopyFixture(t)
 	testutil.Replace(t, filepath.Join(dir, "golden/components.dsl"), "fx_api -> fx_app", "fx_api -> fx_bus")
@@ -210,6 +216,7 @@ func TestCheckOnlyStale(t *testing.T) {
 
 // AC (HAMSP-74, HAMSP-77): c4sync.yml metadata for a component that
 // go-arch-lint does not define fails with the file and line.
+// Verifies: c4-from-code AC-3
 func TestUnknownComponentInConfig(t *testing.T) {
 	dir := testutil.CopyFixture(t)
 	cfg := filepath.Join(dir, "c4sync.yml")
@@ -222,6 +229,7 @@ func TestUnknownComponentInConfig(t *testing.T) {
 
 // AC (HAMSP-78): diff between two source trees reports the change, important
 // components first, and writes a views workspace; identical trees report nothing.
+// Verifies: c4-from-code AC-9
 func TestDiff(t *testing.T) {
 	base := filepath.Join(testutil.Fixture(t), "c4sync.yml")
 	code, out, errOut := c4sync(t, "diff", "-config", base, "-base-config", base)
@@ -272,6 +280,7 @@ func TestDiff(t *testing.T) {
 // AC (HAMSP-74, HAMSP-78): Structurizr accepts the C3 fragment inside the
 // fixture workspace, the code workspace and a diff views workspace, and
 // exports them to Mermaid. Needs Java 21+ and STRUCTURIZR_WAR.
+// Verifies: c4-from-code AC-2
 func TestStructurizrValidates(t *testing.T) {
 	if os.Getenv("STRUCTURIZR_WAR") == "" {
 		t.Skip("STRUCTURIZR_WAR is not set")
@@ -308,6 +317,7 @@ func java(t *testing.T, args ...string) {
 
 // A component declared in .go-arch-lint.yml whose package does not exist yet
 // is not an error, and gets no box.
+// Verifies: c4-from-code AC-4
 func TestDeclaredComponentWithoutPackages(t *testing.T) {
 	dir := testutil.CopyFixture(t)
 	testutil.Replace(t, filepath.Join(dir, ".go-arch-lint.yml"),
@@ -322,6 +332,7 @@ func TestDeclaredComponentWithoutPackages(t *testing.T) {
 
 // AC (HAMSP-80): a module with several binaries gets one fragment per binary,
 // with only the components that binary imports.
+// Verifies: c4-from-code AC-10
 func TestContainers(t *testing.T) {
 	res := build(t, filepath.Join(testutil.Fixture(t), "c4sync.yml"))
 	ids := func(name string) string {
@@ -354,6 +365,7 @@ func TestContainers(t *testing.T) {
 }
 
 // AC (HAMSP-80): a main package that does not exist is an error.
+// Verifies: c4-from-code AC-10
 func TestContainerMainNotFound(t *testing.T) {
 	dir := testutil.CopyFixture(t)
 	testutil.Replace(t, filepath.Join(dir, "c4sync.yml"), "main: cmd/migrate", "main: cmd/nothing")

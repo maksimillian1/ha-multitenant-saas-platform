@@ -84,12 +84,12 @@ projectPath: .                    # Go module root (default ".")
 archFile: .go-arch-lint.yml       # default: .go-arch-lint.yml in projectPath
 identifierPrefix: usage           # every DSL identifier starts with it (default "c")
 output:
-  components: c4/usage.components.dsl   # C3 fragment; empty = do not write
-  code: c4/usage.code.dsl               # code workspace; empty = do not write
+  components: ../../docs/architecture/c4/generated/usage.components.dsl   # C3 fragment; empty = do not write
+  code: ../../docs/architecture/c4/generated/usage.code.dsl               # code workspace; empty = do not write
 containers:                       # optional: one module, several binaries
   - name: Writer                  # header of the fragment; default prefix usage_writer
     main: cmd/writer              # main package, relative to the module root
-    output: c4/usage.writer.dsl   # C3 fragment of this binary
+    output: ../../docs/architecture/c4/generated/usage.writer.components.dsl   # C3 fragment of this binary
 code:
   maxElements: 30                 # types per code view (default 30)
   maxMethods: 6                   # methods listed per type (default 6)
@@ -138,6 +138,8 @@ A component without metadata is still drawn, under its go-arch-lint name. A key 
 
 ### `workspace.dsl`: put the fragment in its container
 
+The workspace here is `docs/architecture/c4/workspace.dsl`, so `!include` is relative to that folder.
+
 ```
 workspace {
     !identifiers hierarchical
@@ -146,7 +148,7 @@ workspace {
             db = container "Usage DB" "" "PostgreSQL"
             kafka = container "Kafka"
             usage = container "Usage service" "" "Go" {
-                !include ../../apps/usage/c4/usage.components.dsl
+                !include generated/usage.components.dsl
             }
         }
     }
@@ -172,8 +174,8 @@ c4sync generate -config apps/usage/c4sync.yml
 ```
 
 ```
-wrote apps/usage/c4/usage.code.dsl
-wrote apps/usage/c4/usage.components.dsl
+wrote docs/architecture/c4/generated/usage.code.dsl
+wrote docs/architecture/c4/generated/usage.components.dsl
 unmapped package: github.com/…/apps/usage/internal/contracttest
 ```
 

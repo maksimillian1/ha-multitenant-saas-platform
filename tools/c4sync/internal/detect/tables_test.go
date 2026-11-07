@@ -5,6 +5,7 @@ import (
 	"testing"
 )
 
+// Verifies: c4-from-code AC-7
 func TestTables(t *testing.T) {
 	for sql, want := range map[string][]TableUse{
 		"INSERT INTO events (id) VALUES ($1)":                      {{"events", "writes"}},

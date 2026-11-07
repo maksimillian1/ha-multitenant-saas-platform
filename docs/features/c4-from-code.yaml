@@ -79,4 +79,4 @@ quality_scenarios:
   touched: []
 
 gates:
-  G-07: {status: not-checked, by: owner, date: 2026-11-07, note: plan for alpha waits for approval}
+  G-07: {status: pass, by: owner, date: 2026-11-07, note: plan for alpha approved in chat}
