@@ -36,9 +36,9 @@ Heavier tests (end-to-end on kind, fuzzing, control canaries, load, chaos) are n
 
 ## 3. Feature flags: both states are tested
 
-Every release flag ([ADR-0011](../adr/0011-feature-flags.md)) needs tests in both states for as long as it exists.
+Every release flag ([ADR-0011](../adr/0011-feature-flags.md)) needs tests in both states for as long as it exists. A release flag is optional ([Feature stages](feature-stages.md), "Flags"); a feature without one has none of the tests below, and its G-01 is `n/a`.
 
-* **Off** (gate G-01, from `proto`). The application works with the flag off, and the off path is the old behaviour or a refusal. CI runs the whole test suite with every release flag at its default, which is off. Code below `alpha` is merged with its flag off, so for everyone else this is the state that matters.
+* **Off** (gate G-01, from `proto`). The application works with the flag off, and the off path is the old behaviour or a refusal. CI runs the whole test suite with every release flag at its default, which is off. Code below `alpha` that has a flag is merged with it off, so for everyone else this is the state that matters.
 * **On** (from `alpha`). The acceptance criteria are tested with the flag on. The kind end-to-end suite runs with one alpha tenant, which has every `alpha` flag on, and one normal tenant.
 * **Rollback** (from `beta`, for a feature that writes data). Flag on, the feature writes data, flag off: the old path still works for that tenant and does not fail on the data the feature left behind. A flag that cannot be switched off safely is not a flag.
 * **No leak into lower stages** (from `beta`). The tests of `stable` packages, run with every flag off, cover no line of a package below `stable` (`go test -coverpkg`). That shows no `stable` path reaches code of a lower stage at runtime; depguard shows the same for imports.
