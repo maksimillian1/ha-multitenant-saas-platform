@@ -15,7 +15,7 @@ acceptance:
     planned: tools/featuremap/featuremap_test.go:TestRun
     verified: [tools/featuremap/featuremap_test.go:TestRun]
   AC-2:
-    text: A feature file fails CI when it has an unknown field, a bad stage, a name that differs from its file name, a stage not backed by a ready verify run, or a stable stage without a review.
+    text: A feature file fails CI when it has an unknown field, a bad stage, a name that differs from its file name, an invalid gate entry, a stage without code, or a stage whose required gates are missing, failed or not checked.
     level: unit
     planned: tools/featuremap/featuremap_test.go:TestValidate
     verified: [tools/featuremap/featuremap_test.go:TestValidate]
