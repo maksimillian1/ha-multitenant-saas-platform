@@ -1,0 +1,12 @@
+feature: usage-ingest
+title: UsageWriteAPI accepts usage events and acknowledges them once they are in Kafka
+critical: true
+code:
+  - apps/usage/internal/writeapi/**
+  - apps/usage/cmd/writeapi/**
+  - apps/usage/internal/kafka/**
+  - apps/usage/internal/httpx/**
+  - docs/contracts/usage-event/**
+c4: [usageWriteApi, kafka]
+links:
+  issues: [HAMSP-23]
