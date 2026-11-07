@@ -1,0 +1,25 @@
+name: features
+
+# The feature map (docs/features/README.md) is generated from the feature
+# files. It depends on every change: a change to the code of a stable feature
+# shows that feature as beta. So this runs on every pull request.
+on:
+  pull_request:
+  push:
+    branches: [master]
+
+jobs:
+  map:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # the review commits named in the feature files
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: tools/featuremap/go.mod
+          cache-dependency-path: tools/featuremap/go.sum
+      - name: Test the generator
+        run: go -C tools/featuremap test -count=1 ./...
+      - name: Feature files are valid and the map is up to date
+        run: go -C tools/featuremap run . -check

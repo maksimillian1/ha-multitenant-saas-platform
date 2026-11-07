@@ -19,9 +19,9 @@ What each stage promises, which guardrails it needs and how features move betwee
 
 Without it, agent-shipped code is not under control.
 
-* Review map with zone stages and risks (HAMSP-45), first: the other guardrails depend on it.
+* Feature map: one file per feature in `docs/features/` with its stage, code, checklist and reviews, and a generated map of all features (HAMSP-45). First: the other guardrails depend on it.
 * Pre-commit hooks and agent rules (HAMSP-40, HAMSP-44).
-* Feature flags per [ADR-0011](adr/0011-feature-flags.md) and `stage:*` labels in Linear (HAMSP-63). `feature-verify` checks the gates of the target stage (HAMSP-64).
+* Feature flags per [ADR-0011](adr/0011-feature-flags.md) (HAMSP-63). `feature-verify` checks the gates of the target stage (HAMSP-64).
 * AGPL check in CI (HAMSP-21, C-03), arm64 builds (HAMSP-27, C-06).
 
 ### Phase 1: close the gaps in the existing core
@@ -62,13 +62,13 @@ The owner decides first; agents implement after the decision.
 
 ## Stabilization: `beta` → `stable`
 
-Runs after the merge, in parallel with part 2. The owner reads the code zone by zone, bottom-up:
+Runs after the merge, in parallel with part 2. The owner reads the code feature by feature, bottom-up:
 
-1. Critical zones of the core: JWT validation and tenant context in the API Gateway, RLS and migrations, UsageWriteAPI ack and deduplication.
+1. Critical features of the core: JWT validation and tenant context in the API Gateway, RLS and migrations, UsageWriteAPI ack and deduplication.
 2. The rest of the core: ExampleApp, Usage Writer, the usage store.
 3. Features from phase 2, in the order they depend on each other.
 
-A zone becomes `stable` when it is reviewed, its flag is removed and the quality scenarios it touches pass. Scenarios that need load pass only after part 2.
+A feature becomes `stable` when it is reviewed, its flag is removed and the quality scenarios it touches pass. Scenarios that need load pass only after part 2.
 
 ## Part 2: AWS
 
