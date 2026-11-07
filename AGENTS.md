@@ -15,11 +15,13 @@ Tasks live in Linear: team key `HAMSP`, issue IDs look like `HAMSP-42`. Use the 
 
 ## Feature workflow
 
-The rules come from `docs/`: start at `docs/index.md`, read `docs/architecture/requirements.md` (FR, QS, C), and treat Accepted ADRs in `docs/adr/` as overriding everything else. The spec and the plan live in the Linear issue, not in repo files.
+The rules come from `docs/`: start at `docs/index.md`, read `docs/architecture/requirements.md` (FR, QS, C), and treat Accepted ADRs in `docs/adr/` as overriding everything else.
 
-1. `feature-clarify HAMSP-N`: asks up to 5 questions and writes acceptance criteria (AC-n) into the issue.
-2. `feature-plan HAMSP-N`: checks the approach against the docs and writes steps and a test map into the issue.
+A feature is keyed by its slug. Its file `docs/features/<slug>.yaml` holds the verified stage, the acceptance criteria, the planned and verified tests, the checklist, the owner's approvals and every verify run (`docs/features/README.md`). The Linear issue holds the work: goal, discussion, decisions and plan steps, with a link to the feature file. Nothing reads feature state from Linear.
+
+1. `feature-clarify HAMSP-N`: asks up to 5 questions, creates or updates the feature file with its acceptance criteria (AC-n), and links it from the issue.
+2. `feature-plan HAMSP-N`: checks the approach against the docs, writes the planned tests and checklist into the feature file and the steps into the issue.
 3. Implement the steps.
-4. `feature-verify HAMSP-N`: runs the tests from the test map. The feature is ready only when every AC and touched QS has a test that ran and passed.
+4. `feature-verify <slug or HAMSP-N>`: runs the planned tests. The feature is ready only when every AC, checklist item of its level and touched QS has a test that ran and passed, or `n/a` with a reason. Writes the result into the feature file and regenerates the map.
 
 The skills are in `.agents/skills/`; `.claude/skills` links to the same folder.

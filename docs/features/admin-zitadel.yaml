@@ -1,0 +1,8 @@
+feature: admin-zitadel
+title: Admin app calls to the Zitadel management API with its service account
+critical: true
+code:
+  - apps/admin/zitadel/**
+c4: [adminPortal, authService]
+links:
+  issues: [HAMSP-23]
