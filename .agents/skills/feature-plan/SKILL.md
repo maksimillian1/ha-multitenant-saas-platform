@@ -23,6 +23,7 @@ Find the feature file by the slug, or by the issue ID under `links.issues`. It m
 3. The FR, QS and C rows from `docs/architecture/requirements.md` listed in the file.
 4. The other feature files whose `code` the plan will touch, to know whether the change is critical (a feature with `critical: true`) and which `stable` features it changes.
 5. The code in the areas the plan will touch: existing structure, naming, test layout and how tests are run (CI workflow, `go test`, k6 scripts). Read enough to place the work, not the whole tree.
+6. The rules in `AGENTS.md`, section Guardrails. The plan does not weaken a check or change a test to make it pass. When the change is critical, the steps put the boundary tests (T-01, T-04, T-12) before the code, and the plan says the owner is told before work starts.
 
 ## 3. Docs check
 
