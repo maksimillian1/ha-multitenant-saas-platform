@@ -1,7 +1,6 @@
 feature: usage-ingest
 title: UsageWriteAPI accepts usage events and acknowledges them once they are in Kafka
 target: beta
-stage: beta  # merged at beta with HAMSP-23, before review (docs/roadmap.md)
 critical: true
 code:
   - apps/usage/internal/writeapi/**

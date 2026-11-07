@@ -1,7 +1,6 @@
 feature: admin-zitadel
 title: Admin app calls to the Zitadel management API with its service account
 target: beta
-stage: beta  # merged at beta with HAMSP-23, before review (docs/roadmap.md)
 critical: true
 code:
   - apps/admin/zitadel/**

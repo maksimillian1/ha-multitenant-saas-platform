@@ -1,7 +1,6 @@
 feature: usage-writer
 title: Usage Writer consumes usage events, drops duplicates and writes them in batches
 target: beta
-stage: beta  # merged at beta with HAMSP-23, before review (docs/roadmap.md)
 critical: true
 code:
   - apps/usage/internal/writer/**

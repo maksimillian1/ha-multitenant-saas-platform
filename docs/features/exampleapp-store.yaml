@@ -1,7 +1,6 @@
 feature: exampleapp-store
 title: ExampleApp tenant data in PostgreSQL with RLS
 target: beta
-stage: beta  # merged at beta with HAMSP-23, before review (docs/roadmap.md)
 critical: true
 code:
   - apps/exampleapp/store/**

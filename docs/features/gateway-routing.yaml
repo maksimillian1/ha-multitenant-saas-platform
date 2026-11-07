@@ -1,7 +1,6 @@
 feature: gateway-routing
 title: API Gateway configuration, routing and health
 target: beta
-stage: beta  # merged at beta with HAMSP-23, before review (docs/roadmap.md)
 critical: false
 code:
   - apps/gateway/core/**
