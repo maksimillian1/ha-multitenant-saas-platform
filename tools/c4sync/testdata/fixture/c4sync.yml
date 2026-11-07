@@ -3,6 +3,13 @@ identifierPrefix: fx
 output:
   components: golden/components.dsl
   code: golden/code.dsl
+containers:
+  - name: Server
+    main: cmd/server
+    output: golden/server.dsl
+  - name: Migrate
+    main: cmd/migrate
+    output: golden/migrate.dsl
 components:
   app:
     name: App

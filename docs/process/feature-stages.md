@@ -39,7 +39,7 @@ A feature's stage cannot be higher than the stage of the zones it changed.
 | G-05 | **Quality scenarios.** The touched `QS-xx` are listed with their recommended load and chaos runs; each run that happened is recorded. Informational: it never blocks a stage or a release. | `feature-verify` | | listed | listed | recorded or *not run* |
 | G-06 | **Owner review.** The owner has read the code; an entry in the review ledger up to a commit. | Owner | | | | ● |
 | G-07 | **Plan approved.** The owner approved the integration, contract and end-to-end rows of the plan checklist and the touched QS before implementation ([Review](review.md), R-1). | Owner | | ● | ● | ● |
-| G-08 | **Structure approved.** Architecture fitness functions pass, and the owner approved the change to the architecture rules since the feature started ([Review](review.md), R-4). The code is not read at this stage. | CI, owner | | | ● | ● |
+| G-08 | **Structure approved.** Architecture fitness functions pass, and the owner approved the structural change since the feature started: the generated component views and the c4sync diff, which include the change to the architecture rules ([Review](review.md), R-4). The code is not read at this stage. | CI, owner | | | ● | ● |
 
 What the owner reads at each gate is in [Review](review.md).
 
