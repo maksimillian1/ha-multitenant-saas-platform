@@ -9,7 +9,7 @@
 | UsagePipeline (L2) | How a usage event becomes a stored record and is read back. |
 | UsageWriteAPI, Usage Writer, ExampleApp components (L3) | Which components a service is built from, what they import, which routes, topics and tables they use. Generated from the Go code. |
 
-The L3 components come from the code: c4sync writes them to [`generated/`](generated/) from each service's `.go-arch-lint.yml` and `c4sync.yml` ([tools/c4sync](../../../tools/c4sync/README.md)). Run `make c4` after changing a service's structure; CI fails when they are stale. The gateway and the admin app have code workspaces only (`generated/gateway.code.dsl`, `generated/admin.code.dsl`) until ADR-0004 and ADR-0009 are accepted.
+The L3 components come from the code: c4sync writes them to [`generated/`](generated/), as `<service>[.<binary>].components.dsl` fragments that `workspace.dsl` includes in a container, and `<service>.code.dsl` workspaces of the code level that open on their own, from each service's `.go-arch-lint.yml` and `c4sync.yml` ([tools/c4sync](../../../tools/c4sync/README.md)). Run `make c4` after changing a service's structure; CI fails when they are stale. The gateway and the admin app have code workspaces only (`generated/gateway.code.dsl`, `generated/admin.code.dsl`) until ADR-0004 and ADR-0009 are accepted.
 
 Infrastructure (namespaces, node pools, Karpenter, KEDA, Cilium) belongs to a Deployment view, which is not drawn yet.
 
