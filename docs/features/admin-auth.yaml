@@ -1,6 +1,5 @@
 feature: admin-auth
 title: Admin app sign-in, session and CSRF protection
-target: beta
 critical: true
 code:
   - apps/admin/auth/**

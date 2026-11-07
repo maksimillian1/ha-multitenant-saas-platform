@@ -1,6 +1,5 @@
 feature: gateway-routing
 title: API Gateway configuration, routing and health
-target: beta
 critical: false
 code:
   - apps/gateway/core/**

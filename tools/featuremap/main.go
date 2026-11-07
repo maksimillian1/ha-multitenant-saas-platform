@@ -1,14 +1,17 @@
-// Command featuremap validates the feature files in docs/features and
-// writes the map of all features into docs/features/README.md.
+// Command featuremap validates the feature files in docs/features, writes
+// the map of all features into docs/features/README.md, and lists the
+// features a pull request touches.
 //
-//	go -C tools/featuremap run .          # write the map
-//	go -C tools/featuremap run . -check   # fail if the map is out of date
+//	go -C tools/featuremap run .                     # validate and write the map
+//	go -C tools/featuremap run . -check              # validate; fail if the map is out of date
+//	go -C tools/featuremap run . -pr origin/master   # print the pull request report
 package main
 
 import (
 	"errors"
 	"flag"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -22,6 +25,7 @@ const (
 
 func main() {
 	check := flag.Bool("check", false, "fail when the map is out of date instead of writing it")
+	pr := flag.String("pr", "", "print the features touched by the changes since this base ref, and exit")
 	root := flag.String("root", "", "repository root (default: git rev-parse --show-toplevel)")
 	flag.Parse()
 
@@ -32,11 +36,20 @@ func main() {
 		}
 		*root = strings.TrimSpace(string(out))
 	}
-	if err := run(*root, gitRepo{root: *root}, *check); err != nil {
+	repo := gitRepo{root: *root}
+	var err error
+	if *pr != "" {
+		err = report(*root, repo, *pr, os.Stdout)
+	} else {
+		err = run(*root, repo, *check)
+	}
+	if err != nil {
 		fail(err)
 	}
 }
 
+// run validates every feature file and writes the map, or with check only
+// compares it.
 func run(root string, repo Repo, check bool) error {
 	features, err := loadFeatures(root, featuresDir)
 	if err != nil {
@@ -55,16 +68,12 @@ func run(root string, repo Repo, check bool) error {
 		return errors.Join(errs...)
 	}
 
-	rows, err := buildRows(features, repo)
-	if err != nil {
-		return err
-	}
 	path := filepath.Join(root, readme)
 	doc, err := os.ReadFile(path)
 	if err != nil {
 		return err
 	}
-	updated, err := replaceBlock(string(doc), renderTable(rows))
+	updated, err := replaceBlock(string(doc), renderTable(features))
 	if err != nil {
 		return fmt.Errorf("%s: %w", readme, err)
 	}
@@ -75,6 +84,19 @@ func run(root string, repo Repo, check bool) error {
 		return fmt.Errorf("%s is out of date: run `go -C tools/featuremap run .` and commit it", readme)
 	}
 	return os.WriteFile(path, []byte(updated), 0o644)
+}
+
+func report(root string, repo Repo, base string, w io.Writer) error {
+	features, err := loadFeatures(root, featuresDir)
+	if err != nil {
+		return err
+	}
+	out, err := prReport(features, repo, base)
+	if err != nil {
+		return err
+	}
+	_, err = io.WriteString(w, out)
+	return err
 }
 
 func fail(err error) {

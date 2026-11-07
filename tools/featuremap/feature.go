@@ -18,7 +18,6 @@ import (
 type Feature struct {
 	Feature           string              `yaml:"feature"`
 	Title             string              `yaml:"title"`
-	Target            string              `yaml:"target"`
 	Stage             string              `yaml:"stage"`
 	Critical          bool                `yaml:"critical"`
 	Flag              string              `yaml:"flag"`
@@ -158,11 +157,10 @@ func (f *Feature) validate() []error {
 	if f.Title == "" {
 		bad("title is missing")
 	}
-	if _, ok := stages[f.Target]; !ok {
-		bad("target %q must be proto, alpha, beta or stable", f.Target)
-	}
 	if _, ok := stages[f.Stage]; f.Stage != "" && !ok {
 		bad("stage %q must be proto, alpha, beta or stable", f.Stage)
+	} else if f.Stage != "" && stages[f.Stage] > f.highestReady() {
+		bad("stage %s is not backed by a ready verify run for %s or higher", f.Stage, f.Stage)
 	}
 	if f.Stage == "stable" && len(f.Reviews) == 0 {
 		bad("stage is stable but reviews is empty (gate G-06)")
@@ -240,6 +238,17 @@ func (f *Feature) validate() []error {
 		}
 	}
 	return errs
+}
+
+// highestReady is the highest stage a verify run reported Ready for, or 0.
+func (f *Feature) highestReady() int {
+	best := 0
+	for _, r := range f.Runs {
+		if r.Verdict == "ready" && stages[r.StageChecked] > best {
+			best = stages[r.StageChecked]
+		}
+	}
+	return best
 }
 
 // verifiedTests lists every test the file claims, with the ID it verifies.

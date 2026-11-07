@@ -1,6 +1,5 @@
 feature: gateway-usage-reporting
 title: The API Gateway reports every API call as a usage event
-target: beta
 critical: false
 code:
   - apps/gateway/usage/**

@@ -18,6 +18,9 @@ type Repo interface {
 	// ChangedSince lists the files that differ between commit and the
 	// working tree, including untracked files.
 	ChangedSince(commit string) ([]string, error)
+	// ChangedInPR lists the files a pull request changes: the diff from the
+	// merge base with base to HEAD.
+	ChangedInPR(base string) ([]string, error)
 	// Read returns the content of a file, by its path from the root.
 	Read(path string) ([]byte, error)
 }
@@ -57,6 +60,10 @@ func (g gitRepo) ChangedSince(commit string) ([]string, error) {
 		return nil, err
 	}
 	return append(changed, untracked...), nil
+}
+
+func (g gitRepo) ChangedInPR(base string) ([]string, error) {
+	return g.git("diff", "--name-only", base+"...HEAD", "--")
 }
 
 func (g gitRepo) Read(path string) ([]byte, error) {

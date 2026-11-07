@@ -1,6 +1,5 @@
 feature: usage-store
 title: "The usage store: schema, RLS views and roles, writes through the store interface"
-target: beta
 critical: true
 code:
   - apps/usage/internal/store/**
