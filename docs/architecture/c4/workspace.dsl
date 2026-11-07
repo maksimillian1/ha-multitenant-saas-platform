@@ -163,6 +163,10 @@ workspace "HAMSP" "High-Availability Multi-Tenant SaaS Platform" {
             element "Container" {
                 background #438dd5
             }
+            element "Component" {
+                background #85bbf0
+                color #000000
+            }
             element "Web Browser" {
                 shape WebBrowser
             }

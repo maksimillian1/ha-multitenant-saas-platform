@@ -4,12 +4,12 @@
 
 | View | Answers |
 |---|---|
-| System Context (L1) | Who uses HAMSP and which external systems it depends on. |
-| RequestPath (L2) | How a request reaches tenant data, and how tenants are kept apart. |
-| UsagePipeline (L2) | How a usage event becomes a stored record and is read back. |
-| UsageWriteAPI, Usage Writer, ExampleApp components (L3) | Which components a service is built from, what they import, which routes, topics and tables they use. Generated from the Go code. |
+| System Context (C1) | Who uses HAMSP and which external systems it depends on. |
+| RequestPath (C2) | How a request reaches tenant data, and how tenants are kept apart. |
+| UsagePipeline (C2) | How a usage event becomes a stored record and is read back. |
+| UsageWriteAPI, Usage Writer, ExampleApp components (C3) | Which components a service is built from, what they import, which routes, topics and tables they use. Generated from the Go code. |
 
-The L3 components come from the code: c4sync writes them to [`generated/`](generated/), as `<service>[.<binary>].components.dsl` fragments that `workspace.dsl` includes in a container, and `<service>.code.dsl` workspaces of the code level that open on their own, from each service's `.go-arch-lint.yml` and `c4sync.yml` ([tools/c4sync](../../../tools/c4sync/README.md)). Run `make c4` after changing a service's structure; CI fails when they are stale. The gateway and the admin app have code workspaces only (`generated/gateway.code.dsl`, `generated/admin.code.dsl`) until ADR-0004 and ADR-0009 are accepted.
+The C3 components come from the code: c4sync writes them to [`generated/`](generated/), as `<service>[.<binary>].components.dsl` fragments that `workspace.dsl` includes in a container, and `<service>.code.dsl` workspaces of the code level that open on their own, from each service's `.go-arch-lint.yml` and `c4sync.yml` ([tools/c4sync](../../../tools/c4sync/README.md)). Run `make c4` after changing a service's structure; CI fails when they are stale. The gateway and the admin app have code workspaces only (`generated/gateway.code.dsl`, `generated/admin.code.dsl`) until ADR-0004 and ADR-0009 are accepted.
 
 Infrastructure (namespaces, node pools, Karpenter, KEDA, Cilium) belongs to a Deployment view, which is not drawn yet.
 
@@ -19,7 +19,7 @@ Infrastructure (namespaces, node pools, Karpenter, KEDA, Cilium) belongs to a De
 
 <!-- diagrams:start -->
 
-### System Context (L1)
+### System Context (C1)
 
 ```mermaid
 graph LR
@@ -56,7 +56,7 @@ graph LR
   end
 ```
 
-### RequestPath (L2)
+### RequestPath (C2)
 
 ```mermaid
 graph LR
@@ -120,7 +120,7 @@ graph LR
   end
 ```
 
-### UsagePipeline (L2)
+### UsagePipeline (C2)
 
 ```mermaid
 graph LR
@@ -174,7 +174,7 @@ graph LR
   end
 ```
 
-### UsageWriteAPI components (L3, generated)
+### UsageWriteAPI components (C3, generated)
 
 ```mermaid
 graph LR
@@ -190,17 +190,17 @@ graph LR
         style 12 fill:#ffffff,stroke:#2e6295,color:#2e6295
 
         61["<div style='font-weight: bold'>main</div><div style='font-size: 70%; margin-top: 0px'>[Component: Go]</div><div style='font-size: 80%; margin-top:10px'>Reads the configuration,<br />wires the components and runs<br />the server.</div>"]
-        style 61 fill:#ffffff,stroke:#444444,color:#ffffff
+        style 61 fill:#85bbf0,stroke:#5d82a8,color:#000000
         62["<div style='font-weight: bold'>Core</div><div style='font-size: 70%; margin-top: 0px'>[Component]</div><div style='font-size: 80%; margin-top:10px'>Usage event model,<br />validation, configuration.</div>"]
-        style 62 fill:#ffffff,stroke:#444444,color:#ffffff
+        style 62 fill:#85bbf0,stroke:#5d82a8,color:#000000
         63["<div style='font-weight: bold'>Health</div><div style='font-size: 70%; margin-top: 0px'>[Component]</div><div style='font-size: 80%; margin-top:10px'>Liveness and readiness<br />endpoints.</div>"]
-        style 63 fill:#ffffff,stroke:#444444,color:#ffffff
+        style 63 fill:#85bbf0,stroke:#5d82a8,color:#000000
         64["<div style='font-weight: bold'>HTTP helpers</div><div style='font-size: 70%; margin-top: 0px'>[Component: net/http]</div>"]
-        style 64 fill:#ffffff,stroke:#444444,color:#ffffff
+        style 64 fill:#85bbf0,stroke:#5d82a8,color:#000000
         65["<div style='font-weight: bold'>Kafka client</div><div style='font-size: 70%; margin-top: 0px'>[Component: franz-go]</div><div style='font-size: 80%; margin-top:10px'>Produces and consumes usage<br />events.</div>"]
-        style 65 fill:#ffffff,stroke:#444444,color:#ffffff
+        style 65 fill:#85bbf0,stroke:#5d82a8,color:#000000
         66["<div style='font-weight: bold'>Write API</div><div style='font-size: 70%; margin-top: 0px'>[Component: Go, net/http]</div><div style='font-size: 80%; margin-top:10px'>Accepts usage events over<br />HTTP, validates them, acks<br />once they are in Kafka.</div>"]
-        style 66 fill:#ffffff,stroke:#444444,color:#ffffff
+        style 66 fill:#85bbf0,stroke:#5d82a8,color:#000000
       end
 
       18["<div style='font-weight: bold'>Kafka</div><div style='font-size: 70%; margin-top: 0px'>[Container: Apache Kafka (Strimzi)]</div><div style='font-size: 80%; margin-top:10px'>Usage events, partitioned by<br />tenant_id (ADR-0001).</div>"]
@@ -222,7 +222,7 @@ graph LR
   end
 ```
 
-### Usage Writer components (L3, generated)
+### Usage Writer components (C3, generated)
 
 ```mermaid
 graph LR
@@ -238,19 +238,19 @@ graph LR
         style 14 fill:#ffffff,stroke:#2e6295,color:#2e6295
 
         78["<div style='font-weight: bold'>main</div><div style='font-size: 70%; margin-top: 0px'>[Component: Go]</div><div style='font-size: 80%; margin-top:10px'>Reads the configuration,<br />wires the components and runs<br />the server.</div>"]
-        style 78 fill:#ffffff,stroke:#444444,color:#ffffff
+        style 78 fill:#85bbf0,stroke:#5d82a8,color:#000000
         79["<div style='font-weight: bold'>Core</div><div style='font-size: 70%; margin-top: 0px'>[Component]</div><div style='font-size: 80%; margin-top:10px'>Usage event model,<br />validation, configuration.</div>"]
-        style 79 fill:#ffffff,stroke:#444444,color:#ffffff
+        style 79 fill:#85bbf0,stroke:#5d82a8,color:#000000
         80["<div style='font-weight: bold'>Health</div><div style='font-size: 70%; margin-top: 0px'>[Component]</div><div style='font-size: 80%; margin-top:10px'>Liveness and readiness<br />endpoints.</div>"]
-        style 80 fill:#ffffff,stroke:#444444,color:#ffffff
+        style 80 fill:#85bbf0,stroke:#5d82a8,color:#000000
         81["<div style='font-weight: bold'>HTTP helpers</div><div style='font-size: 70%; margin-top: 0px'>[Component: net/http]</div>"]
-        style 81 fill:#ffffff,stroke:#444444,color:#ffffff
+        style 81 fill:#85bbf0,stroke:#5d82a8,color:#000000
         82["<div style='font-weight: bold'>Kafka client</div><div style='font-size: 70%; margin-top: 0px'>[Component: franz-go]</div><div style='font-size: 80%; margin-top:10px'>Produces and consumes usage<br />events.</div>"]
-        style 82 fill:#ffffff,stroke:#444444,color:#ffffff
+        style 82 fill:#85bbf0,stroke:#5d82a8,color:#000000
         83["<div style='font-weight: bold'>Store</div><div style='font-size: 70%; margin-top: 0px'>[Component: pgx]</div><div style='font-size: 80%; margin-top:10px'>Writes usage events to the<br />usage store.</div>"]
-        style 83 fill:#ffffff,stroke:#444444,color:#ffffff
+        style 83 fill:#85bbf0,stroke:#5d82a8,color:#000000
         84["<div style='font-weight: bold'>Writer</div><div style='font-size: 70%; margin-top: 0px'>[Component: Go]</div><div style='font-size: 80%; margin-top:10px'>Consumes usage events, drops<br />duplicates, writes batches.</div>"]
-        style 84 fill:#ffffff,stroke:#444444,color:#ffffff
+        style 84 fill:#85bbf0,stroke:#5d82a8,color:#000000
       end
 
       18["<div style='font-weight: bold'>Kafka</div><div style='font-size: 70%; margin-top: 0px'>[Container: Apache Kafka (Strimzi)]</div><div style='font-size: 80%; margin-top:10px'>Usage events, partitioned by<br />tenant_id (ADR-0001).</div>"]
@@ -279,7 +279,7 @@ graph LR
   end
 ```
 
-### ExampleApp components (L3, generated)
+### ExampleApp components (C3, generated)
 
 ```mermaid
 graph LR
@@ -295,15 +295,15 @@ graph LR
         style 10 fill:#ffffff,stroke:#3e6e4d,color:#3e6e4d
 
         101["<div style='font-weight: bold'>Core</div><div style='font-size: 70%; margin-top: 0px'>[Component]</div><div style='font-size: 80%; margin-top:10px'>Tenant context, errors,<br />configuration.</div>"]
-        style 101 fill:#ffffff,stroke:#444444,color:#ffffff
+        style 101 fill:#85bbf0,stroke:#5d82a8,color:#000000
         102["<div style='font-weight: bold'>Health</div><div style='font-size: 70%; margin-top: 0px'>[Component]</div><div style='font-size: 80%; margin-top:10px'>Liveness and readiness<br />endpoints.</div>"]
-        style 102 fill:#ffffff,stroke:#444444,color:#ffffff
+        style 102 fill:#85bbf0,stroke:#5d82a8,color:#000000
         103["<div style='font-weight: bold'>Items API</div><div style='font-size: 70%; margin-top: 0px'>[Component: Go, net/http]</div><div style='font-size: 80%; margin-top:10px'>CRUD for a tenant's items<br />over HTTP.</div>"]
-        style 103 fill:#ffffff,stroke:#444444,color:#ffffff
+        style 103 fill:#85bbf0,stroke:#5d82a8,color:#000000
         104["<div style='font-weight: bold'>main</div><div style='font-size: 70%; margin-top: 0px'>[Component: Go]</div><div style='font-size: 80%; margin-top:10px'>Reads the configuration,<br />wires the components and runs<br />the server.</div>"]
-        style 104 fill:#ffffff,stroke:#444444,color:#ffffff
+        style 104 fill:#85bbf0,stroke:#5d82a8,color:#000000
         105["<div style='font-weight: bold'>Store</div><div style='font-size: 70%; margin-top: 0px'>[Component: pgx]</div><div style='font-size: 80%; margin-top:10px'>Reads and writes items as the<br />tenant, under RLS.</div>"]
-        style 105 fill:#ffffff,stroke:#444444,color:#ffffff
+        style 105 fill:#85bbf0,stroke:#5d82a8,color:#000000
       end
 
       17[("<div style='font-weight: bold'>PostgreSQL</div><div style='font-size: 70%; margin-top: 0px'>[Container: CloudNativePG]</div><div style='font-size: 80%; margin-top:10px'>Tenant and application data<br />with RLS; separate database<br />for Zitadel (ADR-0002,<br />ADR-0003).</div>")]
@@ -334,7 +334,7 @@ Structurizr needs Java 21+ ([binaries](https://docs.structurizr.com/binaries)), 
 curl -fL -o ~/.local/lib/structurizr.war https://download.structurizr.com/structurizr.war
 ```
 
-* Regenerate the L3 components and the diagrams above: `make c4` from the repository root.
+* Regenerate the C3 components and the diagrams above: `make c4` from the repository root.
 * Validate and regenerate only the diagrams: `./render.sh`. CI runs `./render.sh --check`, which fails when they are out of date. If Java 21+ is not registered with `/usr/libexec/java_home`, pass it: `JAVA=/path/to/java ./render.sh`.
 * Browse and lay out views at http://localhost:8080: `java -jar ~/.local/lib/structurizr.war local docs/architecture/c4`.
 * Docker instead of Java: `docker run -it --rm -p 8080:8080 -v "$PWD/docs/architecture/c4:/usr/local/structurizr" structurizr/structurizr local`.
