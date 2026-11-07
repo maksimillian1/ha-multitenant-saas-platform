@@ -64,3 +64,6 @@ tmp/*
 
 # HAMSP-5: test tenant credentials written by prototype/bootstrap-tenants.sh
 prototype/.tenants.json
+
+# Tools and reports built by make (c4sync)
+/bin/
