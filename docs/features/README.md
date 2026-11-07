@@ -8,7 +8,7 @@ The rules behind the fields are in [Feature stages](../process/feature-stages.md
 
 ## A feature is its slug
 
-A feature is a capability of the platform, such as `tenant-suspend` or `gateway-auth`, named by a short kebab-case slug. The slug is the file name and the key everything else uses: tests (`// Verifies: tenant-suspend AC-2; T-01`), release flags ([ADR-0011](../adr/0011-feature-flags.md)), the QS runs log and the skills.
+A feature is a capability of the platform, such as `tenant-suspend` or `gateway-auth`, named by a short kebab-case slug. The slug is the file name and the key everything else uses: tests (`// Verifies: tenant-suspend AC-2; T-01`), release flags, when a feature has one, the QS runs log and the skills.
 
 Linear issues are the work on a feature. The file lists them under `links`, and each issue links back to the file. The links are for people. No tool and no gate reads Linear: if Linear is gone, the state of every feature is still here.
 

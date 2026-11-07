@@ -2,8 +2,6 @@
 
 How features are tested and where the results are kept. [Feature stages](feature-stages.md) says which stage needs which gate; this page is the detail behind gates G-01, G-04, G-05 and G-07 there. What the owner reviews is in [Review](review.md).
 
-This page describes the target. Which of these checks run today and which are still missing: [Guardrails](guardrails.md).
-
 Three rules hold everywhere:
 
 * **A test that did not run is not evidence.** Neither is reading the code.
@@ -16,7 +14,7 @@ Three rules hold everywhere:
 |---|---|---|---|
 | **L1: pre-commit** | seconds | gofmt, golangci-lint and oxlint on changed files, `tsc`, gitleaks, semgrep on changed files | Yes, with `--no-verify`. |
 | **L2: pre-push and the agent hook** | about a minute | unit tests of the touched packages, contract tests of the touched contracts | Yes. |
-| **L3: CI, every pull request** | no limit | L1 and L2 again on the whole change; all unit tests with `-race`; build for `amd64` and `arm64`; licence check; govulncheck, trivy, npm audit; the flag-off suite (section 3); diff coverage (section 6) | No. Required checks. |
+| **L3: CI, every pull request** | no limit | L1 and L2 again on the whole change; all unit tests with `-race`; build for `amd64` and `arm64`; licence check; govulncheck, trivy, npm audit; the flag-off suite once release flags exist (section 3); diff coverage (section 6) | No. Required checks. |
 
 CI repeats L1 and L2 because local hooks can be skipped. CI is the only layer that enforces anything; L1 and L2 exist to fail early and cheaply. Everything in L3 is the *baseline* of [Feature stages](feature-stages.md): it applies to every change at every stage.
 
@@ -38,7 +36,7 @@ Heavier tests (end-to-end on kind, fuzzing, control canaries, load, chaos) are n
 
 ## 3. Feature flags: both states are tested
 
-Every release flag ([ADR-0011](../adr/0011-feature-flags.md)) needs tests in both states for as long as it exists.
+Release flags are optional for now ([Feature stages](feature-stages.md), "Flags"). A feature that has one needs tests in both states for as long as the flag exists.
 
 * **Off** (gate G-01, from `proto`). The application works with the flag off, and the off path is the old behaviour or a refusal. CI runs the whole test suite with every release flag at its default, which is off. Code below `alpha` is merged with its flag off, so for everyone else this is the state that matters.
 * **On** (from `alpha`). The acceptance criteria are tested with the flag on. The kind end-to-end suite runs with one alpha tenant, which has every `alpha` flag on, and one normal tenant.
