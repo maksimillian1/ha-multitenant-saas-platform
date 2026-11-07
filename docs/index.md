@@ -19,7 +19,6 @@ Specific technical constraints must be sourced from the specialized files below:
 - [Contracts](contracts/)
 - [C4 model](architecture/c4/README.md): diagrams generated from [workspace.dsl](architecture/c4/workspace.dsl)
 - [Roadmap](roadmap.md): what gets built, in what order, for v1 and v2
-- [Development process](process/README.md): which file in `docs/process` answers what, and in what order to read them
 - [Feature stages](process/feature-stages.md): how a feature goes from `proto` to `stable`, and which gates each stage needs
 - [Testing](process/testing.md): where checks run, the QA checklist, flags in both states, quality scenario runs, where results are kept
 - [Review](process/review.md): what the owner reviews at each gate, and the architecture fitness functions that check the rest
