@@ -42,12 +42,12 @@ structurizr export -workspace workspace.dsl -format mermaid -output "$out" > /de
 {
   sed '/<!-- diagrams:start -->/q' README.md
   for entry in \
-    "SystemContext:System Context (L1)" \
-    "RequestPath:RequestPath (L2)" \
-    "UsagePipeline:UsagePipeline (L2)" \
-    "UsageWriteAPIComponents:UsageWriteAPI components (L3, generated)" \
-    "UsageWriterComponents:Usage Writer components (L3, generated)" \
-    "ExampleAppComponents:ExampleApp components (L3, generated)"; do
+    "SystemContext:System Context (C1)" \
+    "RequestPath:RequestPath (C2)" \
+    "UsagePipeline:UsagePipeline (C2)" \
+    "UsageWriteAPIComponents:UsageWriteAPI components (C3, generated)" \
+    "UsageWriterComponents:Usage Writer components (C3, generated)" \
+    "ExampleAppComponents:ExampleApp components (C3, generated)"; do
     view="${entry%%:*}"
     printf '\n### %s\n\n```mermaid\n' "${entry#*:}"
     cat "$out/structurizr-$view.mmd"
