@@ -1,5 +1,6 @@
 feature: gateway-auth
 title: JWT validation and tenant context in the API Gateway
+stage: proto
 critical: true
 code:
   - apps/gateway/auth/**
@@ -13,10 +14,12 @@ acceptance:
     text: A request with a valid platform-api token of a machine user whose organization is not in the API Gateway's tenant list gets 401 and never reaches the service behind the Gateway.
     level: e2e
     planned: prototype/e2e/gateway_test.go:TestNonTenantOrgGets401
+    verified: [prototype/e2e/gateway_test.go:TestNonTenantOrgGets401, apps/gateway/auth/auth_test.go:TestTenantNotInListIsRejected]
   AC-2:
     text: A machine user of a tenant organization gets a token with the platform-api audience, and the API Gateway serves its request with x-tenant-id set to its organization ID.
     level: e2e
     planned: prototype/e2e/gateway_test.go:TestGrantedTenantGetsPlatformToken
+    verified: [prototype/e2e/gateway_test.go:TestGrantedTenantGetsPlatformToken]
   AC-3:
     text: prototype/bootstrap-tenants.sh writes the tenant organization IDs to the ConfigMap gateway/api-gateway-tenants and restarts the API Gateway only when the list changed; a rerun changes nothing.
     level: e2e
@@ -25,5 +28,16 @@ acceptance:
     text: The API Gateway does not start when its tenant list is empty or unset.
     level: unit
     planned: apps/gateway/core/config_test.go:TestTenantsRequired
+    verified: [apps/gateway/core/config_test.go:TestTenantsRequired, apps/gateway/auth/auth_test.go:TestEmptyTenantListRejectsAll]
 quality_scenarios:
   touched: [QS-18]
+  recommended_runs: []
+gates:
+  G-01: {status: n/a, by: verify, date: 2026-11-08, commit: 530341d0, note: no release flag}
+runs:
+  - date: 2026-11-08
+    commit: 530341d0
+    stage_checked: proto
+    verdict: ready
+    failed: []
+    not_checked: []
