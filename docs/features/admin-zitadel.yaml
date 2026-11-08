@@ -5,7 +5,7 @@ code:
   - apps/admin/zitadel/**
 c4: [adminPortal, authService]
 links:
-  issues: [HAMSP-23, HAMSP-36]
+  issues: [HAMSP-23, HAMSP-36, HAMSP-91]
 requirements: [C-03, C-04, QS-11]
 
 acceptance:
@@ -63,3 +63,28 @@ acceptance:
       On kind, adding a personal access token to admin-app makes the admin app log
       service_account_credential_drift for it within 5 minutes.
     level: integration
+  AC-10:
+    text: >-
+      After Zitadel is installed on kind, the machine user iam-admin (IAM_OWNER, created by the
+      Helm chart's setup job) has no personal access token, and the Secret zitadel/iam-admin-pat
+      does not exist.
+    level: integration
+  AC-11:
+    text: >-
+      prototype/bootstrap-tenants.sh calls Zitadel as iam-admin only with a short-lived access
+      token it gets by the JWT bearer grant from iam-admin's key (Secret zitadel/iam-admin). It
+      creates the tenant organizations, the test users and the admin app's service accounts and
+      writes its output file as before.
+    level: integration
+  AC-12:
+    text: >-
+      Each run of prototype/bootstrap-tenants.sh gives iam-admin a new key expiring at most
+      30 days after the run, writes it to the Secret zitadel/iam-admin, and deletes iam-admin's
+      other keys and any personal access token.
+    level: integration
+  AC-13:
+    text: >-
+      The credential drift check of AC-8 also covers iam-admin: a personal access token, more
+      than one key, or a key valid for more than 30 days logs service_account_credential_drift
+      with the account and the credential's type and ID, never its secret.
+    level: unit
