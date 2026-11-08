@@ -5,4 +5,61 @@ code:
   - apps/admin/zitadel/**
 c4: [adminPortal, authService]
 links:
-  issues: [HAMSP-23]
+  issues: [HAMSP-23, HAMSP-36]
+requirements: [C-03, C-04, QS-11]
+
+acceptance:
+  AC-1:
+    text: >-
+      The Zitadel client of each service account (admin-app, admin-app-instance) authenticates
+      with an access token it gets from Zitadel by the JWT bearer grant (RFC 7523), signed with
+      the account's JWT profile key. No request to Zitadel carries the private key or a
+      personal access token.
+    level: unit
+  AC-2:
+    text: >-
+      The client reuses its access token until shortly before it expires and gets a new one
+      before that; a Zitadel call never fails because the access token expired.
+    level: unit
+  AC-3:
+    text: >-
+      When Zitadel answers a call with unauthenticated (401), the client drops its access
+      token, gets a new one and repeats the call once; a second 401 is returned to the caller.
+    level: unit
+  AC-4:
+    text: >-
+      The admin app does not start when the key of either service account is missing or
+      cannot be parsed, and its error names the account and the setting; it never logs the key.
+    level: unit
+  AC-5:
+    text: >-
+      After prototype/bootstrap-tenants.sh, admin-app and admin-app-instance each have exactly
+      one key, expiring at most 30 days after the run, and no personal access tokens; the Secret
+      admin/admin-zitadel holds the two keys and no tokens. A second run replaces the keys and
+      deletes the old ones.
+    level: integration
+  AC-6:
+    text: >-
+      On kind, the admin app with these keys lists organizations as admin-app and reads the
+      instance branding as admin-app-instance.
+    level: integration
+  AC-7:
+    text: >-
+      Each service account holds the narrowest Zitadel instance role that covers the routes
+      that use it (no wider than today's IAM_ORG_MANAGER and IAM_OWNER). A call outside those
+      routes is denied with permission_denied: admin-app changing the instance branding,
+      admin-app-instance creating an organization or a user.
+    level: integration
+  AC-8:
+    text: >-
+      At start and every 5 minutes, the admin app lists the credentials of both service
+      accounts. When an account has a personal access token, a key other than the one the app
+      uses, or a key valid for more than 30 days, it logs one ERROR event
+      service_account_credential_drift per finding, with the account and the credential's type
+      and ID, never its secret.
+    level: unit
+  AC-9:
+    text: >-
+      On kind, adding a personal access token to admin-app makes the admin app log
+      service_account_credential_drift for it within 5 minutes.
+    level: integration
