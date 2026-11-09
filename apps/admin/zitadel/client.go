@@ -265,6 +265,7 @@ func (p Page) ascending() *pagination {
 // filter.v2.TextFilterMethod (project and authorization v2).
 const (
 	textContainsIgnoreCase   = "TEXT_QUERY_METHOD_CONTAINS_IGNORE_CASE"
+	textEquals               = "TEXT_QUERY_METHOD_EQUALS"
 	filterContainsIgnoreCase = "TEXT_FILTER_METHOD_CONTAINS_IGNORE_CASE"
 )
 

@@ -478,3 +478,60 @@ func TestBootstrapRerunRotatesKeys(t *testing.T) {
 		checkOnlyShortKey(t, iamAdmin, name, k.UserID, k.KeyID)
 	}
 }
+
+// driftEvent is the event the admin app logs for a credential a service
+// account should not have (apps/admin/zitadel.DriftEvent).
+const driftEvent = "service_account_credential_drift"
+
+// Verifies: admin-zitadel AC-9
+func TestCredentialDriftLogged(t *testing.T) {
+	iamAdmin := keyToken(t, loadServiceKey(t, iamAdminKeySecret, iamAdminKeyField))
+	k := loadServiceKey(t, adminAppKeySecret, adminAppKeyField)
+	since := time.Now().Add(-time.Second).UTC().Format(time.RFC3339)
+
+	r := zitadelCall(t, iamAdmin, http.MethodPost, "/management/v1/users/"+k.UserID+"/pats", map[string]any{
+		"expirationDate": time.Now().Add(time.Hour).UTC().Format(time.RFC3339),
+	})
+	mustStatus(t, r, http.StatusOK, "add a personal access token to admin-app")
+	var pat struct {
+		TokenID string `json:"tokenId"`
+		Token   string `json:"token"`
+	}
+	r.decode(t, &pat)
+	t.Cleanup(func() {
+		r := zitadelCall(t, iamAdmin, http.MethodDelete, "/management/v1/users/"+k.UserID+"/pats/"+pat.TokenID, nil)
+		mustStatus(t, r, http.StatusOK, "remove the test personal access token")
+	})
+
+	// The check runs every 5 minutes.
+	deadline := time.Now().Add(6 * time.Minute)
+	for {
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		logs, err := kubectl(ctx, "-n", "admin", "logs", "-l", "app.kubernetes.io/name=admin",
+			"--since-time="+since, "--tail=-1")
+		cancel()
+		if err != nil {
+			t.Fatal(err)
+		}
+		if pat.Token != "" && strings.Contains(logs, pat.Token) {
+			t.Fatal("the admin app logged the personal access token itself")
+		}
+		for _, line := range strings.Split(logs, "\n") {
+			var e struct {
+				Level, Msg, Account, Credential string
+				CredentialID                    string `json:"credential_id"`
+			}
+			if json.Unmarshal([]byte(line), &e) != nil || e.Msg != driftEvent || e.CredentialID != pat.TokenID {
+				continue
+			}
+			if e.Level != "ERROR" || e.Account != "admin-app" || e.Credential != "personal_access_token" {
+				t.Errorf("drift event = %+v, want ERROR for admin-app's personal_access_token", e)
+			}
+			return
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("no %s event for personal access token %s within 6 minutes", driftEvent, pat.TokenID)
+		}
+		time.Sleep(15 * time.Second)
+	}
+}

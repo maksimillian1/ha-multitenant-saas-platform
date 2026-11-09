@@ -18,6 +18,7 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	"github.com/maksimillian1/ha-multitenant-saas-platform/apps/admin/api"
 	"github.com/maksimillian1/ha-multitenant-saas-platform/apps/admin/auth"
@@ -84,11 +85,25 @@ func bootstrapServices(ctx context.Context, cfg core.Config, log *slog.Logger) (
 		return nil, nil, nil, nil, err
 	}
 	apiService := newAPIService(cfg, authService, tokens, issuerClient, log)
+	// Both service accounts are checked for credentials they should not
+	// have (a PAT, a second key, a long key); a finding is an ERROR event.
+	drift := &zitadel.DriftCheck{
+		Client: zitadel.NewClient(cfg.ZitadelURL, tokens, issuerClient),
+		Accounts: []zitadel.Account{
+			{Name: "admin-app", UserID: key.UserID, OwnKeyID: key.KeyID},
+			{Name: "iam-admin"},
+		},
+		Log: log,
+	}
+	go drift.Loop(ctx, driftInterval)
 	uiService := ui.NewService(authService, log)
 	healthService := health.NewService()
 
 	return authService, apiService, uiService, healthService, nil
 }
+
+// driftInterval is how often the service accounts' credentials are checked.
+const driftInterval = 5 * time.Minute
 
 // newAPIService builds the API with one Zitadel client, the admin app's
 // account, for every route; the platform branding uses it too (HAMSP-36).
