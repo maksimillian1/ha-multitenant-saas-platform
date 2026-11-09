@@ -4,7 +4,7 @@ import { apiError, json, mockApi } from '@/test/api'
 import { signedIn, tenantActive, tenantDeleted, tenantStuck, tenantSuspended } from '@/test/fixtures'
 import { renderApp } from '@/test/render'
 
-// Verifies: AC-13 (the Tenants page, the create dialog and the tenant page)
+// Verifies: tenant-management AC-13
 
 const tenants = { items: [tenantActive, tenantSuspended, tenantStuck] }
 

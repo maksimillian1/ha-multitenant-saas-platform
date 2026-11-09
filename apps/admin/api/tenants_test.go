@@ -19,7 +19,7 @@ import (
 // tenant route are in TestEveryRouteRequiresAdmin and
 // TestMutationsNeedCSRFHeader (apiRoutes lists them).
 //
-// Verifies: AC-14
+// Verifies: tenant-management AC-14; T-04
 func TestTenantRoutes(t *testing.T) {
 	e := newEnv(t)
 
