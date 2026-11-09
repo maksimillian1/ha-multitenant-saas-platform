@@ -23,7 +23,9 @@ type Tokens interface {
 // zitadelAPIScope asks for Zitadel's own API in the token's audience.
 const zitadelAPIScope = "urn:zitadel:iam:org:project:id:zitadel:aud"
 
-// renewBefore is how long before its expiry an access token is replaced.
+// renewBefore is how long before its expiry an access token is replaced, at
+// most: a token that lives less than four times as long is replaced when a
+// quarter of its life is left (the prototype's tokens live 60 s).
 const renewBefore = 2 * time.Minute
 
 // tokenSource is the part of zitadel/oidc's profile.TokenSource we use.
@@ -38,8 +40,9 @@ type KeyTokens struct {
 	src tokenSource
 	now func() time.Time
 
-	mu  sync.Mutex
-	tok *oauth2.Token
+	mu     sync.Mutex
+	tok    *oauth2.Token
+	margin time.Duration // renew when less than this is left
 }
 
 // NewKeyTokens returns the tokens of the machine user of key at the Zitadel
@@ -63,9 +66,10 @@ func NewKeyTokens(ctx context.Context, issuer string, key Key, httpClient *http.
 func (k *KeyTokens) Token(ctx context.Context) (string, error) {
 	k.mu.Lock()
 	defer k.mu.Unlock()
-	if k.tok != nil && k.tok.AccessToken != "" && (k.tok.Expiry.IsZero() || k.now().Add(renewBefore).Before(k.tok.Expiry)) {
+	if k.tok != nil && k.tok.AccessToken != "" && (k.tok.Expiry.IsZero() || k.now().Add(k.margin).Before(k.tok.Expiry)) {
 		return k.tok.AccessToken, nil
 	}
+	fetched := k.now()
 	tok, err := k.src.TokenCtx(ctx)
 	if err != nil {
 		return "", fmt.Errorf("zitadel: getting an access token: %w", err)
@@ -74,6 +78,7 @@ func (k *KeyTokens) Token(ctx context.Context) (string, error) {
 		return "", errors.New("zitadel: the token answer has no access token")
 	}
 	k.tok = tok
+	k.margin = min(renewBefore, tok.Expiry.Sub(fetched)/4)
 	return tok.AccessToken, nil
 }
 

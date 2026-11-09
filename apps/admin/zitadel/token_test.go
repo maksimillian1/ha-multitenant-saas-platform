@@ -208,6 +208,34 @@ func TestTokenRenewedBeforeExpiry(t *testing.T) {
 	}
 }
 
+// A short-lived token (the prototype's live 60 s) is reused too, and renewed
+// when a quarter of its life is left.
+//
+// Verifies: admin-zitadel AC-2
+func TestShortTokenRenewedBeforeExpiry(t *testing.T) {
+	z, c, tokens := newTokenZitadel(t, 60)
+	now := time.Now()
+	tokens.now = func() time.Time { return now }
+	call := func() {
+		t.Helper()
+		c.account = nil
+		if _, err := c.ServiceAccount(context.Background()); err != nil {
+			t.Fatal(err)
+		}
+	}
+	call()
+	now = now.Add(40 * time.Second)
+	call()
+	if z.issued != 1 {
+		t.Fatalf("tokens issued within 40 s = %d, want 1", z.issued)
+	}
+	now = now.Add(6 * time.Second) // 14 s left, less than a quarter
+	call()
+	if z.issued != 2 {
+		t.Fatalf("tokens issued with 14 of 60 s left = %d, want 2", z.issued)
+	}
+}
+
 // Verifies: admin-zitadel AC-3
 func TestUnauthenticatedRetriesOnceWithNewToken(t *testing.T) {
 	t.Run("a revoked token is replaced", func(t *testing.T) {
