@@ -10,14 +10,18 @@
 # service account admin-app with the instance role IAM_ORG_MANAGER, which the
 # app uses to manage organizations, users and role assignments (HAMSP-34), and
 # a second one, admin-app-instance with IAM_OWNER, which the app uses only for
-# the platform (instance) branding (HAMSP-37). Their personal access tokens go
+# the platform (instance) branding (HAMSP-37). For Tenant Management
+# (HAMSP-51) it creates the project tenant-management with the role
+# tenant-manager, the admin app's client of it (Secret admin/admin-tenants)
+# and the service's own account (Secret tenants/tenants-zitadel). Their personal access tokens go
 # to the Secret admin/admin-zitadel (ZITADEL_TOKEN, ZITADEL_INSTANCE_TOKEN). Writes
 # the credentials to prototype/.tenants.json (git-ignored) for the e2e tests
 # and for signing in. Safe to run again: existing organizations, users and
 # projects are reused; client secrets, the service account's token and the
 # admin test users' passwords are regenerated.
 #
-# Tenant lifecycle as a feature is HAMSP-6; this script only seeds test data.
+# The tenants created here are test fixtures from before Tenant Management
+# (ADR-0012); tenants made in the admin app go through apps/tenants.
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -46,6 +50,15 @@ ADMIN_SA_ROLE="IAM_ORG_MANAGER"
 # nothing else.
 INSTANCE_SA="admin-app-instance"
 INSTANCE_SA_ROLE="IAM_OWNER"
+# Tenant Management (apps/tenants, HAMSP-51): its callers need the role
+# tenant-manager of this project; the admin app calls it as TM_CLIENT. The
+# service itself calls Zitadel as TM_SA.
+TM_PROJECT="tenant-management"
+TM_ROLE="tenant-manager"
+TM_CLIENT="admin-tenants-client"
+TM_SA="tenant-management"
+TM_SA_ROLE="IAM_ORG_MANAGER"
+TM_URL="http://tenants.tenants.svc:8080"
 
 # Access tokens live 60 s, so the e2e tests can prove that an expired token is
 # rejected (HAMSP-5 AC-5) without waiting hours.
@@ -317,6 +330,69 @@ if kubectl -n admin get deployment admin &>/dev/null; then
   kubectl -n admin rollout restart deployment/admin >/dev/null
 fi
 
+# ── 7. Tenant Management: its project, its caller and its service account ─────
+
+# The project's ID is the audience of the tokens Tenant Management accepts.
+# Role assertion puts the caller's roles into its access token.
+tm_project=$(jq -nc --arg n "${TM_PROJECT}" '{name: $n, projectRoleAssertion: true}')
+tm_project_id=$(zitadel POST /management/v1/projects/_search "$(jq -nc --arg n "${TM_PROJECT}" \
+  '{queries: [{nameQuery: {name: $n, method: "TEXT_QUERY_METHOD_EQUALS"}}]}')" \
+  | jq -r '.result[0].id // empty')
+if [[ -z "${tm_project_id}" ]]; then
+  tm_project_id=$(zitadel POST /management/v1/projects "${tm_project}" | jq -r '.id')
+  echo "Created project ${TM_PROJECT} (${tm_project_id})"
+else
+  echo "Reusing project ${TM_PROJECT} (${tm_project_id})"
+fi
+role_count=$(zitadel POST "/management/v1/projects/${tm_project_id}/roles/_search" "$(jq -nc --arg r "${TM_ROLE}" \
+  '{queries: [{keyQuery: {key: $r, method: "TEXT_QUERY_METHOD_EQUALS"}}]}')" | jq '.result // [] | length')
+if [[ "${role_count}" == "0" ]]; then
+  zitadel POST "/management/v1/projects/${tm_project_id}/roles" "$(jq -nc --arg r "${TM_ROLE}" \
+    '{roleKey: $r, displayName: $r}')" >/dev/null
+  echo "  created role ${TM_ROLE}"
+fi
+
+# The admin app's client: a machine user with JWT access tokens (validated
+# locally by Tenant Management) and the role tenant-manager.
+tm_client_id=$(zitadel POST /management/v1/users/_search "$(jq -nc --arg u "${TM_CLIENT}" \
+  '{queries: [{userNameQuery: {userName: $u, method: "TEXT_QUERY_METHOD_EQUALS"}}]}')" \
+  | jq -r '.result[0].id // empty')
+if [[ -z "${tm_client_id}" ]]; then
+  tm_client_id=$(zitadel POST /management/v1/users/machine "$(jq -nc --arg u "${TM_CLIENT}" \
+    '{userName: $u, name: $u, description: "apps/admin calls Tenant Management as this user",
+      accessTokenType: "ACCESS_TOKEN_TYPE_JWT"}')" | jq -r '.userId')
+  echo "Created machine user ${TM_CLIENT} (${tm_client_id})"
+fi
+grants=$(zitadel POST /management/v1/users/grants/_search "$(jq -nc --arg u "${tm_client_id}" --arg p "${tm_project_id}" \
+  '{queries: [{userIdQuery: {userId: $u}}, {projectIdQuery: {projectId: $p}}]}')" | jq '.result // [] | length')
+if [[ "${grants}" == "0" ]]; then
+  zitadel POST "/management/v1/users/${tm_client_id}/grants" "$(jq -nc --arg p "${tm_project_id}" --arg r "${TM_ROLE}" \
+    '{projectId: $p, roleKeys: [$r]}')" >/dev/null
+  echo "  granted ${TM_ROLE} to ${TM_CLIENT}"
+fi
+tm_secret=$(zitadel PUT "/management/v1/users/${tm_client_id}/secret" '{}')
+
+tm_sa_token=$(service_account "${TM_SA}" "${TM_SA_ROLE}" \
+  "apps/tenants creates and deletes tenant organizations and their first admins as this user")
+
+kubectl create namespace tenants --dry-run=client -o yaml | kubectl apply -f - >/dev/null
+kubectl -n tenants create secret generic tenants-zitadel --from-literal=ZITADEL_TOKEN="${tm_sa_token}" \
+  --from-literal=TENANT_MANAGEMENT_AUDIENCE="${tm_project_id}" --dry-run=client -o yaml | kubectl apply -f - >/dev/null
+kubectl -n admin create secret generic admin-tenants --from-literal=TENANTS_URL="${TM_URL}" \
+  --from-literal=TENANTS_AUDIENCE="${tm_project_id}" \
+  --from-literal=TENANTS_CLIENT_ID="$(jq -r '.clientId' <<<"${tm_secret}")" \
+  --from-literal=TENANTS_CLIENT_SECRET="$(jq -r '.clientSecret' <<<"${tm_secret}")" \
+  --dry-run=client -o yaml | kubectl apply -f - >/dev/null
+for d in tenants/tenants admin/admin; do
+  if kubectl -n "${d%/*}" get deployment "${d#*/}" &>/dev/null; then
+    kubectl -n "${d%/*}" rollout restart "deployment/${d#*/}" >/dev/null
+  fi
+done
+
+tm_json=$(jq -nc --arg aud "${tm_project_id}" --arg role "${TM_ROLE}" \
+  --arg cid "$(jq -r '.clientId' <<<"${tm_secret}")" --arg cs "$(jq -r '.clientSecret' <<<"${tm_secret}")" \
+  '{audience: $aud, role: $role, client_id: $cid, client_secret: $cs}')
+
 admin_json=$(jq -nc --arg url "${ADMIN_URL}" --arg role "${ADMIN_ROLE}" --arg vrole "${VIEWER_ROLE}" \
   --arg sp "${super_admin_password}" --arg vp "${viewer_password}" --arg rp "${regular_user_password}" \
   '{url: $url, role: $role, users: [{username: "super-admin", password: $sp, roles: [$role]},
@@ -324,8 +400,8 @@ admin_json=$(jq -nc --arg url "${ADMIN_URL}" --arg role "${ADMIN_ROLE}" --arg vr
                                     {username: "regular-user", password: $rp, roles: []}]}')
 
 jq -n --arg issuer "${ISSUER}" --arg gw "${GATEWAY}" --arg aud "${project_id}" --argjson t "${tenants_json}" \
-  --argjson admin "${admin_json}" \
-  '{issuer: $issuer, gateway: $gw, audience: $aud, tenants: $t, admin: $admin}' >"${OUT}"
+  --argjson admin "${admin_json}" --argjson tm "${tm_json}" \
+  '{issuer: $issuer, gateway: $gw, audience: $aud, tenants: $t, admin: $admin, tenant_management: $tm}' >"${OUT}"
 chmod 600 "${OUT}"
 echo ""
 echo "Wrote ${OUT}. Super admin page: ${ADMIN_URL} (users: jq .admin.users ${OUT})"

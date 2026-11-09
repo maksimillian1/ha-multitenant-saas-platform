@@ -1,0 +1,80 @@
+# Tenant Management (apps/tenants, ADR-0012, HAMSP-51). Called only by the
+# admin app (network-policy.yaml), with a Zitadel token holding the role
+# tenant-manager. prototype/bootstrap-tenants.sh creates the Secret
+# tenants-zitadel; until then the pods wait in CreateContainerConfigError.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: tenants
+  namespace: tenants
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: tenants
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: tenants
+    spec:
+      serviceAccountName: tenants
+      containers:
+        - name: tenants
+          # Built and loaded into kind by prototype/create-cluster.sh.
+          image: hamsp/tenants:dev
+          imagePullPolicy: IfNotPresent
+          args: ["serve"]
+          ports:
+            - name: http
+              containerPort: 8080
+          env:
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: tenants-db
+                  key: DATABASE_URL
+            - name: ZITADEL_ISSUER
+              value: http://zitadel.localtest.me:30080
+            # The issuer's name does not resolve inside the cluster; talk to the
+            # Zitadel Service with the issuer as Host header.
+            - name: ZITADEL_DIAL_ADDR
+              value: zitadel.zitadel.svc:8080
+            - name: TENANT_QUOTA_CPU
+              value: "2"
+            - name: TENANT_QUOTA_MEMORY
+              value: 2Gi
+            - name: TENANT_QUOTA_PODS
+              value: "10"
+          envFrom:
+            # ZITADEL_TOKEN (service account tenant-management, IAM_ORG_MANAGER)
+            # and TENANT_MANAGEMENT_AUDIENCE (the project tenant-management).
+            - secretRef:
+                name: tenants-zitadel
+          readinessProbe:
+            httpGet: {path: /readyz, port: http}
+            periodSeconds: 5
+          livenessProbe:
+            httpGet: {path: /healthz, port: http}
+            periodSeconds: 10
+          resources:
+            requests: {cpu: 20m, memory: 32Mi}
+            limits: {memory: 128Mi}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: {drop: ["ALL"]}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: tenants
+  namespace: tenants
+spec:
+  selector:
+    app.kubernetes.io/name: tenants
+  ports:
+    - name: http
+      port: 8080
+      targetPort: http
