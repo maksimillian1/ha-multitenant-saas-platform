@@ -55,10 +55,13 @@ func TestBadRequestsNeverReachZitadel(t *testing.T) {
 		method, path string
 		body         any
 	}{
-		{"POST", "/api/orgs", `{"name": "x"`},
-		{"POST", "/api/orgs", `{"name": "x", "admins": []}`},
-		{"POST", "/api/orgs", `{"name": "x"} {"name": "y"}`},
-		{"POST", "/api/orgs", OrgCreate{Name: "   "}},
+		{"POST", "/api/tenants", `{"name": "x"`},
+		{"POST", "/api/tenants", `{"name": "x", "admin_email": "a@b.test", "admins": []}`},
+		{"POST", "/api/tenants", `{"name": "x", "admin_email": "a@b.test"} {"name": "y"}`},
+		{"POST", "/api/tenants", TenantCreate{Name: "   ", AdminEmail: "a@b.test"}},
+		{"POST", "/api/tenants", TenantCreate{Name: strings.Repeat("n", 101), AdminEmail: "a@b.test"}},
+		{"POST", "/api/tenants", TenantCreate{Name: "x", AdminEmail: "not-an-email"}},
+		{"GET", "/api/tenants?include_deleted=yes", nil},
 		{"PATCH", "/api/orgs/org-a", OrgUpdate{Name: strings.Repeat("n", 201)}},
 		{"GET", "/api/orgs?limit=0", nil},
 		{"GET", "/api/orgs?limit=101", nil},
@@ -77,6 +80,9 @@ func TestBadRequestsNeverReachZitadel(t *testing.T) {
 		errorText(t, rec)
 		if calls := e.z.called(); len(calls) > 0 {
 			t.Errorf("%s %s called Zitadel: %v", tc.method, tc.path, calls)
+		}
+		if calls := e.tm.called(); len(calls) > 0 {
+			t.Errorf("%s %s called Tenant Management: %v", tc.method, tc.path, calls)
 		}
 	}
 }

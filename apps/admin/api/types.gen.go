@@ -118,6 +118,54 @@ func (e ProjectState) Valid() bool {
 	}
 }
 
+// Defines values for TenantPart.
+const (
+	TenantPartAdmin        TenantPart = "admin"
+	TenantPartNamespace    TenantPart = "namespace"
+	TenantPartOrganization TenantPart = "organization"
+)
+
+// Valid indicates whether the value is a known member of the TenantPart enum.
+func (e TenantPart) Valid() bool {
+	switch e {
+	case TenantPartAdmin:
+		return true
+	case TenantPartNamespace:
+		return true
+	case TenantPartOrganization:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for TenantState.
+const (
+	TenantStateActive       TenantState = "active"
+	TenantStateDeleted      TenantState = "deleted"
+	TenantStateDeleting     TenantState = "deleting"
+	TenantStateProvisioning TenantState = "provisioning"
+	TenantStateSuspended    TenantState = "suspended"
+)
+
+// Valid indicates whether the value is a known member of the TenantState enum.
+func (e TenantState) Valid() bool {
+	switch e {
+	case TenantStateActive:
+		return true
+	case TenantStateDeleted:
+		return true
+	case TenantStateDeleting:
+		return true
+	case TenantStateProvisioning:
+		return true
+	case TenantStateSuspended:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for ThemeMode.
 const (
 	ThemeModeAuto  ThemeMode = "auto"
@@ -455,11 +503,6 @@ type Org struct {
 	State         OrgState `json:"state"`
 }
 
-// OrgCreate defines model for OrgCreate.
-type OrgCreate struct {
-	Name string `json:"name"`
-}
-
 // OrgList defines model for OrgList.
 type OrgList struct {
 	Items []Org `json:"items"`
@@ -542,6 +585,54 @@ type Role struct {
 	Key         string `json:"key"`
 }
 
+// Tenant defines model for Tenant.
+type Tenant struct {
+	// AdminEmail The first admin's email; empty on a tombstone
+	AdminEmail *string    `json:"admin_email,omitempty"`
+	CreatedAt  time.Time  `json:"created_at"`
+	CreatedBy  string     `json:"created_by"`
+	DeletedAt  *time.Time `json:"deleted_at,omitempty"`
+	DeletedBy  *string    `json:"deleted_by,omitempty"`
+
+	// Id The tenant_id, also the ID of its Zitadel organization
+	Id string `json:"id"`
+
+	// LastError The error of the last failed step, until a step succeeds
+	LastError *string `json:"last_error,omitempty"`
+
+	// Name Empty on a tombstone
+	Name *string `json:"name,omitempty"`
+
+	// Parts The parts created so far
+	Parts     []TenantPart `json:"parts"`
+	State     TenantState  `json:"state"`
+	UpdatedAt time.Time    `json:"updated_at"`
+}
+
+// TenantCreate defines model for TenantCreate.
+type TenantCreate struct {
+	// AdminEmail The first admin's email; Tenant Management checks its form
+	AdminEmail string `json:"admin_email"`
+	Name       string `json:"name"`
+}
+
+// TenantError defines model for TenantError.
+type TenantError struct {
+	Error  string  `json:"error"`
+	Tenant *Tenant `json:"tenant,omitempty"`
+}
+
+// TenantList defines model for TenantList.
+type TenantList struct {
+	Items []Tenant `json:"items"`
+}
+
+// TenantPart defines model for TenantPart.
+type TenantPart string
+
+// TenantState defines model for TenantState.
+type TenantState string
+
 // ThemeMode defines model for ThemeMode.
 type ThemeMode string
 
@@ -609,6 +700,9 @@ type ProjectId = string
 // Search defines model for Search.
 type Search = string
 
+// TenantId defines model for TenantId.
+type TenantId = string
+
 // UserId defines model for UserId.
 type UserId = string
 
@@ -670,6 +764,12 @@ type ListProjectsParams struct {
 	Limit *Limit `form:"limit,omitempty" json:"limit,omitempty"`
 }
 
+// ListTenantsParams defines parameters for ListTenants.
+type ListTenantsParams struct {
+	// IncludeDeleted Also list the tombstones of deleted tenants
+	IncludeDeleted *bool `form:"include_deleted,omitempty" json:"include_deleted,omitempty"`
+}
+
 // ListUsersParams defines parameters for ListUsers.
 type ListUsersParams struct {
 	// Search Part of the username, display name or email, in any case
@@ -695,9 +795,6 @@ type CreateAuthorizationJSONRequestBody = AuthorizationCreate
 // UpdateAuthorizationJSONRequestBody defines body for UpdateAuthorization for application/json ContentType.
 type UpdateAuthorizationJSONRequestBody = AuthorizationUpdate
 
-// CreateOrgJSONRequestBody defines body for CreateOrg for application/json ContentType.
-type CreateOrgJSONRequestBody = OrgCreate
-
 // UpdateOrgJSONRequestBody defines body for UpdateOrg for application/json ContentType.
 type UpdateOrgJSONRequestBody = OrgUpdate
 
@@ -712,6 +809,9 @@ type SavePlatformBrandingDraftJSONRequestBody = BrandingSettings
 
 // UploadPlatformBrandingAssetMultipartRequestBody defines body for UploadPlatformBrandingAsset for multipart/form-data ContentType.
 type UploadPlatformBrandingAssetMultipartRequestBody UploadPlatformBrandingAssetMultipartBody
+
+// CreateTenantJSONRequestBody defines body for CreateTenant for application/json ContentType.
+type CreateTenantJSONRequestBody = TenantCreate
 
 // CreateHumanUserJSONRequestBody defines body for CreateHumanUser for application/json ContentType.
 type CreateHumanUserJSONRequestBody = HumanUserCreate

@@ -1,7 +1,9 @@
 // Package api is the JSON API that the SPA calls. Every handler requires a
 // session with the admin role, and state-changing handlers also pass a CSRF
 // check; the types come from ../openapi.yaml. The data lives in Zitadel,
-// which the API calls with the admin app's service account (HAMSP-34).
+// which the API calls with the admin app's service account (HAMSP-34), and
+// the tenants in Tenant Management (ADR-0012). Organizations are created and
+// deleted only as tenants, so the API has no route that does it in Zitadel.
 package api
 
 //go:generate go run github.com/oapi-codegen/oapi-codegen/v2/cmd/oapi-codegen@v2.8.1 -config oapi-codegen.yaml ../openapi.yaml
@@ -24,11 +26,9 @@ type Zitadel interface {
 	ListOrganizations(ctx context.Context, f zitadel.OrganizationFilter, p zitadel.Page) (zitadel.OrganizationList, error)
 	GetOrganization(ctx context.Context, id string) (zitadel.Organization, error)
 	DefaultOrganizationID(ctx context.Context) (string, error)
-	AddOrganization(ctx context.Context, name string) (string, error)
 	UpdateOrganization(ctx context.Context, id, name string) error
 	DeactivateOrganization(ctx context.Context, id string) error
 	ActivateOrganization(ctx context.Context, id string) error
-	DeleteOrganization(ctx context.Context, id string) error
 
 	ListUsers(ctx context.Context, f zitadel.UserFilter, p zitadel.Page) (zitadel.UserList, error)
 	GetUser(ctx context.Context, id string) (zitadel.User, error)
@@ -63,9 +63,12 @@ type Zitadel interface {
 var _ Zitadel = (*zitadel.Client)(nil)
 
 type Service struct {
-	Sessions  core.SessionReader
-	Zitadel   Zitadel
-	Platform  PlatformZitadel
+	Sessions core.SessionReader
+	Zitadel  Zitadel
+	Platform PlatformZitadel
+	// Tenants is Tenant Management; nil when TENANTS_URL is not set, and
+	// then the tenant routes answer 503.
+	Tenants   Tenants
 	AdminRole string
 	Log       *slog.Logger
 	csrf      *http.CrossOriginProtection
@@ -90,10 +93,8 @@ func (s *Service) Register(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/overview", s.read(s.overview))
 
 	mux.HandleFunc("GET /api/orgs", s.read(s.listOrgs))
-	mux.HandleFunc("POST /api/orgs", s.change(s.createOrg))
 	mux.HandleFunc("GET /api/orgs/{orgId}", s.read(s.getOrg))
 	mux.HandleFunc("PATCH /api/orgs/{orgId}", s.change(s.updateOrg))
-	mux.HandleFunc("DELETE /api/orgs/{orgId}", s.change(s.deleteOrg))
 	mux.HandleFunc("POST /api/orgs/{orgId}/deactivate", s.change(s.deactivateOrg))
 	mux.HandleFunc("POST /api/orgs/{orgId}/activate", s.change(s.activateOrg))
 
@@ -122,6 +123,7 @@ func (s *Service) Register(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/projects/{projectId}/authorizations", s.read(s.listProjectAuthorizations))
 
 	s.registerBranding(mux)
+	s.registerTenants(mux)
 
 	mux.HandleFunc("GET /api/", s.NotFoundHandler)
 }
@@ -211,7 +213,7 @@ func (a *auditWriter) WriteHeader(code int) {
 // pathTarget is the ID of the resource a route changes; "instance" for the
 // platform branding.
 func pathTarget(r *http.Request) string {
-	for _, name := range []string{"authorizationId", "userId", "orgId"} {
+	for _, name := range []string{"authorizationId", "userId", "orgId", "tenantId"} {
 		if id := r.PathValue(name); id != "" {
 			return id
 		}

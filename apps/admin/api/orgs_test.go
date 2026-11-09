@@ -41,16 +41,11 @@ func TestListOrgs(t *testing.T) {
 
 func TestOrgLifecycle(t *testing.T) {
 	e := newEnv(t)
-	var made Created
-	expect(t, e.do("POST", "/api/orgs", OrgCreate{Name: "  tenant-c "}), http.StatusCreated, &made)
-	if made.Id == "" || e.z.orgs[made.Id].Name != "tenant-c" {
-		t.Fatalf("created %+v, stored %+v", made, e.z.orgs[made.Id])
-	}
-	path := "/api/orgs/" + made.Id
+	path := "/api/orgs/org-a"
 
 	var org Org
 	expect(t, e.do("GET", path, nil), http.StatusOK, &org)
-	if org.Id != made.Id || org.Name != "tenant-c" || org.State != OrgStateActive || org.IsDefault {
+	if org.Id != "org-a" || org.Name != "tenant-a" || org.State != OrgStateActive || org.IsDefault {
 		t.Fatalf("org = %+v", org)
 	}
 	expect(t, e.do("PATCH", path, OrgUpdate{Name: "tenant-d"}), http.StatusNoContent, nil)
@@ -60,12 +55,40 @@ func TestOrgLifecycle(t *testing.T) {
 		t.Fatalf("after rename and deactivate: %+v", org)
 	}
 	expect(t, e.do("POST", path+"/activate", nil), http.StatusNoContent, nil)
-	if e.z.orgs[made.Id].State != zitadel.OrganizationActive {
+	if e.z.orgs["org-a"].State != zitadel.OrganizationActive {
 		t.Fatal("not activated")
 	}
-	expect(t, e.do("DELETE", path, nil), http.StatusNoContent, nil)
-	if rec := e.do("GET", path, nil); rec.Code != http.StatusNotFound {
-		t.Fatalf("deleted organization: status %d", rec.Code)
+}
+
+// TestOrgCreateAndDeleteAreGone: organizations are created and deleted only
+// as tenants, through Tenant Management (ADR-0012). The former routes answer
+// 404 or 405 and reach neither Zitadel nor Tenant Management.
+//
+// Verifies: AC-15
+func TestOrgCreateAndDeleteAreGone(t *testing.T) {
+	for _, tc := range []struct {
+		method, path string
+		body         any
+		status       int
+	}{
+		{"POST", "/api/orgs", `{"name": "tenant-c"}`, http.StatusMethodNotAllowed},
+		{"DELETE", "/api/orgs/org-a", nil, http.StatusMethodNotAllowed},
+		{"DELETE", "/api/orgs/org-zitadel", nil, http.StatusMethodNotAllowed},
+	} {
+		e := newEnv(t)
+		rec := e.do(tc.method, tc.path, tc.body)
+		if rec.Code != tc.status {
+			t.Errorf("%s %s: status %d, want %d", tc.method, tc.path, rec.Code, tc.status)
+		}
+		if calls := e.z.called(); len(calls) > 0 {
+			t.Errorf("%s %s called Zitadel: %v", tc.method, tc.path, calls)
+		}
+		if calls := e.tm.called(); len(calls) > 0 {
+			t.Errorf("%s %s called Tenant Management: %v", tc.method, tc.path, calls)
+		}
+		if len(e.z.orgs) != 3 {
+			t.Errorf("%s %s: %d organizations, want 3", tc.method, tc.path, len(e.z.orgs))
+		}
 	}
 }
 
@@ -75,7 +98,6 @@ func TestUnknownOrgIs404(t *testing.T) {
 		{"GET", "/api/orgs/nope"},
 		{"POST", "/api/orgs/nope/activate"},
 		{"POST", "/api/orgs/nope/deactivate"},
-		{"DELETE", "/api/orgs/nope"},
 	} {
 		if rec := e.do(tc.method, tc.path, nil); rec.Code != http.StatusNotFound {
 			t.Errorf("%s %s: status %d, want 404", tc.method, tc.path, rec.Code)

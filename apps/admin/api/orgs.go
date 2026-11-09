@@ -72,25 +72,6 @@ func (s *Service) getOrg(w http.ResponseWriter, r *http.Request, _ core.Session)
 	core.WriteJSON(w, http.StatusOK, orgFromZitadel(org, defaultID))
 }
 
-func (s *Service) createOrg(w http.ResponseWriter, r *http.Request, _ core.Session) {
-	var body OrgCreate
-	if !decode(w, r, &body) {
-		return
-	}
-	var f fields
-	f.text("name", &body.Name, 1, 200)
-	if err := f.err(); err != nil {
-		badRequest(w, err)
-		return
-	}
-	id, err := s.Zitadel.AddOrganization(r.Context(), body.Name)
-	if err != nil {
-		s.fail(w, r, err)
-		return
-	}
-	created(w, id)
-}
-
 func (s *Service) updateOrg(w http.ResponseWriter, r *http.Request, _ core.Session) {
 	var body OrgUpdate
 	if !decode(w, r, &body) {
@@ -124,19 +105,6 @@ func (s *Service) deactivateOrg(w http.ResponseWriter, r *http.Request, admin co
 
 func (s *Service) activateOrg(w http.ResponseWriter, r *http.Request, _ core.Session) {
 	if err := s.Zitadel.ActivateOrganization(r.Context(), r.PathValue("orgId")); err != nil {
-		s.fail(w, r, err)
-		return
-	}
-	noContent(w)
-}
-
-func (s *Service) deleteOrg(w http.ResponseWriter, r *http.Request, admin core.Session) {
-	id := r.PathValue("orgId")
-	if err := s.checkOrgChange(r.Context(), admin, id, "delete"); err != nil {
-		s.fail(w, r, err)
-		return
-	}
-	if err := s.Zitadel.DeleteOrganization(r.Context(), id); err != nil {
 		s.fail(w, r, err)
 		return
 	}
