@@ -41,7 +41,7 @@ const (
 var (
 	// ErrNotOurs: the namespace exists but belongs to another tenant or was
 	// not created by Tenant Management.
-	ErrNotOurs = errors.New("kube: the namespace belongs to someone else")
+	ErrNotOurs = fmt.Errorf("kube: the namespace belongs to someone else: %w", core.ErrForeign)
 	// ErrTerminating: the namespace is still being deleted.
 	ErrTerminating = errors.New("kube: the namespace is still being deleted")
 )

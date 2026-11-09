@@ -30,7 +30,7 @@ acceptance:
     level: integration
     planned: apps/tenants/lifecycle/lifecycle_test.go:TestDependencyFailureStopsAndRecords
   AC-5:
-    text: "Two requests on the same tenant never run at once: the second one gets 409 while the first holds the tenant's row (SELECT ... FOR UPDATE NOWAIT), and the lock is released when the first request ends or its process dies."
+    text: "Two requests on the same tenant never run at once: the second one gets 409 while the first holds the tenant's lock (a PostgreSQL session advisory lock), and the lock is released when the first request ends or its process dies."
     level: integration
     planned: apps/tenants/store/store_test.go:TestConcurrentRequestOnSameTenantGets409
   AC-6:

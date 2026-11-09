@@ -20,6 +20,8 @@ import (
 	"io"
 	"net/http"
 	"strings"
+
+	"github.com/maksimillian1/ha-multitenant-saas-platform/apps/tenants/core"
 )
 
 const (
@@ -62,6 +64,9 @@ type Error struct {
 
 func (e *Error) Error() string { return fmt.Sprintf("zitadel: %s: %s", e.Code, e.Message) }
 
+// Timeout reports whether Zitadel ran out of time.
+func (e *Error) Timeout() bool { return e.Code == CodeDeadlineExceeded }
+
 // HasCode reports whether err is an error answer of Zitadel with the code.
 func HasCode(err error, code string) bool {
 	var zerr *Error
@@ -70,7 +75,7 @@ func HasCode(err error, code string) bool {
 
 // ErrNameTaken: an organization with the tenant's name exists in Zitadel
 // but is not the tenant's.
-var ErrNameTaken = errors.New("zitadel: another organization has this name")
+var ErrNameTaken = fmt.Errorf("zitadel: another organization has this name: %w", core.ErrForeign)
 
 // CreateOrganization creates the tenant's organization with the tenant ID as
 // its ID. If it exists already, from an earlier attempt, that is success.
