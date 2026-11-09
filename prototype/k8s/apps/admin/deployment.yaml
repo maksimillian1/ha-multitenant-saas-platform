@@ -20,10 +20,13 @@ spec:
       labels:
         app.kubernetes.io/name: admin
     spec:
-      # The image runs as distroless nonroot (65532); fsGroup lets it read the
-      # key file, which is not readable by others.
+      # The image runs as distroless nonroot (65532). The image names the user,
+      # not its number, so runAsUser gives the number runAsNonRoot can check;
+      # fsGroup lets it read the key file, which is not readable by others.
       securityContext:
         runAsNonRoot: true
+        runAsUser: 65532
+        runAsGroup: 65532
         fsGroup: 65532
       containers:
         - name: admin
