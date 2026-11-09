@@ -38,7 +38,7 @@ The core is the request path (HAMSP-5) and the usage pipeline (HAMSP-25, HAMSP-2
 
 The owner decides first; agents implement after the decision.
 
-* **Tenant Management (FR-01):** decision HAMSP-6, then the service (HAMSP-51). The API Gateway rejects a suspended tenant (HAMSP-52). Tenant deletion removes data from every store (QS-18, HAMSP-53), and the conflict with 13-month usage retention is settled (HAMSP-20).
+* **Tenant Management (FR-01):** decision HAMSP-6 ([ADR-0012](adr/0012-tenant-provisioning-lifecycle.md)), then the service (HAMSP-51). Self-service sign-up creates a tenant through the same workflow (HAMSP-93). The API Gateway rejects a suspended tenant (HAMSP-52). Tenant deletion removes data from every store (QS-18, HAMSP-53), and the conflict with 13-month usage retention is settled (HAMSP-20).
 * **Per-tenant rate limits and quotas (FR-07):** store decision HAMSP-15, then enforcement in the API Gateway and the source of each tenant's limits (HAMSP-54; QS-03, QS-16 at low load). How quotas reach the gateway within 60 s is a decision of its own (HAMSP-55, QS-15).
 * **Metering Query Service (FR-05):** reads through the same store interface; its read API follows HAMSP-9 (HAMSP-56).
 * **Admin app:** Zitadel organizations, users and role assignments (HAMSP-34). Tenant admins manage their own users, roles and SSO (FR-02, HAMSP-57).
