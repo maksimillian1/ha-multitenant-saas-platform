@@ -237,7 +237,9 @@ func TestAdminAppRoleBoundary(t *testing.T) {
 			ID string `json:"id"`
 		}
 		_ = json.Unmarshal(r.Body, &created)
-		zitadelCall(t, iamAdmin, http.MethodDelete, "/admin/v1/idps/"+created.ID, nil)
+		// An IdP made by generic_oidc is a template; /admin/v1/idps/{id} is the old API.
+		d := zitadelCall(t, iamAdmin, http.MethodDelete, "/admin/v1/idps/templates/"+created.ID, nil)
+		mustStatus(t, d, http.StatusOK, "remove the identity provider admin-app created")
 	})
 
 	mustBeDenied(t, zitadelCall(t, app, http.MethodPost, "/zitadel.action.v2.ActionService/CreateTarget", map[string]any{
@@ -248,7 +250,8 @@ func TestAdminAppRoleBoundary(t *testing.T) {
 			ID string `json:"id"`
 		}
 		_ = json.Unmarshal(r.Body, &created)
-		zitadelCall(t, iamAdmin, http.MethodPost, "/zitadel.action.v2.ActionService/DeleteTarget", map[string]string{"id": created.ID})
+		d := zitadelCall(t, iamAdmin, http.MethodPost, "/zitadel.action.v2.ActionService/DeleteTarget", map[string]string{"id": created.ID})
+		mustStatus(t, d, http.StatusOK, "remove the action target admin-app created")
 	})
 
 	// The instance branding is what IAM_BRANDING_MANAGER is for: change the
