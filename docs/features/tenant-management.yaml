@@ -1,0 +1,53 @@
+feature: tenant-management
+title: "Tenant Management: a platform admin creates, suspends and deletes tenants (ADR-0012)"
+critical: true
+links:
+  issues: [HAMSP-51, HAMSP-6]
+requirements: [FR-01, QS-02, QS-18, C-03, C-04, C-06]
+
+acceptance:
+  AC-1:
+    text: "POST /tenants with a name and the first admin's email, called with a valid service token that holds the role tenant-manager, inserts the tenant in state provisioning, runs every step in the same request and answers 201 with the tenant in state active; GET /tenants and GET /tenants/{id} show its state, the steps done and the last error."
+    level: integration
+  AC-2:
+    text: "The provisioning steps run in order: a Zitadel organization whose ID becomes the tenant_id; a human user with the given email in that organization, with the role ORG_OWNER, invited by email; a namespace tenant-<tenant_id> labelled with the tenant_id, with a ResourceQuota and a default-deny CiliumNetworkPolicy."
+    level: integration
+  AC-3:
+    text: "Every step is idempotent: after a failure or a crash after any step, POST /tenants/{id}/retry resumes at the first step not done and the tenant ends active with exactly one organization, one admin user and one namespace."
+    level: integration
+  AC-4:
+    text: "When Zitadel or the Kubernetes API fails or times out during a step, the request stops, the tenant stays in provisioning (or deleting) with the error in last_error and the steps done so far, the answer is 502 or 504 with the tenant, and no later step runs."
+    level: integration
+  AC-5:
+    text: "Two requests on the same tenant never run at once: the second one gets 409 while the first holds the tenant's row (SELECT ... FOR UPDATE NOWAIT), and the lock is released when the first request ends or its process dies."
+    level: integration
+  AC-6:
+    text: "POST /tenants/{id}/suspend moves an active tenant to suspended and deactivates its Zitadel organization; POST /tenants/{id}/resume moves it back to active and reactivates the organization. Either call on a tenant in another state answers 409 and changes nothing."
+    level: integration
+  AC-7:
+    text: "DELETE /tenants/{id} on a suspended tenant, or one in provisioning, moves it to deleting and in the same request removes the namespace and then the Zitadel organization (with its users), and leaves a tombstone with the tenant_id, the timestamps and the deleting admin, state deleted; a failed step leaves it in deleting with last_error until a retry. DELETE in any other state answers 409. Deleting tenant A leaves tenant B's organization, users and namespace untouched."
+    level: integration
+  AC-8:
+    text: "A tenant name is unique among tenants that are not deleted: a second POST with the same name answers 409. An empty or over-long name, or a malformed email, answers 400 and creates nothing."
+    level: unit
+  AC-9:
+    text: "Every route answers 401 without a valid token (no token, bad signature, expired, wrong issuer or audience) and 403 for a valid token without the role tenant-manager; in neither case is Zitadel, Kubernetes or the tenants table written."
+    level: integration
+  AC-10:
+    text: "Only pods of the admin namespace can open a connection to Tenant Management (CiliumNetworkPolicy)."
+    level: e2e
+  AC-11:
+    text: "Every state change is logged with the acting admin's user ID, the action and the tenant_id; the admin's user ID comes from the request of an authenticated caller and is required on every mutation."
+    level: unit
+  AC-12:
+    text: "The tenants table is a platform table: only Tenant Management's database role has privileges on it, and the RLS guardrail names it in an explicit list of platform tables while still failing on any other table without forced RLS."
+    level: integration
+  AC-13:
+    text: "The admin app has a Tenants page: a list of tenants with name, state and creation time; a create dialog (name, first admin's email); a tenant page with its state, steps and last error that shows a Retry button while the tenant is in provisioning or deleting; suspend, resume and delete, where delete is offered only for a suspended tenant and asks to type the tenant's name."
+    level: unit
+  AC-14:
+    text: "The admin app's tenant routes require a session with the role super-admin (401 or 403 otherwise) and the CSRF checks of ADR-0009, call Tenant Management with the app's machine token and the admin's user ID, and map its 400, 404 and 409 answers through and an outage to 502 or 504."
+    level: unit
+  AC-15:
+    text: "The admin app no longer creates or deletes Zitadel organizations directly: the Organizations page has no create or delete action, and the BFF has no routes for them (a request to the former routes answers 404 or 405 and calls no Zitadel API). Organizations are created and deleted only as tenants, through the Tenants page."
+    level: unit
