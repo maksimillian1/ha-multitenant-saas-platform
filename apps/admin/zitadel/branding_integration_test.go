@@ -33,8 +33,8 @@ func TestBrandingIntegration(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 	defer cancel()
 	httpClient := &http.Client{Timeout: 10 * time.Second}
-	c := NewClient(base, token, httpClient)
-	platform := NewClient(base, instanceToken, httpClient)
+	c := NewClient(base, staticTokens(token), httpClient)
+	platform := NewClient(base, staticTokens(instanceToken), httpClient)
 
 	tenantA, tenantB := orgByName(ctx, t, c, "tenant-a"), orgByName(ctx, t, c, "tenant-b")
 	a := OrgScope(tenantA)

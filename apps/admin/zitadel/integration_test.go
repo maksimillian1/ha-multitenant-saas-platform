@@ -28,7 +28,7 @@ func TestIntegration(t *testing.T) {
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 	defer cancel()
-	c := NewClient(url, token, &http.Client{Timeout: 10 * time.Second})
+	c := NewClient(url, staticTokens(token), &http.Client{Timeout: 10 * time.Second})
 	suffix := randomSuffix(t)
 
 	account, err := c.ServiceAccount(ctx)
