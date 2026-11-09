@@ -62,6 +62,12 @@ func newTestDB(t *testing.T) testDB {
 	}
 	t.Cleanup(func() { super.Close(ctx) })
 
+	// Test packages run in parallel against one server, and two ALTER ROLE
+	// on the same role at once fail ("tuple concurrently updated"). The lock
+	// ends with the statement below or with the connection.
+	if _, err := super.Exec(ctx, "SELECT pg_advisory_lock(5100051)"); err != nil {
+		t.Fatal(err)
+	}
 	for _, stmt := range []string{
 		fmt.Sprintf(`DO $$ BEGIN
 			IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = '%[1]s') THEN CREATE ROLE %[1]s LOGIN; END IF;
@@ -73,6 +79,9 @@ func newTestDB(t *testing.T) testDB {
 		if _, err := super.Exec(ctx, stmt); err != nil {
 			t.Fatal(err)
 		}
+	}
+	if _, err := super.Exec(ctx, "SELECT pg_advisory_unlock(5100051)"); err != nil {
+		t.Fatal(err)
 	}
 
 	db := fmt.Sprintf("tenants_test_%d", time.Now().UnixNano())
