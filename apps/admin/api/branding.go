@@ -29,8 +29,10 @@ type BrandingClient interface {
 	BrandingAsset(ctx context.Context, s zitadel.Scope, a zitadel.Asset, preview bool) (zitadel.AssetFile, error)
 }
 
-// PlatformZitadel is the client with the instance token. It is used only for
-// the instance's branding.
+// PlatformZitadel is the client for the instance's branding. Since HAMSP-36
+// it is the admin app's own client, whose account holds the custom role
+// IAM_BRANDING_MANAGER; the type keeps the platform routes' dependency
+// narrow.
 type PlatformZitadel interface {
 	BrandingClient
 }
