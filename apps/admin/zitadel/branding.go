@@ -325,7 +325,6 @@ func (c *Client) rest(ctx context.Context, method, path string, s Scope, req, re
 // x-zitadel-orgid header, without which Zitadel acts on the token's own
 // organization.
 func (c *Client) request(ctx context.Context, method, path string, s Scope, body io.Reader) (*http.Request, error) {
-	//nolint:gosec // G704: baseURL is the configured Zitadel address; path is built from this package's asset routes.
 	req, err := http.NewRequestWithContext(ctx, method, c.baseURL+path, body)
 	if err != nil {
 		return nil, err

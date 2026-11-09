@@ -103,7 +103,6 @@ func (c *Client) call(ctx context.Context, service, method string, req, resp any
 	if err != nil {
 		return err
 	}
-	//nolint:gosec // G704: baseURL is the configured Zitadel address; service and method are constants of this package.
 	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, c.baseURL+"/"+service+"/"+method, bytes.NewReader(body))
 	if err != nil {
 		return err
@@ -161,7 +160,7 @@ func (c *Client) sendWithToken(req *http.Request) (*http.Response, []byte, strin
 		return nil, nil, "", err
 	}
 	req.Header.Set("Authorization", "Bearer "+token)
-	res, err := c.http.Do(req) //nolint:gosec // G704: every request goes to the configured Zitadel base URL.
+	res, err := c.http.Do(req)
 	if err != nil {
 		return nil, nil, "", fmt.Errorf("zitadel: %w", err)
 	}
@@ -292,7 +291,7 @@ func (c *Client) ServiceAccount(ctx context.Context) (ServiceAccount, error) {
 	if c.account != nil {
 		return *c.account, nil
 	}
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, c.baseURL+"/auth/v1/users/me", nil) //nolint:gosec // G704: configured Zitadel base URL and a fixed path.
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, c.baseURL+"/auth/v1/users/me", nil)
 	if err != nil {
 		return ServiceAccount{}, err
 	}

@@ -11,24 +11,43 @@ import (
 	"time"
 )
 
-// TestIntegration runs the client against a real Zitadel: the instance on
-// the kind cluster, with the admin app's service account token. It is
-// skipped unless both variables are set:
+// integrationClient is a client of the Zitadel on the kind cluster with the
+// admin app's key, as the admin app uses it. The test is skipped unless both
+// variables are set:
 //
 //	ZITADEL_TEST_URL=http://zitadel.localtest.me:30080
-//	ZITADEL_TEST_TOKEN=$(kubectl -n admin get secret admin-zitadel -o jsonpath='{.data.ZITADEL_TOKEN}' | base64 -d)
+//	ZITADEL_TEST_KEY_FILE=<a file with the key.json field of Secret admin/admin-zitadel>
+//
+// prototype/README.md shows how to write the file.
+func integrationClient(t *testing.T) (*Client, string) {
+	t.Helper()
+	base, keyFile := os.Getenv("ZITADEL_TEST_URL"), os.Getenv("ZITADEL_TEST_KEY_FILE")
+	if base == "" || keyFile == "" {
+		t.Skip("ZITADEL_TEST_URL and ZITADEL_TEST_KEY_FILE are not set")
+	}
+	key, err := LoadKey("ZITADEL_TEST_KEY_FILE", keyFile)
+	if err != nil {
+		t.Fatal(err)
+	}
+	httpClient := &http.Client{Timeout: 10 * time.Second}
+	// On kind the issuer is the URL the API is reached at.
+	tokens, err := NewKeyTokens(context.Background(), base, key, httpClient)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return NewClient(base, tokens, httpClient), base
+}
+
+// TestIntegration runs the client against a real Zitadel: the instance on
+// the kind cluster, with the admin app's key (integrationClient).
 //
 // It creates an organization with a human and a machine user, changes them
 // and deletes everything again. With the platform-admin project of
 // bootstrap-tenants.sh it also assigns and revokes a role.
 func TestIntegration(t *testing.T) {
-	url, token := os.Getenv("ZITADEL_TEST_URL"), os.Getenv("ZITADEL_TEST_TOKEN")
-	if url == "" || token == "" {
-		t.Skip("ZITADEL_TEST_URL and ZITADEL_TEST_TOKEN are not set")
-	}
+	c, _ := integrationClient(t)
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 	defer cancel()
-	c := NewClient(url, staticTokens(token), &http.Client{Timeout: 10 * time.Second})
 	suffix := randomSuffix(t)
 
 	account, err := c.ServiceAccount(ctx)
