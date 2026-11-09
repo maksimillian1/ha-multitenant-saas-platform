@@ -43,6 +43,13 @@ spec:
             # (through ISSUER_DIAL_ADDR) as the service account admin-app.
             - secretRef:
                 name: admin-zitadel
+            # TENANTS_URL, TENANTS_AUDIENCE, TENANTS_CLIENT_ID/SECRET: Tenant
+            # Management and the machine user admin-tenants-client
+            # (bootstrap-tenants.sh). Optional: without it the tenant routes
+            # answer 503.
+            - secretRef:
+                name: admin-tenants
+                optional: true
           readinessProbe:
             httpGet: {path: /healthz, port: http}
             periodSeconds: 5

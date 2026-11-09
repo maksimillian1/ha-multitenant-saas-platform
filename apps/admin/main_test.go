@@ -23,7 +23,7 @@ func TestRoutes(t *testing.T) {
 	log := slog.New(slog.NewTextHandler(io.Discard, nil))
 	authService := auth.NewService(nil, auth.NewCookies("0123456789abcdef0123456789abcdef"), "http://admin.test", "client", log)
 	mux := routes(authService,
-		newAPIService(core.Config{ZitadelURL: "http://zitadel.test", ZitadelToken: "token", ZitadelInstanceToken: "instance-token",
+		newAPIService(t.Context(), core.Config{ZitadelURL: "http://zitadel.test", ZitadelToken: "token", ZitadelInstanceToken: "instance-token",
 			AdminRole: "super-admin", PublicURL: "http://admin.test"}, authService, http.DefaultClient, log),
 		ui.NewService(authService, log),
 		health.NewService())
@@ -36,6 +36,8 @@ func TestRoutes(t *testing.T) {
 		{http.MethodGet, "/healthz", http.StatusOK, ""},
 		{http.MethodGet, "/api/me", http.StatusUnauthorized, "application/json"},
 		{http.MethodGet, "/api/orgs", http.StatusUnauthorized, "application/json"},
+		{http.MethodPost, "/api/tenants/1/suspend", http.StatusUnauthorized, "application/json"},
+		{http.MethodPost, "/api/orgs", http.StatusMethodNotAllowed, ""},
 		{http.MethodPost, "/api/users/42/lock", http.StatusUnauthorized, "application/json"},
 		{http.MethodGet, "/api/projects/7/roles", http.StatusUnauthorized, "application/json"},
 		{http.MethodGet, "/api/unknown", http.StatusNotFound, "application/json"},
@@ -89,7 +91,7 @@ func TestBrandingTokensGoToTheirRoutes(t *testing.T) {
 
 	log := slog.New(slog.NewTextHandler(io.Discard, nil))
 	mux := http.NewServeMux()
-	newAPIService(core.Config{ZitadelURL: zitadel.URL, ZitadelToken: "org-token", ZitadelInstanceToken: "instance-token",
+	newAPIService(t.Context(), core.Config{ZitadelURL: zitadel.URL, ZitadelToken: "org-token", ZitadelInstanceToken: "instance-token",
 		AdminRole: "super-admin", PublicURL: "http://admin.test"}, adminSession{}, zitadel.Client(), log).Register(mux)
 
 	for _, target := range []string{"/api/orgs/org-a/branding", "/api/platform/branding"} {
@@ -144,7 +146,7 @@ func TestTokensNeverReachTheBrowser(t *testing.T) {
 
 	log := slog.New(slog.NewTextHandler(io.Discard, nil))
 	mux := http.NewServeMux()
-	newAPIService(core.Config{ZitadelURL: zitadel.URL, ZitadelToken: "org-token-secret", ZitadelInstanceToken: "instance-token-secret",
+	newAPIService(t.Context(), core.Config{ZitadelURL: zitadel.URL, ZitadelToken: "org-token-secret", ZitadelInstanceToken: "instance-token-secret",
 		AdminRole: "super-admin", PublicURL: "http://admin.test"}, adminSession{}, zitadel.Client(), log).Register(mux)
 
 	settings := `{"primary_color":"#7c3aed","background_color":"#fafafa","warn_color":"#cd3d56","font_color":"#000000",

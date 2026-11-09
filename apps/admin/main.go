@@ -17,12 +17,15 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
+	"time"
 
 	"github.com/maksimillian1/ha-multitenant-saas-platform/apps/admin/api"
 	"github.com/maksimillian1/ha-multitenant-saas-platform/apps/admin/auth"
 	"github.com/maksimillian1/ha-multitenant-saas-platform/apps/admin/core"
 	"github.com/maksimillian1/ha-multitenant-saas-platform/apps/admin/health"
+	"github.com/maksimillian1/ha-multitenant-saas-platform/apps/admin/tenants"
 	"github.com/maksimillian1/ha-multitenant-saas-platform/apps/admin/ui"
 	"github.com/maksimillian1/ha-multitenant-saas-platform/apps/admin/zitadel"
 )
@@ -75,7 +78,7 @@ func bootstrapServices(ctx context.Context, cfg core.Config, log *slog.Logger) (
 	authService := auth.NewService(provider, cookies, cfg.PublicURL, cfg.ClientID, log)
 	// The issuer client also reaches the Zitadel APIs: same host, same
 	// in-cluster dial address.
-	apiService := newAPIService(cfg, authService, issuerClient, log)
+	apiService := newAPIService(ctx, cfg, authService, issuerClient, log)
 	uiService := ui.NewService(authService, log)
 	healthService := health.NewService()
 
@@ -84,10 +87,29 @@ func bootstrapServices(ctx context.Context, cfg core.Config, log *slog.Logger) (
 
 // newAPIService builds the API with its two Zitadel clients: the admin app's
 // account for everything, and the instance account for the platform
-// branding only.
-func newAPIService(cfg core.Config, sessions core.SessionReader, httpClient *http.Client, log *slog.Logger) *api.Service {
-	return api.NewService(sessions,
+// branding only. Tenant Management gets the app's machine token from the
+// issuer.
+func newAPIService(ctx context.Context, cfg core.Config, sessions core.SessionReader, httpClient *http.Client, log *slog.Logger) *api.Service {
+	svc := api.NewService(sessions,
 		zitadel.NewClient(cfg.ZitadelURL, cfg.ZitadelToken, httpClient),
 		zitadel.NewClient(cfg.ZitadelURL, cfg.ZitadelInstanceToken, httpClient),
 		cfg.AdminRole, cfg.PublicURL, log)
+	if cfg.TenantsURL != "" {
+		svc.Tenants = tenants.New(ctx, tenants.Config{
+			URL:          cfg.TenantsURL,
+			TokenURL:     strings.TrimRight(cfg.Issuer, "/") + "/oauth/v2/token",
+			ClientID:     cfg.TenantsClientID,
+			ClientSecret: cfg.TenantsClientSecret,
+			Audience:     cfg.TenantsAudience,
+			// A create or delete runs every step in the request (ADR-0012).
+			Timeout: tenantsTimeout,
+		}, httpClient)
+	} else {
+		log.Warn("TENANTS_URL is not set: the tenant routes answer 503")
+	}
+	return svc
 }
+
+// tenantsTimeout is above Tenant Management's own limit for a deletion,
+// which waits for the namespace to go.
+const tenantsTimeout = 4 * time.Minute

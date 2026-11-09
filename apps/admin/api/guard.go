@@ -48,7 +48,7 @@ func (s *Service) checkUserChange(ctx context.Context, admin core.Session, userI
 	return nil
 }
 
-// checkOrgChange refuses to deactivate or delete the organization of the
+// checkOrgChange refuses to deactivate the organization of the
 // signed-in admin or of the app's service account.
 func (s *Service) checkOrgChange(ctx context.Context, admin core.Session, orgID, verb string) error {
 	me, err := s.Zitadel.GetUser(ctx, admin.Subject)
