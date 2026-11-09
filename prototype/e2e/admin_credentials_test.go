@@ -27,6 +27,8 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"os"
+	"os/exec"
 	"slices"
 	"strings"
 	"testing"
@@ -331,5 +333,148 @@ func TestNoInstanceServiceAccount(t *testing.T) {
 		if _, err := secretField(ctx, adminAppKeySecret, field); err == nil {
 			t.Errorf("Secret %s still has %s, want only the key", adminAppKeySecret, field)
 		}
+	}
+}
+
+// machineKey is a key of a machine user as the management API lists it.
+type machineKey struct {
+	ID             string    `json:"id"`
+	ExpirationDate time.Time `json:"expirationDate"`
+}
+
+// credentials lists the keys and personal access tokens of a machine user of
+// the IAM admin's organization.
+func credentials(t testing.TB, iamAdmin, userID string) (keys []machineKey, pats []string) {
+	t.Helper()
+	r := zitadelCall(t, iamAdmin, http.MethodPost, "/management/v1/users/"+userID+"/keys/_search", map[string]any{})
+	mustStatus(t, r, http.StatusOK, "list keys of "+userID)
+	var k struct {
+		Result []machineKey `json:"result"`
+	}
+	r.decode(t, &k)
+	r = zitadelCall(t, iamAdmin, http.MethodPost, "/management/v1/users/"+userID+"/pats/_search", map[string]any{})
+	mustStatus(t, r, http.StatusOK, "list personal access tokens of "+userID)
+	var p struct {
+		Result []struct {
+			ID string `json:"id"`
+		} `json:"result"`
+	}
+	r.decode(t, &p)
+	for _, x := range p.Result {
+		pats = append(pats, x.ID)
+	}
+	return k.Result, pats
+}
+
+// checkOnlyShortKey checks that a machine user has exactly the key keyID,
+// valid at most 30 days, and no personal access token.
+func checkOnlyShortKey(t *testing.T, iamAdmin, name, userID, keyID string) {
+	t.Helper()
+	keys, pats := credentials(t, iamAdmin, userID)
+	if len(keys) != 1 || keys[0].ID != keyID {
+		t.Errorf("%s has keys %+v, want only %s", name, keys, keyID)
+	}
+	for _, k := range keys {
+		if limit := time.Now().Add(30*24*time.Hour + time.Hour); k.ExpirationDate.IsZero() || k.ExpirationDate.After(limit) {
+			t.Errorf("key %s of %s expires %s, want at most 30 days from now", k.ID, name, k.ExpirationDate)
+		}
+	}
+	if len(pats) != 0 {
+		t.Errorf("%s has personal access tokens %v, want none", name, pats)
+	}
+}
+
+// Verifies: admin-zitadel AC-5
+func TestAdminAppHasOnlyShortKey(t *testing.T) {
+	iamAdmin := keyToken(t, loadServiceKey(t, iamAdminKeySecret, iamAdminKeyField))
+	k := loadServiceKey(t, adminAppKeySecret, adminAppKeyField)
+	checkOnlyShortKey(t, iamAdmin, "admin-app", k.UserID, k.KeyID)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+	defer cancel()
+	out, err := kubectl(ctx, "-n", "admin", "get", "secret", "admin-zitadel", "-o", "jsonpath={.data}")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var data map[string]string
+	if err := json.Unmarshal([]byte(out), &data); err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := data[adminAppKeyField]; len(data) != 1 || !ok {
+		fields := make([]string, 0, len(data))
+		for f := range data {
+			fields = append(fields, f)
+		}
+		t.Errorf("Secret %s has fields %v, want only %s", adminAppKeySecret, fields, adminAppKeyField)
+	}
+}
+
+// Verifies: admin-zitadel AC-11
+func TestBootstrapOutputWithoutPAT(t *testing.T) {
+	// What bootstrap-tenants.sh created works: TestMain got a token for a
+	// tenant and passed the gateway with it. Here: its output has the admin
+	// app's users, and nothing it could have used is a token.
+	var out struct {
+		Admin struct {
+			Users []struct {
+				Username string `json:"username"`
+			} `json:"users"`
+		} `json:"admin"`
+	}
+	path := os.Getenv("HAMSP_TENANTS")
+	if path == "" {
+		path = "../.tenants.json"
+	}
+	raw, err := os.ReadFile(path) //nolint:gosec // G304: the bootstrap output the tests read anyway.
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := json.Unmarshal(raw, &out); err != nil {
+		t.Fatal(err)
+	}
+	if len(out.Admin.Users) != 3 || len(cfg.Tenants) != 2 {
+		t.Errorf("output has %d tenants and %d admin users, want 2 and 3", len(cfg.Tenants), len(out.Admin.Users))
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+	defer cancel()
+	if _, err := secretField(ctx, "zitadel/iam-admin-pat", "pat"); !errors.Is(err, errNotFound) {
+		t.Errorf("Secret zitadel/iam-admin-pat: %v, want it not to exist", err)
+	}
+	k := loadServiceKey(t, iamAdminKeySecret, iamAdminKeyField)
+	if _, pats := credentials(t, keyToken(t, k), k.UserID); len(pats) != 0 {
+		t.Errorf("iam-admin has personal access tokens %v, want none", pats)
+	}
+}
+
+// Verifies: admin-zitadel AC-12, AC-5
+func TestBootstrapRerunRotatesKeys(t *testing.T) {
+	before := map[string]serviceKey{
+		"iam-admin": loadServiceKey(t, iamAdminKeySecret, iamAdminKeyField),
+		"admin-app": loadServiceKey(t, adminAppKeySecret, adminAppKeyField),
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, "../bootstrap-tenants.sh")
+	var output bytes.Buffer
+	cmd.Stdout, cmd.Stderr = &output, &output
+	if err := cmd.Run(); err != nil {
+		t.Fatalf("bootstrap-tenants.sh: %v\n%s", err, output.String())
+	}
+	// The run made new client secrets; read them as the next tests need them.
+	t.Setenv("HAMSP_TENANTS", "../.tenants.json")
+	if err := loadConfig(); err != nil {
+		t.Fatal(err)
+	}
+
+	after := map[string]serviceKey{
+		"iam-admin": loadServiceKey(t, iamAdminKeySecret, iamAdminKeyField),
+		"admin-app": loadServiceKey(t, adminAppKeySecret, adminAppKeyField),
+	}
+	iamAdmin := keyToken(t, after["iam-admin"])
+	for name, k := range after {
+		if k.KeyID == before[name].KeyID {
+			t.Errorf("%s still has the key %s of before the run", name, k.KeyID)
+		}
+		checkOnlyShortKey(t, iamAdmin, name, k.UserID, k.KeyID)
 	}
 }
