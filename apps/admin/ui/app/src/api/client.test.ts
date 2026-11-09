@@ -19,11 +19,13 @@ describe('api client', () => {
   })
 
   it("throws ApiError with the server's message", async () => {
-    mockApi({ 'POST /api/orgs': apiError(409, 'Organisation already exists') })
+    mockApi({ 'POST /api/tenants': apiError(409, 'a tenant with this name exists') })
 
-    const error = await unwrap(api.POST('/api/orgs', { body: { name: 'tenant-a' } })).catch((e: unknown) => e)
+    const error = await unwrap(api.POST('/api/tenants', { body: { name: 'Acme', admin_email: 'it@acme.test' } })).catch(
+      (e: unknown) => e,
+    )
     expect(error).toBeInstanceOf(ApiError)
-    expect(error).toMatchObject({ status: 409, message: 'Organisation already exists' })
+    expect(error).toMatchObject({ status: 409, message: 'a tenant with this name exists', body: { error: 'a tenant with this name exists' } })
   })
 
   it('sends the browser to the login when the session has ended', async () => {
