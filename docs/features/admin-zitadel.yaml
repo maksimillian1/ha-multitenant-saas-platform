@@ -72,9 +72,10 @@ acceptance:
     planned: prototype/e2e/admin_credentials_test.go:TestCredentialDriftLogged
   AC-10:
     text: >-
-      After Zitadel is installed on kind, the machine user iam-admin (IAM_OWNER, created by the
-      Helm chart's setup job) has no personal access token, and the Secret zitadel/iam-admin-pat
-      does not exist.
+      After prototype/bootstrap-tenants.sh has run on kind, the machine user iam-admin (IAM_OWNER,
+      created by the Helm chart's setup job) has no personal access token, and the Secret
+      zitadel/iam-admin-pat does not exist. (Changed 2026-11-09 by the owner from "after Zitadel
+      is installed": the chart's PAT cannot be switched off, so the bootstrap deletes it.)
     level: integration
     planned: prototype/e2e/admin_credentials_test.go:TestIAMAdminHasNoPAT
   AC-11:
@@ -140,7 +141,8 @@ checklist:
     planned: >-
       applies (critical) — three controls, each broken once by hand while its test must fail:
       admin-app given IAM_OWNER fails the AC-7 test; the drift check switched off fails AC-9;
-      the chart's Pat block restored fails AC-10
+      a personal access token given to iam-admin fails AC-10 (the chart's Pat block cannot be
+      switched off, so it cannot be restored either; changed with AC-10 on 2026-11-09)
 
 quality_scenarios:
   touched: [QS-11]
