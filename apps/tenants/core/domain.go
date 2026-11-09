@@ -2,7 +2,9 @@
 package core
 
 import (
+	"crypto/rand"
 	"errors"
+	"fmt"
 	"regexp"
 	"time"
 )
@@ -60,6 +62,9 @@ var (
 	ErrNameTaken = errors.New("a tenant with this name exists")
 	ErrBusy      = errors.New("another request is changing this tenant")
 	ErrState     = errors.New("the tenant is not in a state that allows this")
+	// ErrForeign: Zitadel or Kubernetes holds an object with the tenant's
+	// name that is not the tenant's. It is never adopted or changed.
+	ErrForeign = errors.New("an object with this name belongs to someone else")
 )
 
 // IDRe matches a tenant ID: a lowercase UUID, which is also a valid tenant_id
@@ -68,3 +73,12 @@ var IDRe = regexp.MustCompile(`^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-
 
 // UserIDRe matches the acting admin's Zitadel user ID.
 var UserIDRe = regexp.MustCompile(`^[A-Za-z0-9_-]{1,64}$`)
+
+// NewID returns a random tenant ID: a version 4 UUID in lowercase.
+func NewID() string {
+	var b [16]byte
+	_, _ = rand.Read(b[:]) // crypto/rand.Read never fails (Go 1.24+)
+	b[6] = b[6]&0x0f | 0x40
+	b[8] = b[8]&0x3f | 0x80
+	return fmt.Sprintf("%x-%x-%x-%x-%x", b[0:4], b[4:6], b[6:8], b[8:10], b[10:16])
+}

@@ -56,7 +56,7 @@ Today the admin app creates and deletes Zitadel Organizations directly (HAMSP-34
    * When a step fails, the request stops, stores the error in `last_error` and answers with an error and the tenant, still in `provisioning`. It does not roll back the steps already done. The admin either retries (`POST /tenants/{id}/retry`), which resumes at the first step not done, or deletes the tenant (item 6).
    * If the process dies in the middle, the row stays in `provisioning` with the steps done so far; the admin sees it and retries or deletes it the same way.
    * Every step is idempotent, so a retry never creates a second Organization, user or namespace. The Organization step makes the `tenant_id`; to stay idempotent it first looks for an Organization an earlier attempt created (by an ID Tenant Management chooses and passes to Zitadel, or by the unique name if Zitadel does not accept one; HAMSP-51 checks which).
-   * Two requests on the same tenant do not run at once: a request locks the tenant's row (`SELECT … FOR UPDATE NOWAIT`) and a second one gets `409`.
+   * Two requests on the same tenant do not run at once: a request holds the tenant's lock (a PostgreSQL session advisory lock, released when the request ends or its process dies) and a second one gets `409`.
 
 5. **Suspend and resume** are state changes with two effects: Tenant Management deactivates or reactivates the Organization in Zitadel, and the API Gateway reads the state and rejects a suspended tenant (HAMSP-52). Suspending keeps every piece of data.
 
