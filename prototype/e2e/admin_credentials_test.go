@@ -506,6 +506,8 @@ func TestCredentialDriftLogged(t *testing.T) {
 	}
 	r.decode(t, &pat)
 	t.Cleanup(func() {
+		// Minutes later: the first token (60 s on kind) has expired.
+		iamAdmin := keyToken(t, loadServiceKey(t, iamAdminKeySecret, iamAdminKeyField))
 		r := zitadelCall(t, iamAdmin, http.MethodDelete, "/management/v1/users/"+k.UserID+"/pats/"+pat.TokenID, nil)
 		mustStatus(t, r, http.StatusOK, "remove the test personal access token")
 	})
