@@ -167,3 +167,32 @@ func TestCredentialDriftIAMAdmin(t *testing.T) {
 		}
 	})
 }
+
+// A broken answer to a credential listing is an error: the check logs that it
+// failed and reports no finding.
+//
+// Verifies: admin-zitadel T-02
+func TestBrokenCredentialAnswer(t *testing.T) {
+	app := Account{Name: "admin-app", UserID: "user-admin-app", OwnKeyID: "own"}
+	for name, broken := range map[string]map[string]string{
+		"keys not JSON":       {"/" + userService + "/ListKeys": `{"result":[`},
+		"tokens not JSON":     {"/" + userService + "/ListPersonalAccessTokens": `[1,2`},
+		"result not a list":   {"/" + userService + "/ListKeys": `{"result":"x"}`},
+		"bad expiration date": {"/" + userService + "/ListKeys": `{"result":[{"id":"own","expirationDate":"soon"}]}`},
+	} {
+		t.Run(name, func(t *testing.T) {
+			answers := credentialAnswers(map[string]time.Time{"own": driftNow.Add(time.Hour)})
+			for k, v := range broken {
+				answers[k] = v
+			}
+			_, c := newFake(t, answers)
+			if creds, err := c.ListCredentials(context.Background(), app.UserID); err == nil {
+				t.Errorf("ListCredentials = %+v, want an error", creds)
+			}
+			events, _ := runDrift(t, app, answers)
+			if got := findings(events); len(got) != 1 || got[0] != "WARN service_account_credential_check_failed" {
+				t.Errorf("events = %q, want one check failure", got)
+			}
+		})
+	}
+}

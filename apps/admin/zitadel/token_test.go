@@ -284,3 +284,48 @@ func TestUnauthenticatedRetriesOnceWithNewToken(t *testing.T) {
 		}
 	})
 }
+
+// A broken answer of the token endpoint is an error for the caller, and no
+// API call is made with it.
+//
+// Verifies: admin-zitadel T-02
+func TestBrokenTokenAnswerIsAnError(t *testing.T) {
+	for name, answer := range map[string]struct {
+		status int
+		body   string
+	}{
+		"not JSON":           {http.StatusOK, `{"access_token":`},
+		"no access token":    {http.StatusOK, `{"token_type":"Bearer","expires_in":60}`},
+		"an HTML error page": {http.StatusBadGateway, `<html>bad gateway</html>`},
+		"an empty body":      {http.StatusOK, ``},
+	} {
+		t.Run(name, func(t *testing.T) {
+			apiCalls := 0
+			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if r.URL.Path != "/oauth/v2/token" {
+					apiCalls++
+					return
+				}
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(answer.status)
+				_, _ = w.Write([]byte(answer.body))
+			}))
+			t.Cleanup(srv.Close)
+			key, _ := testKey(t)
+			tokens, err := NewKeyTokens(context.Background(), srv.URL, key, srv.Client())
+			if err != nil {
+				t.Fatal(err)
+			}
+			if tok, err := tokens.Token(context.Background()); err == nil {
+				t.Fatalf("token = %q, want an error", tok)
+			}
+			c := NewClient(srv.URL, tokens, srv.Client())
+			if _, err := c.ServiceAccount(context.Background()); err == nil {
+				t.Error("ServiceAccount succeeded without a token")
+			}
+			if apiCalls != 0 {
+				t.Errorf("API calls = %d, want none without a token", apiCalls)
+			}
+		})
+	}
+}

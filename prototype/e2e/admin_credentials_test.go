@@ -486,7 +486,7 @@ func TestBootstrapRerunRotatesKeys(t *testing.T) {
 // account should not have (apps/admin/zitadel.DriftEvent).
 const driftEvent = "service_account_credential_drift"
 
-// Verifies: admin-zitadel AC-9
+// Verifies: admin-zitadel AC-9; T-12
 func TestCredentialDriftLogged(t *testing.T) {
 	// A bootstrap run just before (TestBootstrapRerunRotatesKeys) restarts
 	// the admin app; its new pod must be up to log anything.
