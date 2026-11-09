@@ -36,7 +36,7 @@ func OrgScope(orgID string) Scope { return Scope{orgID: orgID} }
 
 // InstanceScope is the instance's branding, the default of every
 // organization. The token needs iam.policy.read and iam.policy.write
-// (IAM_OWNER).
+// (IAM_BRANDING_MANAGER, HAMSP-36).
 func InstanceScope() Scope { return Scope{instance: true} }
 
 // OrgID is the organization of an OrgScope, "" for the instance.
