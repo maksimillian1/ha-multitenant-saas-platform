@@ -11,7 +11,6 @@ import { Badge } from '@/components/ui/badge'
 import { Card, CardContent } from '@/components/ui/card'
 import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select'
 import { Skeleton } from '@/components/ui/skeleton'
-import { CreateOrgDialog } from '@/forms/org-forms'
 import { formatDate } from '@/lib/format'
 import { orgStates } from '@/router'
 
@@ -53,8 +52,12 @@ export function OrgsPage() {
     <div className="flex flex-col gap-6">
       <PageHeader
         title="Organizations"
-        description="One organization per tenant (ADR-0003), plus the instance's own."
-        actions={<CreateOrgDialog />}
+        description={
+          <>
+            One organization per tenant (ADR-0003), plus the instance&apos;s own. Organizations are created and deleted as
+            tenants, on the <Link to="/tenants" className="underline">Tenants</Link> page.
+          </>
+        }
       />
       <div className="flex flex-wrap gap-2">
         <SearchInput

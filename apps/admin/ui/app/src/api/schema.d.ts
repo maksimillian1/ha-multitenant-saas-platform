@@ -48,8 +48,7 @@ export interface paths {
         /** Organizations (tenants), sorted by name */
         get: operations["listOrgs"];
         put?: never;
-        /** Create an organization without admin users */
-        post: operations["createOrg"];
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -69,8 +68,7 @@ export interface paths {
         get: operations["getOrg"];
         put?: never;
         post?: never;
-        /** Delete an organization with its users, projects and grants in Zitadel. The tenant's data in other stores stays (FR-01 and QS-18 are HAMSP-6). Refused (409) for the admin's own organization and the service account's organization. */
-        delete: operations["deleteOrg"];
+        delete?: never;
         options?: never;
         head?: never;
         /** Rename an organization */
@@ -172,6 +170,101 @@ export interface paths {
         post?: never;
         /** Remove the asset from the draft */
         delete: operations["removeOrgBrandingAsset"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/tenants": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Tenants from Tenant Management, newest first */
+        get: operations["listTenants"];
+        put?: never;
+        /** Create a tenant: its organization, its first admin (invited by email with ORG_OWNER) and its namespace, in one request */
+        post: operations["createTenant"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/tenants/{tenantId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                tenantId: components["parameters"]["TenantId"];
+            };
+            cookie?: never;
+        };
+        /** One tenant with its state, steps done and last error */
+        get: operations["getTenant"];
+        put?: never;
+        post?: never;
+        /** Delete a suspended tenant (or one left in provisioning or deleting) in every store and leave a tombstone */
+        delete: operations["deleteTenant"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/tenants/{tenantId}/retry": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                tenantId: components["parameters"]["TenantId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Resume a tenant left in provisioning or deleting at its first step not done */
+        post: operations["retryTenant"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/tenants/{tenantId}/suspend": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                tenantId: components["parameters"]["TenantId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Suspend an active tenant, which deactivates its organization */
+        post: operations["suspendTenant"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/tenants/{tenantId}/resume": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                tenantId: components["parameters"]["TenantId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Make a suspended tenant active again */
+        post: operations["resumeTenant"];
+        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
@@ -604,11 +697,45 @@ export interface components {
             /** Format: int64 */
             total: number;
         };
-        OrgCreate: {
-            name: string;
-        };
         OrgUpdate: {
             name: string;
+        };
+        /** @enum {string} */
+        TenantState: "provisioning" | "active" | "suspended" | "deleting" | "deleted";
+        /** @enum {string} */
+        TenantPart: "organization" | "admin" | "namespace";
+        Tenant: {
+            /** @description The tenant_id, also the ID of its Zitadel organization */
+            id: string;
+            /** @description Empty on a tombstone */
+            name?: string;
+            /** @description The first admin's email; empty on a tombstone */
+            admin_email?: string;
+            state: components["schemas"]["TenantState"];
+            /** @description The parts created so far */
+            parts: components["schemas"]["TenantPart"][];
+            /** @description The error of the last failed step, until a step succeeds */
+            last_error?: string;
+            created_by: string;
+            /** Format: date-time */
+            created_at: string;
+            /** Format: date-time */
+            updated_at: string;
+            deleted_by?: string;
+            /** Format: date-time */
+            deleted_at?: string;
+        };
+        TenantList: {
+            items: components["schemas"]["Tenant"][];
+        };
+        TenantCreate: {
+            name: string;
+            /** @description The first admin's email; Tenant Management checks its form */
+            admin_email: string;
+        };
+        TenantError: {
+            error: string;
+            tenant?: components["schemas"]["Tenant"];
         };
         /** @enum {string} */
         UserType: "human" | "machine";
@@ -847,6 +974,15 @@ export interface components {
                 "application/json": components["schemas"]["Error"];
             };
         };
+        /** @description An error of Tenant Management: the name is taken, another request is changing the tenant or its state does not allow the change (409), a step failed (502) or timed out (504). When the tenant was changed before the failure, the answer has the tenant as the failure left it. 503 when the app has no connection to Tenant Management configured. */
+        TenantError: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": components["schemas"]["TenantError"];
+            };
+        };
         /** @description Created; the ID of the new resource */
         Created: {
             headers: {
@@ -865,6 +1001,7 @@ export interface components {
         /** @description Page size */
         Limit: number;
         OrgId: string;
+        TenantId: string;
         UserId: string;
         ProjectId: string;
         AuthorizationId: string;
@@ -958,28 +1095,6 @@ export interface operations {
             504: components["responses"]["Error"];
         };
     };
-    createOrg: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["OrgCreate"];
-            };
-        };
-        responses: {
-            201: components["responses"]["Created"];
-            400: components["responses"]["Error"];
-            401: components["responses"]["Error"];
-            403: components["responses"]["Error"];
-            409: components["responses"]["Error"];
-            502: components["responses"]["Error"];
-            504: components["responses"]["Error"];
-        };
-    };
     getOrg: {
         parameters: {
             query?: never;
@@ -1003,32 +1118,6 @@ export interface operations {
             401: components["responses"]["Error"];
             403: components["responses"]["Error"];
             404: components["responses"]["Error"];
-            502: components["responses"]["Error"];
-            504: components["responses"]["Error"];
-        };
-    };
-    deleteOrg: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                orgId: components["parameters"]["OrgId"];
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Deleted */
-            204: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            401: components["responses"]["Error"];
-            403: components["responses"]["Error"];
-            404: components["responses"]["Error"];
-            409: components["responses"]["Error"];
             502: components["responses"]["Error"];
             504: components["responses"]["Error"];
         };
@@ -1319,6 +1408,210 @@ export interface operations {
             409: components["responses"]["Error"];
             502: components["responses"]["Error"];
             504: components["responses"]["Error"];
+        };
+    };
+    listTenants: {
+        parameters: {
+            query?: {
+                /** @description Also list the tombstones of deleted tenants */
+                include_deleted?: boolean;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The tenants */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TenantList"];
+                };
+            };
+            400: components["responses"]["Error"];
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+            502: components["responses"]["TenantError"];
+            503: components["responses"]["Error"];
+            504: components["responses"]["TenantError"];
+        };
+    };
+    createTenant: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TenantCreate"];
+            };
+        };
+        responses: {
+            /** @description The tenant, active */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Tenant"];
+                };
+            };
+            400: components["responses"]["Error"];
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+            409: components["responses"]["TenantError"];
+            502: components["responses"]["TenantError"];
+            503: components["responses"]["Error"];
+            504: components["responses"]["TenantError"];
+        };
+    };
+    getTenant: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                tenantId: components["parameters"]["TenantId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The tenant */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Tenant"];
+                };
+            };
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+            404: components["responses"]["Error"];
+            502: components["responses"]["TenantError"];
+            503: components["responses"]["Error"];
+            504: components["responses"]["TenantError"];
+        };
+    };
+    deleteTenant: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                tenantId: components["parameters"]["TenantId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The tombstone */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Tenant"];
+                };
+            };
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+            404: components["responses"]["Error"];
+            409: components["responses"]["TenantError"];
+            502: components["responses"]["TenantError"];
+            503: components["responses"]["Error"];
+            504: components["responses"]["TenantError"];
+        };
+    };
+    retryTenant: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                tenantId: components["parameters"]["TenantId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The tenant after the change */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Tenant"];
+                };
+            };
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+            404: components["responses"]["Error"];
+            409: components["responses"]["TenantError"];
+            502: components["responses"]["TenantError"];
+            503: components["responses"]["Error"];
+            504: components["responses"]["TenantError"];
+        };
+    };
+    suspendTenant: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                tenantId: components["parameters"]["TenantId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The tenant after the change */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Tenant"];
+                };
+            };
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+            404: components["responses"]["Error"];
+            409: components["responses"]["TenantError"];
+            502: components["responses"]["TenantError"];
+            503: components["responses"]["Error"];
+            504: components["responses"]["TenantError"];
+        };
+    };
+    resumeTenant: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                tenantId: components["parameters"]["TenantId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The tenant after the change */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Tenant"];
+                };
+            };
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+            404: components["responses"]["Error"];
+            409: components["responses"]["TenantError"];
+            502: components["responses"]["TenantError"];
+            503: components["responses"]["Error"];
+            504: components["responses"]["TenantError"];
         };
     };
     listUsers: {

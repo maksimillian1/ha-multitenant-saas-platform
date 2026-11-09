@@ -1,13 +1,16 @@
 import createClient from 'openapi-fetch'
 import type { paths } from './schema'
 
-// ApiError is a non-2xx answer of the Go API, with its {"error": "..."} text.
+// ApiError is a non-2xx answer of the Go API, with its {"error": "..."} text
+// and the whole body (a failed tenant change also returns the tenant).
 export class ApiError extends Error {
   readonly status: number
+  readonly body: unknown
 
-  constructor(status: number, message: string) {
+  constructor(status: number, message: string, body?: unknown) {
     super(message)
     this.status = status
+    this.body = body
   }
 }
 
@@ -47,7 +50,7 @@ type Result<T> = { data?: T; error?: unknown; response: Response }
 export async function unwrap<T>(call: Promise<Result<T>>): Promise<T> {
   const { data, error, response } = await call
   if (!response.ok) {
-    throw new ApiError(response.status, errorMessage(error, response))
+    throw new ApiError(response.status, errorMessage(error, response), error)
   }
   return data as T
 }

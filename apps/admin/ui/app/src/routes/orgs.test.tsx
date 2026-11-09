@@ -38,49 +38,15 @@ describe('organizations list', () => {
     expect(router.state.location.search).toEqual({ q: 'tenant', state: 'inactive', offset: 20 })
   })
 
-  it('creates an organization and opens it', async () => {
-    const created = { ...orgA, id: 'org-new', name: 'tenant-c' }
-    const api = mockApi({
-      ...signedIn,
-      'GET /api/orgs': orgs,
-      'POST /api/orgs': () => new Response(JSON.stringify({ id: 'org-new' }), { status: 201 }),
-      'GET /api/orgs/org-new': created,
-      'GET /api/users/admin': admin,
-      'GET /api/users': list([]),
-      'GET /api/projects': list([]),
-    })
-    const { user, router } = renderApp('/orgs')
-    await user.click(await screen.findByRole('button', { name: 'New organization' }))
-    const dialog = await screen.findByRole('dialog', { name: 'New organization' })
+  // Organizations are created only as tenants (ADR-0012, AC-15).
+  it('has no create action and points to the Tenants page', async () => {
+    const api = mockApi({ ...signedIn, 'GET /api/orgs': orgs })
+    renderApp('/orgs')
+    await screen.findByRole('link', { name: 'tenant-a' })
 
-    // An empty name never reaches the API.
-    await user.click(within(dialog).getByRole('button', { name: 'Create' }))
-    expect(await within(dialog).findByText('Required')).toBeInTheDocument()
-    expect(api.sent('POST', '/api/orgs')).toHaveLength(0)
-
-    await user.type(within(dialog).getByLabelText('Name'), '  tenant-c ')
-    await user.click(within(dialog).getByRole('button', { name: 'Create' }))
-
-    expect(await screen.findByRole('heading', { name: 'tenant-c' })).toBeInTheDocument()
-    expect(router.state.location.pathname).toBe('/orgs/org-new')
-    expect(api.sent('POST', '/api/orgs')[0].body).toEqual({ name: 'tenant-c' })
-    expect(await screen.findByText('Organization tenant-c created')).toBeInTheDocument()
-  })
-
-  it("keeps the dialog open with Zitadel's answer when the name is taken", async () => {
-    mockApi({
-      ...signedIn,
-      'GET /api/orgs': orgs,
-      'POST /api/orgs': apiError(409, 'Organisation already exists (V2-HN3SD)'),
-    })
-    const { user } = renderApp('/orgs')
-    await user.click(await screen.findByRole('button', { name: 'New organization' }))
-    const dialog = await screen.findByRole('dialog', { name: 'New organization' })
-    await user.type(within(dialog).getByLabelText('Name'), 'tenant-a')
-    await user.click(within(dialog).getByRole('button', { name: 'Create' }))
-
-    expect(await within(dialog).findByText('Organisation already exists (V2-HN3SD)')).toBeInTheDocument()
-    expect(screen.getByRole('dialog', { name: 'New organization' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /New organization/ })).not.toBeInTheDocument()
+    expect(within(screen.getByRole('main')).getByRole('link', { name: 'Tenants' })).toHaveAttribute('href', '/tenants')
+    expect(api.calls.filter((call) => call.method !== 'GET')).toHaveLength(0)
   })
 })
 
@@ -140,30 +106,22 @@ describe('organization page', () => {
     await waitFor(() => expect(api.sent('POST', '/api/orgs/org-b/activate')).toHaveLength(1))
   })
 
-  it('deletes only after the name is typed, then goes back to the list', async () => {
-    const api = mockApi({ ...answers(), 'DELETE /api/orgs/org-a': noContent(), 'GET /api/orgs': list([orgZitadel]) })
-    const { user, router } = renderApp('/orgs/org-a')
-    await user.click(await screen.findByRole('button', { name: 'Delete' }))
-    const confirm = await screen.findByRole('alertdialog', { name: 'Delete tenant-a?' })
-    expect(within(confirm).getByText(/data in other stores/)).toBeInTheDocument()
+  // Organizations are deleted only as tenants (ADR-0012, AC-15).
+  it('has no delete action', async () => {
+    const api = mockApi(answers())
+    renderApp('/orgs/org-a')
+    await screen.findByRole('heading', { name: 'tenant-a' })
 
-    const button = within(confirm).getByRole('button', { name: 'Delete' })
-    expect(button).toBeDisabled()
-    await user.type(within(confirm).getByLabelText('Type tenant-a to confirm'), 'tenant-')
-    expect(button).toBeDisabled()
-    await user.type(within(confirm).getByLabelText('Type tenant-a to confirm'), 'a')
-    await user.click(button)
-
-    await waitFor(() => expect(router.state.location.pathname).toBe('/orgs'))
-    expect(api.sent('DELETE', '/api/orgs/org-a')).toHaveLength(1)
+    expect(screen.queryByRole('button', { name: 'Delete' })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Deactivate' })).toBeInTheDocument()
+    expect(api.sent('DELETE', '/api/orgs/org-a')).toHaveLength(0)
   })
 
-  it("does not offer to delete the default organization or to lock the admin's own", async () => {
+  it("does not offer to lock the admin's own organization", async () => {
     mockApi(answers(orgZitadel))
     renderApp('/orgs/org-zitadel')
     await screen.findByRole('heading', { name: 'ZITADEL' })
 
-    expect(screen.getByRole('button', { name: 'Delete' })).toBeDisabled()
     await waitFor(() => expect(screen.getByRole('button', { name: 'Deactivate' })).toBeDisabled())
     expect(screen.getByRole('button', { name: 'Deactivate' })).toHaveAttribute('title', 'This is your own organization.')
   })
