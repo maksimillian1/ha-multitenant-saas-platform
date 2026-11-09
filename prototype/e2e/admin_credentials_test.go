@@ -485,6 +485,13 @@ const driftEvent = "service_account_credential_drift"
 
 // Verifies: admin-zitadel AC-9
 func TestCredentialDriftLogged(t *testing.T) {
+	// A bootstrap run just before (TestBootstrapRerunRotatesKeys) restarts
+	// the admin app; its new pod must be up to log anything.
+	rctx, rcancel := context.WithTimeout(context.Background(), 3*time.Minute)
+	defer rcancel()
+	if _, err := kubectl(rctx, "-n", "admin", "rollout", "status", "deployment/admin", "--timeout=3m"); err != nil {
+		t.Fatal(err)
+	}
 	iamAdmin := keyToken(t, loadServiceKey(t, iamAdminKeySecret, iamAdminKeyField))
 	k := loadServiceKey(t, adminAppKeySecret, adminAppKeyField)
 	since := time.Now().Add(-time.Second).UTC().Format(time.RFC3339)
@@ -511,7 +518,9 @@ func TestCredentialDriftLogged(t *testing.T) {
 			"--since-time="+since, "--tail=-1")
 		cancel()
 		if err != nil {
-			t.Fatal(err)
+			// A pod that is still starting has no logs yet; try again.
+			logs = ""
+			t.Logf("reading the admin app's logs: %v", err)
 		}
 		if pat.Token != "" && strings.Contains(logs, pat.Token) {
 			t.Fatal("the admin app logged the personal access token itself")
