@@ -1,5 +1,6 @@
 feature: admin-zitadel
 title: Admin app calls to the Zitadel management API with its service account
+stage: alpha
 critical: true
 code:
   - apps/admin/zitadel/**
@@ -18,24 +19,33 @@ acceptance:
       profile key. No request to Zitadel carries the private key or a personal access token.
     level: unit
     planned: apps/admin/zitadel/token_test.go:TestClientUsesJWTProfileToken
+    verified:
+      - apps/admin/zitadel/token_test.go:TestClientUsesJWTProfileToken
   AC-2:
     text: >-
       The client reuses its access token until shortly before it expires and gets a new one
       before that; a Zitadel call never fails because the access token expired.
     level: unit
     planned: apps/admin/zitadel/token_test.go:TestTokenRenewedBeforeExpiry
+    verified:
+      - apps/admin/zitadel/token_test.go:TestTokenRenewedBeforeExpiry
+      - apps/admin/zitadel/token_test.go:TestShortTokenRenewedBeforeExpiry
   AC-3:
     text: >-
       When Zitadel answers a call with unauthenticated (401), the client drops its access
       token, gets a new one and repeats the call once; a second 401 is returned to the caller.
     level: unit
     planned: apps/admin/zitadel/token_test.go:TestUnauthenticatedRetriesOnceWithNewToken
+    verified:
+      - apps/admin/zitadel/token_test.go:TestUnauthenticatedRetriesOnceWithNewToken
   AC-4:
     text: >-
       The admin app does not start when the key of its service account is missing or cannot be
       parsed, and its error names the setting; it never logs the key.
     level: unit
     planned: apps/admin/zitadel/key_test.go:TestLoadKeyRejectsMissingOrInvalid
+    verified:
+      - apps/admin/zitadel/key_test.go:TestLoadKeyRejectsMissingOrInvalid
   AC-5:
     text: >-
       After prototype/bootstrap-tenants.sh, admin-app has exactly one key, expiring at most
@@ -43,12 +53,17 @@ acceptance:
       holds that key and no tokens. A second run replaces the key and deletes the old one.
     level: integration
     planned: prototype/e2e/admin_credentials_test.go:TestAdminAppHasOnlyShortKey
+    verified:
+      - prototype/e2e/admin_credentials_test.go:TestAdminAppHasOnlyShortKey
+      - prototype/e2e/admin_credentials_test.go:TestBootstrapRerunRotatesKeys
   AC-6:
     text: >-
       On kind, the client with admin-app's key lists organizations and reads and changes the
       instance branding.
     level: integration
     planned: apps/admin/zitadel/branding_integration_test.go:TestBrandingIntegration
+    verified:
+      - apps/admin/zitadel/branding_integration_test.go:TestBrandingIntegration
   AC-7:
     text: >-
       admin-app holds exactly the instance roles IAM_ORG_MANAGER and IAM_BRANDING_MANAGER. It
@@ -56,6 +71,8 @@ acceptance:
       instance member, changes an instance identity provider or adds an instance action.
     level: integration
     planned: prototype/e2e/admin_credentials_test.go:TestAdminAppRoleBoundary
+    verified:
+      - prototype/e2e/admin_credentials_test.go:TestAdminAppRoleBoundary
   AC-8:
     text: >-
       At start and every 5 minutes, the admin app lists the credentials of admin-app. When it
@@ -64,12 +81,16 @@ acceptance:
       finding, with the account and the credential's type and ID, never its secret.
     level: unit
     planned: apps/admin/zitadel/drift_test.go:TestCredentialDrift
+    verified:
+      - apps/admin/zitadel/drift_test.go:TestCredentialDrift
   AC-9:
     text: >-
       On kind, adding a personal access token to admin-app makes the admin app log
       service_account_credential_drift for it within 5 minutes.
     level: integration
     planned: prototype/e2e/admin_credentials_test.go:TestCredentialDriftLogged
+    verified:
+      - prototype/e2e/admin_credentials_test.go:TestCredentialDriftLogged
   AC-10:
     text: >-
       After prototype/bootstrap-tenants.sh has run on kind, the machine user iam-admin (IAM_OWNER,
@@ -78,6 +99,8 @@ acceptance:
       is installed": the chart's PAT cannot be switched off, so the bootstrap deletes it.)
     level: integration
     planned: prototype/e2e/admin_credentials_test.go:TestIAMAdminHasNoPAT
+    verified:
+      - prototype/e2e/admin_credentials_test.go:TestIAMAdminHasNoPAT
   AC-11:
     text: >-
       prototype/bootstrap-tenants.sh calls Zitadel as iam-admin only with a short-lived access
@@ -86,6 +109,8 @@ acceptance:
       writes its output file as before.
     level: integration
     planned: prototype/e2e/admin_credentials_test.go:TestBootstrapOutputWithoutPAT
+    verified:
+      - prototype/e2e/admin_credentials_test.go:TestBootstrapOutputWithoutPAT
   AC-12:
     text: >-
       Each run of prototype/bootstrap-tenants.sh gives iam-admin a new key expiring at most
@@ -93,6 +118,8 @@ acceptance:
       other keys and any personal access token.
     level: integration
     planned: prototype/e2e/admin_credentials_test.go:TestBootstrapRerunRotatesKeys
+    verified:
+      - prototype/e2e/admin_credentials_test.go:TestBootstrapRerunRotatesKeys
   AC-13:
     text: >-
       The credential drift check of AC-8 also covers iam-admin: a personal access token, more
@@ -100,6 +127,8 @@ acceptance:
       with the account and the credential's type and ID, never its secret.
     level: unit
     planned: apps/admin/zitadel/drift_test.go:TestCredentialDriftIAMAdmin
+    verified:
+      - apps/admin/zitadel/drift_test.go:TestCredentialDriftIAMAdmin
   AC-14:
     text: >-
       After prototype/bootstrap-tenants.sh, the machine user admin-app-instance does not exist,
@@ -107,6 +136,9 @@ acceptance:
       Zitadel as admin-app.
     level: integration
     planned: prototype/e2e/admin_credentials_test.go:TestNoInstanceServiceAccount
+    verified:
+      - prototype/e2e/admin_credentials_test.go:TestNoInstanceServiceAccount
+      - apps/admin/main_test.go:TestBrandingCallsUseTheAdminAppAccount
   AC-15:
     text: >-
       The Zitadel role mappings in prototype/k8s/apps/zitadel/values.yaml equal Zitadel's
@@ -114,38 +146,79 @@ acceptance:
       instance policy permissions (iam.policy.*) only; any other difference fails CI.
     level: unit
     planned: tools/zitadelroles/roles_test.go:TestRoleMappingsMatchUpstream
+    verified:
+      - tools/zitadelroles/roles_test.go:TestRoleMappingsMatchUpstream
 
 checklist:
   T-01:
     planned: >-
       does not apply — the admin app is the platform admin and works across all tenants by
       design; no tenant data path changes
+    verified: n/a — the admin app is the platform admin and works across all tenants by design; the diff changes no tenant data path (approved in the plan)
   T-02:
     planned: >-
       applies — the client decodes Zitadel v4.19.2's answers to the JWT bearer token request,
       user.v2 ListKeys and ListPersonalAccessTokens; a broken answer gives an error, not a
       panic; recorded answers, admin app → Zitadel
+    verified:
+      - apps/admin/zitadel/token_test.go:TestClientUsesJWTProfileToken
+      - apps/admin/zitadel/token_test.go:TestBrokenTokenAnswerIsAnError
+      - apps/admin/zitadel/drift_test.go:TestCredentialDrift
+      - apps/admin/zitadel/drift_test.go:TestBrokenCredentialAnswer
   T-04:
     planned: >-
       applies (critical) — on kind, admin-app does what the pages need (organizations, users,
       role assignments, organization and instance branding) and is denied outside its roles
       (instance members, IdPs, actions); the admin API's own 401/403 checks are unchanged;
       admin app → Zitadel
+    verified:
+      - prototype/e2e/admin_credentials_test.go:TestAdminAppRoleBoundary
   T-08:
     planned: does not apply — no migration
+    verified: n/a — no migration in the diff
   T-11:
     planned: >-
       does not apply — no new decoder of untrusted input; the key comes from our own Secret and
       Zitadel's answers are decoded with encoding/json as today
+    verified: n/a — no new decoder of untrusted input; the key comes from our own Secret, Zitadel answers go through encoding/json
   T-12:
     planned: >-
       applies (critical) — three controls, each broken once by hand while its test must fail:
       admin-app given IAM_OWNER fails the AC-7 test; the drift check switched off fails AC-9;
       a personal access token given to iam-admin fails AC-10 (the chart's Pat block cannot be
       switched off, so it cannot be restored either; changed with AC-10 on 2026-11-09)
+    verified:
+      - prototype/e2e/admin_credentials_test.go:TestAdminAppRoleBoundary
+      - prototype/e2e/admin_credentials_test.go:TestIAMAdminHasNoPAT
+      - prototype/e2e/admin_credentials_test.go:TestCredentialDriftLogged
 
 quality_scenarios:
   touched: [QS-11]
+  recommended_runs: []
 
 gates:
+  G-01: {status: n/a, by: verify, date: 2026-11-09, note: no release flag}
+  G-02: {status: pass, by: verify, date: 2026-11-09, commit: 13bfb24}
+  G-03: {status: n/a, by: verify, date: 2026-11-09, note: no schema of ours added or changed; the Zitadel API is third-party}
+  G-04: {status: pass, by: verify, date: 2026-11-09, level: basic}
+  G-05: {status: pass, by: verify, date: 2026-11-09, note: "QS-11 listed; the admin app is not on the tenant request path; no run recommended"}
   G-07: {status: pass, by: owner, date: 2026-11-09, note: plan for alpha approved in chat}
+
+deviations:
+  - item: T-12
+    change: the AC-10 canary gives iam-admin a PAT instead of restoring the chart's Pat block, which cannot be switched off
+    approved: "2026-11-09"
+
+runs:
+  - date: 2026-11-09
+    commit: fac01d7
+    stage_checked: alpha
+    verdict: not-ready
+    failed: [T-02, T-12]
+    not_checked: []
+  - date: 2026-11-09
+    commit: 13bfb24
+    stage_checked: alpha
+    verdict: ready
+    failed: []
+    not_checked: []
