@@ -88,7 +88,7 @@ func (f *fakeTM) serve(w http.ResponseWriter, r *http.Request) {
 // is fetched once and reused, and every change names the admin. The
 // answers are the contract's examples.
 //
-// Verifies: AC-14 (T-02: the client against docs/contracts/tenants/examples)
+// Verifies: tenant-management AC-14; T-02
 func TestClientSendsTokenAndAdmin(t *testing.T) {
 	f, c := newFake(t)
 	active := example(t, "tenant-active.json")

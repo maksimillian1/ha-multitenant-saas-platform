@@ -16,7 +16,7 @@ if code=$(curl -s -m 5 -o /dev/null -w '%{http_code}' http://tenants.tenants.svc
 // control pod carries the admin app's label and must get the token check's
 // 401, so a blocked answer elsewhere is the policy, not a broken service.
 //
-// Verifies: AC-10, T-12 (fails without the CiliumNetworkPolicy tenants-from-admin-only)
+// Verifies: tenant-management AC-10; T-12
 func TestOnlyAdminNamespaceReachesTenantManagement(t *testing.T) {
 	if out := directAccess(t, "admin", "app.kubernetes.io/name=admin", tenantsProbe); !strings.Contains(out, "tenants=401") {
 		t.Fatalf("a pod with the admin app's label did not get 401 from Tenant Management, so the check proves nothing: %q", out)
