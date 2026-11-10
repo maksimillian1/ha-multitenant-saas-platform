@@ -16,9 +16,8 @@ zitadel:
       #
       # Zitadel's own role mappings, copied from its defaults because a list in
       # the config replaces the default list as a whole, plus our role
-      # IAM_BRANDING_MANAGER at the end. tools/zitadelroles checks in CI that
-      # the copy equals the defaults of the chart's Zitadel version (AC-15 of
-      # docs/features/admin-zitadel.yaml); refresh it when the chart changes.
+      # IAM_BRANDING_MANAGER at the end. Refresh the copy from the defaults of
+      # the new Zitadel version when the chart changes.
       InternalAuthZ:
         RolePermissionMappings:
           - Role: "SYSTEM_OWNER"

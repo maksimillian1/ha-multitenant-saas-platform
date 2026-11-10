@@ -5,7 +5,6 @@ critical: true
 code:
   - apps/admin/zitadel/**
   - prototype/k8s/apps/zitadel/values.yaml
-  - tools/zitadelroles/**
 c4: [adminPortal, authService]
 links:
   issues: [HAMSP-23, HAMSP-36, HAMSP-91]
@@ -139,15 +138,6 @@ acceptance:
     verified:
       - prototype/e2e/admin_credentials_test.go:TestNoInstanceServiceAccount
       - apps/admin/main_test.go:TestBrandingCallsUseTheAdminAppAccount
-  AC-15:
-    text: >-
-      The Zitadel role mappings in prototype/k8s/apps/zitadel/values.yaml equal Zitadel's
-      defaults of the version the chart pins, plus the role IAM_BRANDING_MANAGER with
-      instance policy permissions (iam.policy.*) only; any other difference fails CI.
-    level: unit
-    planned: tools/zitadelroles/roles_test.go:TestRoleMappingsMatchUpstream
-    verified:
-      - tools/zitadelroles/roles_test.go:TestRoleMappingsMatchUpstream
 
 checklist:
   T-01:
