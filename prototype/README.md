@@ -100,9 +100,9 @@ The pages manage what lives in Zitadel (HAMSP-34):
 
 Deleting an organization deletes it in Zitadel only: the tenant's rows in PostgreSQL and its usage events stay (tenant lifecycle, HAMSP-6). The app does not let the admin lock, deactivate or delete their own user or the service account, deactivate or delete their organizations, or change their own role assignments.
 
-The app calls Zitadel's v2 APIs (Connect with JSON) as its own service account `admin-app`, a machine user with the instance role `IAM_ORG_MANAGER`, never with the admin's token. Zitadel's audit trail therefore shows `admin-app` as the editor; the app's log has a line `admin change` with the admin's user ID, the route, the target and the status for every change. State-changing requests need the header `X-Requested-With: XMLHttpRequest` and must come from the app's origin (CSRF).
+The app calls Zitadel's v2 APIs (Connect with JSON) as its own service account `admin-app`, a machine user with the instance roles `IAM_ORG_MANAGER` and `IAM_BRANDING_MANAGER` (a custom role that may only read and change the instance's policies, defined in `prototype/k8s/apps/zitadel/values.yaml`), never with the admin's token. The app holds no long-lived token: it signs a JWT with the account's key (JWT profile, RFC 7523) and gets an access token that lives 60 seconds, renewed before it expires (HAMSP-36). Zitadel's audit trail therefore shows `admin-app` as the editor; the app's log has a line `admin change` with the admin's user ID, the route, the target and the status for every change. State-changing requests need the header `X-Requested-With: XMLHttpRequest` and must come from the app's origin (CSRF).
 
-`bootstrap-tenants.sh` sets it up. It switches the instance to Zitadel's built-in login (the instance requires Login V2, which this cluster does not deploy), creates the project, the role and an OIDC web app, writes the app's client and a session key to the Secret `admin/admin-oidc`, creates the service accounts `admin-app` and `admin-app-instance` with personal access tokens (new on every run, valid for a year) in the Secret `admin/admin-zitadel`, and creates three human users in the IAM admin's organization: `super-admin` with the role (all pages), `viewer` with the role `viewer` only (access denied page) and `regular-user` with no role (Zitadel refuses the sign-in). Their passwords are new on every run:
+`bootstrap-tenants.sh` sets it up. It switches the instance to Zitadel's built-in login (the instance requires Login V2, which this cluster does not deploy), creates the project, the role and an OIDC web app, writes the app's client and a session key to the Secret `admin/admin-oidc`, creates the service account `admin-app` with a key (new on every run, valid for 30 days; the old keys and any personal access token are deleted) in the field `key.json` of the Secret `admin/admin-zitadel`, which the app reads as a file, deletes the old second account `admin-app-instance` if it exists, gives the IAM admin `iam-admin` a new 30-day key in the Secret `zitadel/iam-admin` and deletes its personal access token and the Secret `zitadel/iam-admin-pat`, and creates three human users in the IAM admin's organization: `super-admin` with the role (all pages), `viewer` with the role `viewer` only (access denied page) and `regular-user` with no role (Zitadel refuses the sign-in). Their passwords are new on every run:
 
 ```bash
 jq -r '.admin.users[] | "\(.username)  \(.password)  roles: \(.roles)"' prototype/.tenants.json
@@ -110,11 +110,17 @@ jq -r '.admin.users[] | "\(.username)  \(.password)  roles: \(.roles)"' prototyp
 
 Zitadel may offer to set up a second factor after the password; skip it.
 
-The Zitadel client has an integration test that runs against this cluster with the service account's token. It creates and deletes an organization with a human and a machine user, and assigns and revokes a role in `platform-admin`:
+Run `bootstrap-tenants.sh` again before the 30 days are over; the app's key and the IAM admin's key are replaced, and the app picks up its new key when its pod restarts. Every 5 minutes the app also checks both accounts and logs an `ERROR` event `service_account_credential_drift` for a personal access token, a key it does not use, a second key or a key valid for more than 30 days.
+
+The Zitadel client has an integration test that runs against this cluster with the service account's key. It creates and deletes an organization with a human and a machine user, and assigns and revokes a role in `platform-admin`. The key goes to a file only you can read:
+
+```bash
+(umask 077; kubectl -n admin get secret admin-zitadel -o jsonpath='{.data.key\.json}' | base64 -d > /tmp/admin-app-key.json)
+```
 
 ```bash
 ZITADEL_TEST_URL=http://zitadel.localtest.me:30080 \
-ZITADEL_TEST_TOKEN=$(kubectl -n admin get secret admin-zitadel -o jsonpath='{.data.ZITADEL_TOKEN}' | base64 -d) \
+ZITADEL_TEST_KEY_FILE=/tmp/admin-app-key.json \
 go test -C apps/admin -count=1 -run TestIntegration -v ./zitadel/
 ```
 
@@ -122,12 +128,11 @@ go test -C apps/admin -count=1 -run TestIntegration -v ./zitadel/
 
 The Branding tab of an organization and the Platform branding page edit Zitadel's label policies (HAMSP-37): colors for light and dark, theme mode, two flags, and the logo, icon and font. Changes go to a draft, which a preview shows; **Publish** makes the Zitadel login show it. An organization without its own branding shows the platform's, and **Reset to platform branding** removes its own. The admin app takes its primary color, logo and icon from the published platform branding.
 
-The platform branding needs the instance role `IAM_OWNER`, so `bootstrap-tenants.sh` creates a second machine user, `admin-app-instance`, and writes its token as `ZITADEL_INSTANCE_TOKEN` to the same Secret; the app uses it for the platform branding only. The app does not start without it. The integration test publishes branding for `tenant-a` and checks the login's CSS for `tenant-a`, `tenant-b` and the platform; it restores what it changed:
+The platform branding is the instance's label policy; `admin-app` changes it through its role `IAM_BRANDING_MANAGER`, so no account with `IAM_OWNER` is needed. The integration test publishes branding for `tenant-a` and checks the login's CSS for `tenant-a`, `tenant-b` and the platform, and saves and restores a draft of the platform branding; it restores what it changed. It uses the key file from above:
 
 ```bash
 ZITADEL_TEST_URL=http://zitadel.localtest.me:30080 \
-ZITADEL_TEST_TOKEN=$(kubectl -n admin get secret admin-zitadel -o jsonpath='{.data.ZITADEL_TOKEN}' | base64 -d) \
-ZITADEL_TEST_INSTANCE_TOKEN=$(kubectl -n admin get secret admin-zitadel -o jsonpath='{.data.ZITADEL_INSTANCE_TOKEN}' | base64 -d) \
+ZITADEL_TEST_KEY_FILE=/tmp/admin-app-key.json \
 go test -C apps/admin -count=1 -run TestBrandingIntegration -v ./zitadel/
 ```
 

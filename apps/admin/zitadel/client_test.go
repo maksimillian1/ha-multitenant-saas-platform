@@ -32,7 +32,7 @@ func newFake(t *testing.T, answers map[string]string) (*fakeZitadel, *Client) {
 	f := &fakeZitadel{t: t, answers: answers}
 	srv := httptest.NewServer(f)
 	t.Cleanup(srv.Close)
-	return f, NewClient(srv.URL+"/", "pat-of-admin-app", srv.Client())
+	return f, NewClient(srv.URL+"/", staticTokens("token-of-admin-app"), srv.Client())
 }
 
 func (f *fakeZitadel) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -81,7 +81,7 @@ func TestClientSendsConnectJSONWithToken(t *testing.T) {
 	for header, want := range map[string]string{
 		"Content-Type":             "application/json",
 		"Connect-Protocol-Version": "1",
-		"Authorization":            "Bearer pat-of-admin-app",
+		"Authorization":            "Bearer token-of-admin-app",
 	} {
 		if got.header.Get(header) != want {
 			t.Errorf("%s = %q, want %q", header, got.header.Get(header), want)
@@ -344,7 +344,7 @@ func TestErrorsCarryTheConnectCode(t *testing.T) {
 				_, _ = io.WriteString(w, tc.body)
 			}))
 			defer srv.Close()
-			err := NewClient(srv.URL, "t", srv.Client()).DeleteUser(context.Background(), "7")
+			err := NewClient(srv.URL, staticTokens("t"), srv.Client()).DeleteUser(context.Background(), "7")
 			var zerr *Error
 			if !errors.As(err, &zerr) || zerr.Status != tc.status || zerr.Code != tc.code || zerr.Message != tc.msg {
 				t.Fatalf("err = %#v, want status %d code %s message %q", err, tc.status, tc.code, tc.msg)
@@ -386,7 +386,7 @@ func TestServiceAccountIsLookedUpOnce(t *testing.T) {
 		_, _ = io.WriteString(w, `{"user": {"id": "sa", "details": {"sequence": "3", "resourceOwner": "0"}, "userName": "admin-app"}}`)
 	}))
 	defer srv.Close()
-	c := NewClient(srv.URL, "t", srv.Client())
+	c := NewClient(srv.URL, staticTokens("t"), srv.Client())
 
 	if _, err := c.ServiceAccount(context.Background()); !HasCode(err, CodeUnavailable) {
 		t.Fatalf("err = %v, want unavailable", err)

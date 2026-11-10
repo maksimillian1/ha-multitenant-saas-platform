@@ -125,11 +125,8 @@ func TestBrandingCallsCarryTheirToken(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			f, url, httpClient := newBrandingFake(t, nil)
-			token := "pat-of-admin-app"
-			if tc.orgHeader == "" {
-				token = "pat-of-admin-app-instance"
-			}
-			if err := tc.call(NewClient(url, token, httpClient)); err != nil {
+			token := "token-of-admin-app"
+			if err := tc.call(NewClient(url, staticTokens(token), httpClient)); err != nil {
 				t.Fatal(err)
 			}
 			got := f.last()
@@ -161,7 +158,7 @@ func TestBrandingCallsCarryTheirToken(t *testing.T) {
 
 func TestBrandingNeedsAScope(t *testing.T) {
 	f, url, httpClient := newBrandingFake(t, nil)
-	c := NewClient(url, "t", httpClient)
+	c := NewClient(url, staticTokens("t"), httpClient)
 	if _, err := c.GetBranding(context.Background(), Scope{}, false); err == nil {
 		t.Error("GetBranding without a scope: no error")
 	}
@@ -187,7 +184,7 @@ func TestDecodesBranding(t *testing.T) {
 			"logoUrlDark": "org-a/policy/label/logo-dark-3", "fontUrl": "org-a/policy/label/font-4",
 			"themeMode": "THEME_MODE_LIGHT"}, "isDefault": true}`},
 	})
-	got, err := NewClient(url, "t", httpClient).GetBranding(context.Background(), OrgScope("org-a"), true)
+	got, err := NewClient(url, staticTokens("t"), httpClient).GetBranding(context.Background(), OrgScope("org-a"), true)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -221,7 +218,7 @@ func TestUploadAsset(t *testing.T) {
 		t.Run(string(tc.asset), func(t *testing.T) {
 			f, url, httpClient := newBrandingFake(t, nil)
 			data := []byte("\x89PNG\r\n\x1a\nnot really a png")
-			err := NewClient(url, "t", httpClient).UploadBrandingAsset(context.Background(), tc.scope, tc.asset, "logo.png", "image/png", data)
+			err := NewClient(url, staticTokens("t"), httpClient).UploadBrandingAsset(context.Background(), tc.scope, tc.asset, "logo.png", "image/png", data)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -250,7 +247,7 @@ func TestDownloadAsset(t *testing.T) {
 		"GET /assets/v1/org/policy/label/logo/_preview": {200, "image/svg+xml", `<svg xmlns="http://www.w3.org/2000/svg"/>`},
 		"GET /assets/v1/org/policy/label/logo":          {404, "text/plain; charset=utf-8", "file not found: \n"},
 	})
-	c := NewClient(url, "t", httpClient)
+	c := NewClient(url, staticTokens("t"), httpClient)
 	file, err := c.BrandingAsset(context.Background(), OrgScope("org-a"), AssetLogo, true)
 	if err != nil {
 		t.Fatal(err)
@@ -280,7 +277,7 @@ func TestAssetErrorsCarryAConnectCode(t *testing.T) {
 		_, url, httpClient := newBrandingFake(t, map[string]cannedAnswer{
 			"POST /assets/v1/org/policy/label/logo": {tc.status, "text/plain", tc.body},
 		})
-		err := NewClient(url, "t", httpClient).UploadBrandingAsset(context.Background(), OrgScope("org-a"), AssetLogo, "a.png", "image/png", []byte("x"))
+		err := NewClient(url, staticTokens("t"), httpClient).UploadBrandingAsset(context.Background(), OrgScope("org-a"), AssetLogo, "a.png", "image/png", []byte("x"))
 		var zerr *Error
 		if !errors.As(err, &zerr) || zerr.Status != tc.status || zerr.Code != tc.code || zerr.Message != tc.msg {
 			t.Errorf("%d: err = %#v, want code %s message %q", tc.status, err, tc.code, tc.msg)
@@ -292,7 +289,7 @@ func TestBrandingGatewayErrors(t *testing.T) {
 	_, url, httpClient := newBrandingFake(t, map[string]cannedAnswer{
 		"POST /management/v1/policies/label": {409, "application/json", `{"code": 6, "message": "Private Label Policy has already been created", "details": []}`},
 	})
-	err := NewClient(url, "t", httpClient).CreateOrgBranding(context.Background(), "org-a", settings)
+	err := NewClient(url, staticTokens("t"), httpClient).CreateOrgBranding(context.Background(), "org-a", settings)
 	if !HasCode(err, CodeAlreadyExists) {
 		t.Errorf("err = %v, want already_exists", err)
 	}
