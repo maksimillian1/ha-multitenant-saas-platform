@@ -20,6 +20,14 @@ spec:
         app.kubernetes.io/name: tenants
     spec:
       serviceAccountName: tenants
+      # The image runs as nonroot (65532); runAsUser gives runAsNonRoot the
+      # number to check, and fsGroup lets the process read the key file,
+      # which is not readable by others.
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        runAsGroup: 65532
+        fsGroup: 65532
       containers:
         - name: tenants
           # Built and loaded into kind by prototype/create-cluster.sh.
