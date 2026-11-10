@@ -11,8 +11,9 @@
 // Branding (label policies and their assets) has no v2 write API in
 // v4.19.2, so branding.go calls the v1 REST gateway and the assets API.
 //
-// The client authenticates with the personal access token of the admin
-// app's service account, not with the signed-in admin's token.
+// The client calls as the admin app's service account, with short-lived
+// access tokens it gets from the account's JWT profile key (KeyTokens), never
+// with the signed-in admin's token.
 package zitadel
 
 import (
@@ -59,7 +60,7 @@ const maxAnswer = 4 << 20
 // Client calls Zitadel as the admin app's service account.
 type Client struct {
 	baseURL string
-	token   string
+	tokens  Tokens
 	http    *http.Client
 
 	mu      sync.Mutex
@@ -69,8 +70,9 @@ type Client struct {
 // NewClient returns a client for the Zitadel instance at baseURL (the
 // issuer). httpClient carries the requests; the admin app passes the issuer
 // client, which dials the in-cluster Service but keeps the public Host.
-func NewClient(baseURL, token string, httpClient *http.Client) *Client {
-	return &Client{baseURL: strings.TrimSuffix(baseURL, "/"), token: token, http: httpClient}
+// tokens gives the access token of every call.
+func NewClient(baseURL string, tokens Tokens, httpClient *http.Client) *Client {
+	return &Client{baseURL: strings.TrimSuffix(baseURL, "/"), tokens: tokens, http: httpClient}
 }
 
 // Error is an error answer of Zitadel, with its Connect code and message.
@@ -101,7 +103,6 @@ func (c *Client) call(ctx context.Context, service, method string, req, resp any
 	if err != nil {
 		return err
 	}
-	//nolint:gosec // G704: baseURL is the configured Zitadel address; service and method are constants of this package.
 	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, c.baseURL+"/"+service+"/"+method, bytes.NewReader(body))
 	if err != nil {
 		return err
@@ -129,19 +130,46 @@ func (c *Client) do(req *http.Request, resp any) error {
 	return nil
 }
 
-// send makes the request with the client's token and reads the whole answer.
+// send makes the request with the client's access token and reads the whole
+// answer. When Zitadel answers 401, the token is dropped and the request is
+// sent once more with a new one (a token revoked or expired early).
 func (c *Client) send(req *http.Request) (*http.Response, []byte, error) {
-	req.Header.Set("Authorization", "Bearer "+c.token)
-	res, err := c.http.Do(req) //nolint:gosec // G704: every request goes to the configured Zitadel base URL.
+	res, data, token, err := c.sendWithToken(req)
+	if err != nil || res.StatusCode != http.StatusUnauthorized {
+		return res, data, err
+	}
+	c.tokens.Invalidate(token)
+	retry := req.Clone(req.Context())
+	if req.Body != nil && req.Body != http.NoBody {
+		if req.GetBody == nil {
+			return res, data, nil
+		}
+		body, err := req.GetBody()
+		if err != nil {
+			return nil, nil, fmt.Errorf("zitadel: repeating %s: %w", req.URL.Path, err)
+		}
+		retry.Body = body
+	}
+	res, data, _, err = c.sendWithToken(retry)
+	return res, data, err
+}
+
+func (c *Client) sendWithToken(req *http.Request) (*http.Response, []byte, string, error) {
+	token, err := c.tokens.Token(req.Context())
 	if err != nil {
-		return nil, nil, fmt.Errorf("zitadel: %w", err)
+		return nil, nil, "", err
+	}
+	req.Header.Set("Authorization", "Bearer "+token)
+	res, err := c.http.Do(req)
+	if err != nil {
+		return nil, nil, "", fmt.Errorf("zitadel: %w", err)
 	}
 	defer res.Body.Close()
 	data, err := io.ReadAll(io.LimitReader(res.Body, maxAnswer))
 	if err != nil {
-		return nil, nil, fmt.Errorf("zitadel: reading the answer to %s: %w", req.URL.Path, err)
+		return nil, nil, "", fmt.Errorf("zitadel: reading the answer to %s: %w", req.URL.Path, err)
 	}
-	return res, data, nil
+	return res, data, token, nil
 }
 
 // grpcCodes names the numeric gRPC codes of the v1 REST gateway's errors.
@@ -236,6 +264,7 @@ func (p Page) ascending() *pagination {
 // filter.v2.TextFilterMethod (project and authorization v2).
 const (
 	textContainsIgnoreCase   = "TEXT_QUERY_METHOD_CONTAINS_IGNORE_CASE"
+	textEquals               = "TEXT_QUERY_METHOD_EQUALS"
 	filterContainsIgnoreCase = "TEXT_FILTER_METHOD_CONTAINS_IGNORE_CASE"
 )
 
@@ -262,7 +291,7 @@ func (c *Client) ServiceAccount(ctx context.Context) (ServiceAccount, error) {
 	if c.account != nil {
 		return *c.account, nil
 	}
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, c.baseURL+"/auth/v1/users/me", nil) //nolint:gosec // G704: configured Zitadel base URL and a fixed path.
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, c.baseURL+"/auth/v1/users/me", nil)
 	if err != nil {
 		return ServiceAccount{}, err
 	}

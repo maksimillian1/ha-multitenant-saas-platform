@@ -5,10 +5,10 @@
 // the server; the browser holds only an encrypted session cookie. Its public
 // route does not go through the API Gateway, which accepts only bearer tokens.
 //
-// The API manages Zitadel's organizations, users and role assignments as the
-// app's own service account (ZITADEL_TOKEN), never with the admin's token.
-// Only the platform branding uses a second account with the instance role
-// IAM_OWNER (ZITADEL_INSTANCE_TOKEN).
+// The API manages Zitadel's organizations, users, role assignments and
+// branding as the app's own service account admin-app, never with the
+// admin's token. It gets short-lived access tokens with the account's JWT
+// profile key (ZITADEL_KEY_FILE).
 package main
 
 import (
@@ -18,6 +18,7 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	"github.com/maksimillian1/ha-multitenant-saas-platform/apps/admin/api"
 	"github.com/maksimillian1/ha-multitenant-saas-platform/apps/admin/auth"
@@ -73,21 +74,40 @@ func bootstrapServices(ctx context.Context, cfg core.Config, log *slog.Logger) (
 	}
 
 	authService := auth.NewService(provider, cookies, cfg.PublicURL, cfg.ClientID, log)
-	// The issuer client also reaches the Zitadel APIs: same host, same
-	// in-cluster dial address.
-	apiService := newAPIService(cfg, authService, issuerClient, log)
+	// The issuer client also reaches the Zitadel APIs and the token
+	// endpoint: same host, same in-cluster dial address.
+	key, err := zitadel.LoadKey("ZITADEL_KEY_FILE", cfg.ZitadelKeyFile)
+	if err != nil {
+		return nil, nil, nil, nil, err
+	}
+	tokens, err := zitadel.NewKeyTokens(ctx, cfg.Issuer, key, issuerClient)
+	if err != nil {
+		return nil, nil, nil, nil, err
+	}
+	apiService := newAPIService(cfg, authService, tokens, issuerClient, log)
+	// Both service accounts are checked for credentials they should not
+	// have (a PAT, a second key, a long key); a finding is an ERROR event.
+	drift := &zitadel.DriftCheck{
+		Client: zitadel.NewClient(cfg.ZitadelURL, tokens, issuerClient),
+		Accounts: []zitadel.Account{
+			{Name: "admin-app", UserID: key.UserID, OwnKeyID: key.KeyID},
+			{Name: "iam-admin"},
+		},
+		Log: log,
+	}
+	go drift.Loop(ctx, driftInterval)
 	uiService := ui.NewService(authService, log)
 	healthService := health.NewService()
 
 	return authService, apiService, uiService, healthService, nil
 }
 
-// newAPIService builds the API with its two Zitadel clients: the admin app's
-// account for everything, and the instance account for the platform
-// branding only.
-func newAPIService(cfg core.Config, sessions core.SessionReader, httpClient *http.Client, log *slog.Logger) *api.Service {
-	return api.NewService(sessions,
-		zitadel.NewClient(cfg.ZitadelURL, cfg.ZitadelToken, httpClient),
-		zitadel.NewClient(cfg.ZitadelURL, cfg.ZitadelInstanceToken, httpClient),
-		cfg.AdminRole, cfg.PublicURL, log)
+// driftInterval is how often the service accounts' credentials are checked.
+const driftInterval = 5 * time.Minute
+
+// newAPIService builds the API with one Zitadel client, the admin app's
+// account, for every route; the platform branding uses it too (HAMSP-36).
+func newAPIService(cfg core.Config, sessions core.SessionReader, tokens zitadel.Tokens, httpClient *http.Client, log *slog.Logger) *api.Service {
+	client := zitadel.NewClient(cfg.ZitadelURL, tokens, httpClient)
+	return api.NewService(sessions, client, client, cfg.AdminRole, cfg.PublicURL, log)
 }

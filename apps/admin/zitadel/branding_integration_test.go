@@ -9,7 +9,6 @@ import (
 	"io"
 	"net/http"
 	"net/url"
-	"os"
 	"strings"
 	"testing"
 	"time"
@@ -19,33 +18,23 @@ import (
 // cluster and checks Zitadel's login CSS (HAMSP-37 AC-5, AC-13): tenant-a
 // shows the new primary color, while tenant-b's login and the platform
 // branding stay as they were. It also uploads, downloads and removes a draft
-// logo. Everything it changes is restored. It needs the admin app's token and
-// the instance token:
+// logo. Everything it changes is restored. With one account (HAMSP-36) the
+// admin app's key also reads and changes the instance branding: a draft is
+// saved and put back. It needs the variables of integrationClient.
 //
-//	ZITADEL_TEST_URL=http://zitadel.localtest.me:30080
-//	ZITADEL_TEST_TOKEN=$(kubectl -n admin get secret admin-zitadel -o jsonpath='{.data.ZITADEL_TOKEN}' | base64 -d)
-//	ZITADEL_TEST_INSTANCE_TOKEN=$(kubectl -n admin get secret admin-zitadel -o jsonpath='{.data.ZITADEL_INSTANCE_TOKEN}' | base64 -d)
+// Verifies: admin-zitadel AC-6
 func TestBrandingIntegration(t *testing.T) {
-	base, token, instanceToken := os.Getenv("ZITADEL_TEST_URL"), os.Getenv("ZITADEL_TEST_TOKEN"), os.Getenv("ZITADEL_TEST_INSTANCE_TOKEN")
-	if base == "" || token == "" || instanceToken == "" {
-		t.Skip("ZITADEL_TEST_URL, ZITADEL_TEST_TOKEN and ZITADEL_TEST_INSTANCE_TOKEN are not set")
-	}
+	c, base := integrationClient(t)
+	platform := c // the platform branding uses the same account
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 	defer cancel()
-	httpClient := &http.Client{Timeout: 10 * time.Second}
-	c := NewClient(base, token, httpClient)
-	platform := NewClient(base, instanceToken, httpClient)
 
 	tenantA, tenantB := orgByName(ctx, t, c, "tenant-a"), orgByName(ctx, t, c, "tenant-b")
 	a := OrgScope(tenantA)
 
-	// The admin app's token may not touch the instance's branding; the
-	// instance token may.
-	if _, err := c.GetBranding(ctx, InstanceScope(), false); !HasCode(err, CodePermissionDenied) {
-		t.Errorf("the admin app's token read the instance branding: %v", err)
-	}
 	platformBefore, err := platform.GetBranding(ctx, InstanceScope(), false)
 	must(t, err)
+	changeInstanceDraft(ctx, t, platform)
 	platformCSSBefore := loginCSS(ctx, t, base, tenantB, true)
 	tenantBCSSBefore := loginCSS(ctx, t, base, tenantB, false)
 
@@ -101,6 +90,31 @@ func TestBrandingIntegration(t *testing.T) {
 	if after, err := platform.GetBranding(ctx, InstanceScope(), false); err != nil || after.BrandingSettings != platformBefore.BrandingSettings {
 		t.Errorf("the platform branding changed: %+v, %v", after.BrandingSettings, err)
 	}
+}
+
+// changeInstanceDraft saves a changed draft of the instance branding with the
+// admin app's account and puts the old draft back. The active branding stays.
+func changeInstanceDraft(ctx context.Context, t *testing.T, c *Client) {
+	t.Helper()
+	draft, err := c.GetBranding(ctx, InstanceScope(), true)
+	must(t, err)
+	changed := draft.BrandingSettings
+	changed.BackgroundColor = "#fefefe"
+	if changed == draft.BrandingSettings {
+		changed.BackgroundColor = "#fdfdfd"
+	}
+	must(t, c.UpdateBranding(ctx, InstanceScope(), changed))
+	t.Cleanup(func() {
+		ctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 30*time.Second)
+		defer cancel()
+		if err := c.UpdateBranding(ctx, InstanceScope(), draft.BrandingSettings); err != nil {
+			t.Errorf("restoring the instance draft: %v", err)
+		}
+	})
+	eventually(t, func() bool {
+		got, err := c.GetBranding(ctx, InstanceScope(), true)
+		return err == nil && got.BackgroundColor == changed.BackgroundColor
+	})
 }
 
 // restoreBranding puts tenant-a's branding back: removed if it had none,

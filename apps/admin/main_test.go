@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"io"
 	"log/slog"
@@ -23,8 +24,8 @@ func TestRoutes(t *testing.T) {
 	log := slog.New(slog.NewTextHandler(io.Discard, nil))
 	authService := auth.NewService(nil, auth.NewCookies("0123456789abcdef0123456789abcdef"), "http://admin.test", "client", log)
 	mux := routes(authService,
-		newAPIService(core.Config{ZitadelURL: "http://zitadel.test", ZitadelToken: "token", ZitadelInstanceToken: "instance-token",
-			AdminRole: "super-admin", PublicURL: "http://admin.test"}, authService, http.DefaultClient, log),
+		newAPIService(core.Config{ZitadelURL: "http://zitadel.test",
+			AdminRole: "super-admin", PublicURL: "http://admin.test"}, authService, testTokens("token"), http.DefaultClient, log),
 		ui.NewService(authService, log),
 		health.NewService())
 
@@ -64,10 +65,18 @@ func (adminSession) Session(*http.Request) (core.Session, bool) {
 	return core.Session{Subject: "admin", Roles: []string{"super-admin"}, Expires: time.Now().Add(time.Hour)}, true
 }
 
-// TestBrandingTokensGoToTheirRoutes checks that the instance token reaches
-// Zitadel only on the platform branding routes, and the admin app's token on
-// every other call (HAMSP-37, AC-7).
-func TestBrandingTokensGoToTheirRoutes(t *testing.T) {
+// testTokens is a fixed access token in place of the key's tokens.
+type testTokens string
+
+func (s testTokens) Token(context.Context) (string, error) { return string(s), nil }
+func (testTokens) Invalidate(string)                       {}
+
+// TestBrandingCallsUseTheAdminAppAccount checks that the organization and
+// the platform branding routes both call Zitadel as admin-app. Until HAMSP-36
+// the platform routes used a second account with IAM_OWNER (HAMSP-37, AC-7).
+//
+// Verifies: admin-zitadel AC-14
+func TestBrandingCallsUseTheAdminAppAccount(t *testing.T) {
 	var (
 		mu    sync.Mutex
 		calls = map[string]string{} // path -> token
@@ -89,8 +98,8 @@ func TestBrandingTokensGoToTheirRoutes(t *testing.T) {
 
 	log := slog.New(slog.NewTextHandler(io.Discard, nil))
 	mux := http.NewServeMux()
-	newAPIService(core.Config{ZitadelURL: zitadel.URL, ZitadelToken: "org-token", ZitadelInstanceToken: "instance-token",
-		AdminRole: "super-admin", PublicURL: "http://admin.test"}, adminSession{}, zitadel.Client(), log).Register(mux)
+	newAPIService(core.Config{ZitadelURL: zitadel.URL,
+		AdminRole: "super-admin", PublicURL: "http://admin.test"}, adminSession{}, testTokens("admin-app-token"), zitadel.Client(), log).Register(mux)
 
 	for _, target := range []string{"/api/orgs/org-a/branding", "/api/platform/branding"} {
 		rec := httptest.NewRecorder()
@@ -103,11 +112,7 @@ func TestBrandingTokensGoToTheirRoutes(t *testing.T) {
 		t.Fatal("no call reached Zitadel")
 	}
 	for path, token := range calls {
-		want := "org-token"
-		if strings.HasPrefix(path, "/admin/v1/") {
-			want = "instance-token"
-		}
-		if token != want {
+		if want := "admin-app-token"; token != want {
 			t.Errorf("%s was called with %q, want %q", path, token, want)
 		}
 	}
@@ -144,8 +149,8 @@ func TestTokensNeverReachTheBrowser(t *testing.T) {
 
 	log := slog.New(slog.NewTextHandler(io.Discard, nil))
 	mux := http.NewServeMux()
-	newAPIService(core.Config{ZitadelURL: zitadel.URL, ZitadelToken: "org-token-secret", ZitadelInstanceToken: "instance-token-secret",
-		AdminRole: "super-admin", PublicURL: "http://admin.test"}, adminSession{}, zitadel.Client(), log).Register(mux)
+	newAPIService(core.Config{ZitadelURL: zitadel.URL,
+		AdminRole: "super-admin", PublicURL: "http://admin.test"}, adminSession{}, testTokens("admin-app-token-secret"), zitadel.Client(), log).Register(mux)
 
 	settings := `{"primary_color":"#7c3aed","background_color":"#fafafa","warn_color":"#cd3d56","font_color":"#000000",
 		"primary_color_dark":"#c4b5fd","background_color_dark":"#111827","warn_color_dark":"#ff3b5b","font_color_dark":"#ffffff",
@@ -187,7 +192,7 @@ func TestTokensNeverReachTheBrowser(t *testing.T) {
 		for name, values := range rec.Header() {
 			answer += "\n" + name + ": " + strings.Join(values, ",")
 		}
-		for _, token := range []string{"org-token-secret", "instance-token-secret"} {
+		for _, token := range []string{"admin-app-token-secret"} {
 			if strings.Contains(answer, token) {
 				t.Errorf("%s %s answered with the token %s:\n%s", route.method, route.path, token, answer)
 			}
