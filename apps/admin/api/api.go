@@ -74,8 +74,9 @@ type Service struct {
 	csrf      *http.CrossOriginProtection
 }
 
-// NewService returns the API. platform is the Zitadel client with the
-// instance token, used only for the platform branding. publicURL is the
+// NewService returns the API. platform is the Zitadel client for the
+// platform branding; since HAMSP-36 it is the same admin-app client as
+// zitadel. publicURL is the
 // app's own origin, which state-changing requests must come from.
 func NewService(sessions core.SessionReader, zitadel Zitadel, platform PlatformZitadel, adminRole, publicURL string, log *slog.Logger) *Service {
 	csrf := http.NewCrossOriginProtection()

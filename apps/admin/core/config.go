@@ -16,12 +16,11 @@ type Config struct {
 	AdminRole      string
 	// ZitadelURL is where the Zitadel APIs are; the issuer by default.
 	ZitadelURL string
-	// ZitadelToken is the personal access token of the admin app's service
-	// account in Zitadel (instance role IAM_ORG_MANAGER).
-	ZitadelToken string
-	// ZitadelInstanceToken is the token of a second service account
-	// (IAM_OWNER), used only to change the instance's branding (HAMSP-37).
-	ZitadelInstanceToken string
+	// ZitadelKeyFile is the JWT profile key file of the admin app's service
+	// account admin-app (instance roles IAM_ORG_MANAGER and
+	// IAM_BRANDING_MANAGER, HAMSP-36). The app gets short-lived access tokens
+	// with it.
+	ZitadelKeyFile string
 
 	// Tenant Management (ADR-0012): its URL, and the client credentials of
 	// the machine user whose token has the role tenant-manager in the
@@ -51,9 +50,7 @@ func LoadConfig() Config {
 		SessionKey:     GetEnv("SESSION_KEY", ""),
 		AdminRole:      GetEnv("ADMIN_ROLE", "super-admin"),
 		ZitadelURL:     GetEnv("ZITADEL_API_URL", GetEnv("ISSUER", "")),
-		ZitadelToken:   GetEnv("ZITADEL_TOKEN", ""),
-
-		ZitadelInstanceToken: GetEnv("ZITADEL_INSTANCE_TOKEN", ""),
+		ZitadelKeyFile: GetEnv("ZITADEL_KEY_FILE", ""),
 
 		TenantsURL:          GetEnv("TENANTS_URL", ""),
 		TenantsAudience:     GetEnv("TENANTS_AUDIENCE", ""),
@@ -65,7 +62,7 @@ func LoadConfig() Config {
 func (c Config) Validate() error {
 	for _, setting := range [][2]string{
 		{"ISSUER", c.Issuer}, {"CLIENT_ID", c.ClientID}, {"CLIENT_SECRET", c.ClientSecret}, {"SESSION_KEY", c.SessionKey},
-		{"ZITADEL_TOKEN", c.ZitadelToken}, {"ZITADEL_INSTANCE_TOKEN", c.ZitadelInstanceToken},
+		{"ZITADEL_KEY_FILE", c.ZitadelKeyFile},
 	} {
 		if setting[1] == "" {
 			return fmt.Errorf("%s is required", setting[0])

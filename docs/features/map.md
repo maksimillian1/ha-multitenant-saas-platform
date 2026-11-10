@@ -10,7 +10,7 @@ Each feature's stage and the gates behind it ([Feature stages](../process/featur
 |---|---|---|---|---|---|---|---|---|---|---|---|
 | [`admin-app`](admin-app.yaml) | — |  |  |  |  |  |  |  |  | — | HAMSP-23 |
 | [`admin-auth`](admin-auth.yaml) **critical** | — |  |  |  |  |  |  |  |  | — | HAMSP-23 |
-| [`admin-zitadel`](admin-zitadel.yaml) **critical** | — |  |  |  |  |  |  |  |  | — | HAMSP-23 |
+| [`admin-zitadel`](admin-zitadel.yaml) **critical** | alpha | n/a | ✓ | n/a | ✓ basic | ✓ |  | ✓ (owner) |  | 2026-11-09 ready for alpha | HAMSP-23, HAMSP-36, HAMSP-91 |
 | [`c4-from-code`](c4-from-code.yaml) | alpha | n/a | ✓ (owner) | n/a | ✓ basic | n/a |  | ✓ (owner) |  | 2026-11-07 ready for alpha | HAMSP-73, HAMSP-74, HAMSP-75, HAMSP-76, HAMSP-77, HAMSP-78, HAMSP-79, HAMSP-80, HAMSP-81 |
 | [`exampleapp`](exampleapp.yaml) | — |  |  |  |  |  |  |  |  | — | HAMSP-23 |
 | [`exampleapp-store`](exampleapp-store.yaml) **critical** | — |  |  |  |  |  |  |  |  | — | HAMSP-23 |

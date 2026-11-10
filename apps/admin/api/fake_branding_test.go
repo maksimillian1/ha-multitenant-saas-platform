@@ -269,7 +269,7 @@ func (z *fakeZitadel) BrandingAsset(_ context.Context, s zitadel.Scope, a zitade
 	return z.asset(s, a, preview, false)
 }
 
-// fakePlatform is the client with the instance token. Its calls are recorded
+// fakePlatform is the client for the platform branding. Its calls are recorded
 // in the same list, as "platform.<method>", and fail with the same err; it
 // may touch only the instance's branding.
 type fakePlatform struct{ z *fakeZitadel }

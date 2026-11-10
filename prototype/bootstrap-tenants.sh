@@ -7,18 +7,28 @@
 # project with the super-admin and viewer roles, an OIDC web app and three
 # human test users, super-admin, viewer and regular-user (no role), and writes
 # the app's client to the Secret admin/admin-oidc. It also creates the app's
-# service account admin-app with the instance role IAM_ORG_MANAGER, which the
-# app uses to manage organizations, users and role assignments (HAMSP-34), and
-# a second one, admin-app-instance with IAM_OWNER, which the app uses only for
-# the platform (instance) branding (HAMSP-37). For Tenant Management
-# (HAMSP-51) it creates the project tenant-management with the role
-# tenant-manager, the admin app's client of it (Secret admin/admin-tenants)
-# and the service's own account (Secret tenants/tenants-zitadel). Their personal access tokens go
-# to the Secret admin/admin-zitadel (ZITADEL_TOKEN, ZITADEL_INSTANCE_TOKEN). Writes
-# the credentials to prototype/.tenants.json (git-ignored) for the e2e tests
-# and for signing in. Safe to run again: existing organizations, users and
-# projects are reused; client secrets, the service account's token and the
-# admin test users' passwords are regenerated.
+# service account admin-app with the instance roles IAM_ORG_MANAGER and
+# IAM_BRANDING_MANAGER (our role, prototype/k8s/apps/zitadel/values.yaml),
+# which the app uses to manage organizations, users, role assignments and
+# branding (HAMSP-34, HAMSP-37, HAMSP-36), and writes its JWT profile key to
+# the Secret admin/admin-zitadel (key.json). Writes the credentials to
+# prototype/.tenants.json (git-ignored) for the e2e tests and for signing in.
+#
+# It works as the Zitadel chart's machine user iam-admin (IAM_OWNER), with
+# short-lived tokens from its key in the Secret zitadel/iam-admin. Keys live
+# 30 days (HAMSP-36): every run gives iam-admin and admin-app a new key and
+# deletes their other keys and any personal access token, including the
+# chart's iam-admin-pat. A cluster on which this script has not run for 30
+# days has no valid key left: recreate it.
+#
+# Safe to run again: existing organizations, users and projects are reused;
+# client secrets, the keys and the admin test users' passwords are
+# regenerated.
+#
+# For Tenant Management (HAMSP-51) it creates the project tenant-management
+# with the role tenant-manager, the admin app's client of it (Secret
+# admin/admin-tenants) and the service's own account (Secret
+# tenants/tenants-zitadel).
 #
 # The tenants created here are test fixtures from before Tenant Management
 # (ADR-0012); tenants made in the admin app go through apps/tenants.
@@ -44,12 +54,16 @@ ADMIN_EMAIL_DOMAIN="admin.localtest.me"
 # covers the organizations, users, role assignments and projects of every
 # organization, without the instance's settings.
 ADMIN_SA="admin-app"
-ADMIN_SA_ROLE="IAM_ORG_MANAGER"
-# The instance's branding needs iam.policy.write, which only IAM_OWNER has.
-# The admin app uses this account for the platform branding routes and
-# nothing else.
-INSTANCE_SA="admin-app-instance"
-INSTANCE_SA_ROLE="IAM_OWNER"
+# IAM_BRANDING_MANAGER adds the instance policies (the platform branding)
+# without the rest of IAM_OWNER.
+ADMIN_SA_ROLES='["IAM_BRANDING_MANAGER","IAM_ORG_MANAGER"]'
+# Until HAMSP-36 the platform branding used a second account with IAM_OWNER.
+# It is deleted when found.
+OLD_INSTANCE_SA="admin-app-instance"
+# The setup job of the Zitadel chart creates this IAM_OWNER machine user.
+IAM_ADMIN="iam-admin"
+# How long a service account key lives.
+KEY_DAYS=30
 # Tenant Management (apps/tenants, HAMSP-51): its callers need the role
 # tenant-manager of this project; the admin app calls it as TM_CLIENT. The
 # service itself calls Zitadel as TM_SA.
@@ -66,12 +80,40 @@ ACCESS_TOKEN_LIFETIME="60s"  # protobuf Duration: seconds only
 
 # ── helpers ────────────────────────────────────────────────────────────────────
 
+b64url() { openssl base64 -A | tr '+/' '-_' | tr -d '='; }
+
+# key_token KEYFILE_JSON — an access token for the machine user of a JWT
+# profile key, by the JWT bearer grant (RFC 7523). The key stays in memory.
+key_token() {
+  local key_json=$1 kid uid header payload sig
+  kid=$(jq -r .keyId <<<"${key_json}")
+  uid=$(jq -r .userId <<<"${key_json}")
+  header=$(jq -nc --arg k "${kid}" '{alg: "RS256", typ: "JWT", kid: $k}' | b64url)
+  payload=$(jq -nc --arg u "${uid}" --arg aud "${ISSUER}"     '{iss: $u, sub: $u, aud: $aud, iat: (now | floor), exp: ((now | floor) + 60)}' | b64url)
+  sig=$(printf '%s.%s' "${header}" "${payload}"     | openssl dgst -sha256 -sign <(jq -r .key <<<"${key_json}") | b64url)
+  curl -sS --fail-with-body --connect-to "${ZITADEL_HOST}:${GATEWAY}" -X POST "${ISSUER}/oauth/v2/token" \
+    --data-urlencode "grant_type=urn:ietf:params:oauth:grant-type:jwt-bearer" \
+    --data-urlencode "scope=openid urn:zitadel:iam:org:project:id:zitadel:aud" \
+    --data-urlencode "assertion=${header}.${payload}.${sig}" | jq -er .access_token
+}
+
+# admin_token — the IAM admin's current access token. Access tokens live 60 s
+# on this instance (ACCESS_TOKEN_LIFETIME), so it gets a new one every 40 s.
+TOKEN="" TOKEN_AT=0
+admin_token() {
+  if [[ -z "${TOKEN}" || $(( $(date +%s) - TOKEN_AT )) -ge 40 ]]; then
+    TOKEN=$(key_token "${IAM_ADMIN_KEY}") || { echo "ERROR: no token for ${IAM_ADMIN}." >&2; return 1; }
+    TOKEN_AT=$(date +%s)
+  fi
+}
+
 # zitadel METHOD PATH [JSON] — calls the Zitadel API through the API Gateway as
 # the IAM admin. Set ORG to act inside an organization.
 zitadel() {
+  admin_token
   local args=(-sS --fail-with-body --connect-to "${ZITADEL_HOST}:${GATEWAY}"
     -X "$1" "${ISSUER}$2"
-    -H "Authorization: Bearer ${PAT}" -H "Content-Type: application/json")
+    -H "Authorization: Bearer ${TOKEN}" -H "Content-Type: application/json")
   [[ -n "${ORG:-}" ]] && args+=(-H "x-zitadel-orgid: ${ORG}")
   [[ $# -ge 3 ]] && args+=(-d "$3")
   curl "${args[@]}"
@@ -97,9 +139,9 @@ zitadel_up() {
 
 # ── 1. wait for Zitadel and its admin token ────────────────────────────────────
 
-wait_for "IAM admin PAT (zitadel setup job)" 120 \
-  kubectl -n zitadel get secret iam-admin-pat
-PAT=$(kubectl -n zitadel get secret iam-admin-pat -o jsonpath='{.data.pat}' | base64 -d)
+wait_for "IAM admin key (zitadel setup job)" 120 \
+  kubectl -n zitadel get secret "${IAM_ADMIN}"
+IAM_ADMIN_KEY=$(kubectl -n zitadel get secret "${IAM_ADMIN}" -o jsonpath="{.data.${IAM_ADMIN}\.json}" | base64 -d)
 wait_for "Zitadel behind the API Gateway" 60 zitadel_up
 
 # ── 2. short token lifetime for the tests ──────────────────────────────────────
@@ -276,61 +318,97 @@ grant "${viewer_id}" viewer "${VIEWER_ROLE}"
 
 # ── 6. the admin app's service account: it calls the Zitadel APIs ───────────
 
-# service_account NAME ROLE DESCRIPTION — a machine user in the IAM admin's
-# organization with an instance role; prints a new personal access token (the
-# old ones are removed). The admin app checks the super-admin role of the
-# signed-in user itself.
-service_account() {
-  local name=$1 role=$2 description=$3 id count token_id token
-  id=$(zitadel POST /management/v1/users/_search "$(jq -nc --arg u "${name}" \
-    '{queries: [{userNameQuery: {userName: $u, method: "TEXT_QUERY_METHOD_EQUALS"}}]}')" \
-    | jq -r '.result[0].id // empty')
-  if [[ -z "${id}" ]]; then
-    id=$(zitadel POST /management/v1/users/machine "$(jq -nc --arg u "${name}" --arg d "${description}" \
-      '{userName: $u, name: $u, description: $d}')" | jq -r '.userId')
-    echo "Created machine user ${name} (${id})" >&2
-  else
-    echo "Reusing machine user ${name} (${id})" >&2
-  fi
-  count=$(zitadel POST /admin/v1/members/_search "$(jq -nc --arg u "${id}" \
-    '{queries: [{userIdQuery: {userId: $u}}]}')" | jq '.result // [] | length')
-  if [[ "${count}" == "0" ]]; then
-    zitadel POST /admin/v1/members "$(jq -nc --arg u "${id}" --arg r "${role}" \
-      '{userId: $u, roles: [$r]}')" >/dev/null
-    echo "  gave ${name} the instance role ${role}" >&2
-  fi
+# new_key USER_ID — a new JSON key of a machine user, valid KEY_DAYS days;
+# prints the key file. ORG must be the user's organization (or empty for the
+# IAM admin's).
+new_key() {
+  zitadel POST "/management/v1/users/$1/keys" "$(jq -nc --argjson d "${KEY_DAYS}" \
+    '{type: "KEY_TYPE_JSON", expirationDate: (now + $d * 24 * 3600 | todate)}')" \
+    | jq -er .keyDetails | base64 -d
+}
+
+# drop_credentials USER_ID KEEP_KEY_ID — deletes every key of a machine user
+# but KEEP_KEY_ID, and every personal access token.
+drop_credentials() {
+  local id=$1 keep=$2 key_id token_id
+  for key_id in $(zitadel POST "/management/v1/users/${id}/keys/_search" '{}' | jq -r '.result[]?.id'); do
+    [[ "${key_id}" == "${keep}" ]] || zitadel DELETE "/management/v1/users/${id}/keys/${key_id}" >/dev/null
+  done
   for token_id in $(zitadel POST "/management/v1/users/${id}/pats/_search" '{}' | jq -r '.result[]?.id'); do
     zitadel DELETE "/management/v1/users/${id}/pats/${token_id}" >/dev/null
   done
-  token=$(zitadel POST "/management/v1/users/${id}/pats" "$(jq -nc \
-    '{expirationDate: (now + 365 * 24 * 3600 | todate)}')" | jq -r '.token')
-  if [[ -z "${token}" || "${token}" == "null" ]]; then
-    echo "ERROR: creating the token of ${name} failed." >&2
-    return 1
-  fi
-  echo "${token}"
 }
 
-sa_token=$(service_account "${ADMIN_SA}" "${ADMIN_SA_ROLE}" \
-  "apps/admin manages organizations, users and role assignments as this user")
-instance_token=$(service_account "${INSTANCE_SA}" "${INSTANCE_SA_ROLE}" \
-  "apps/admin changes the platform (instance) branding as this user, and nothing else")
+# user_id NAME — the ID of a user of the IAM admin's organization, or empty.
+user_id() {
+  zitadel POST /management/v1/users/_search "$(jq -nc --arg u "$1" \
+    '{queries: [{userNameQuery: {userName: $u, method: "TEXT_QUERY_METHOD_EQUALS"}}]}')" \
+    | jq -r '.result[0].id // empty'
+}
 
-# The admin app reads its client and session key from admin-oidc and the
-# service accounts' tokens from admin-zitadel (k8s/apps/admin). A new session
+# The admin app's machine user, in the IAM admin's organization, with its
+# instance roles. The admin app checks the super-admin role of the signed-in
+# user itself.
+sa_id=$(user_id "${ADMIN_SA}")
+if [[ -z "${sa_id}" ]]; then
+  sa_id=$(zitadel POST /management/v1/users/machine "$(jq -nc --arg u "${ADMIN_SA}" \
+    '{userName: $u, name: $u, description: "apps/admin manages organizations, users, role assignments and branding as this user"}')" \
+    | jq -r '.userId')
+  echo "Created machine user ${ADMIN_SA} (${sa_id})"
+else
+  echo "Reusing machine user ${ADMIN_SA} (${sa_id})"
+fi
+member=$(zitadel POST /admin/v1/members/_search "$(jq -nc --arg u "${sa_id}" \
+  '{queries: [{userIdQuery: {userId: $u}}]}')" | jq -c '.result[0].roles // empty | sort')
+if [[ -z "${member}" ]]; then
+  zitadel POST /admin/v1/members "$(jq -nc --arg u "${sa_id}" --argjson r "${ADMIN_SA_ROLES}" \
+    '{userId: $u, roles: $r}')" >/dev/null
+  echo "  gave ${ADMIN_SA} the instance roles ${ADMIN_SA_ROLES}"
+elif [[ "${member}" != "$(jq -c 'sort' <<<"${ADMIN_SA_ROLES}")" ]]; then
+  zitadel PUT "/admin/v1/members/${sa_id}" "$(jq -nc --argjson r "${ADMIN_SA_ROLES}" '{roles: $r}')" >/dev/null
+  echo "  changed the instance roles of ${ADMIN_SA} from ${member} to ${ADMIN_SA_ROLES}"
+fi
+sa_key=$(new_key "${sa_id}")
+drop_credentials "${sa_id}" "$(jq -r .keyId <<<"${sa_key}")"
+echo "  new ${KEY_DAYS}-day key for ${ADMIN_SA}; its other keys and tokens are deleted"
+
+# The IAM_OWNER account of the platform branding before HAMSP-36.
+old_id=$(user_id "${OLD_INSTANCE_SA}")
+if [[ -n "${old_id}" ]]; then
+  zitadel DELETE "/v2/users/${old_id}" >/dev/null
+  echo "Deleted machine user ${OLD_INSTANCE_SA} (${old_id})"
+fi
+
+# The admin app reads its client and session key from admin-oidc and its
+# service account's key from admin-zitadel (k8s/apps/admin). A new session
 # key signs everyone out, which is fine for test users.
 kubectl create namespace admin --dry-run=client -o yaml | kubectl apply -f - >/dev/null
 kubectl -n admin create secret generic admin-oidc \
   --from-literal=CLIENT_ID="${admin_client_id}" --from-literal=CLIENT_SECRET="${admin_client_secret}" \
   --from-literal=SESSION_KEY="$(openssl rand -hex 32)" \
   --dry-run=client -o yaml | kubectl apply -f - >/dev/null
-kubectl -n admin create secret generic admin-zitadel --from-literal=ZITADEL_TOKEN="${sa_token}" \
-  --from-literal=ZITADEL_INSTANCE_TOKEN="${instance_token}" --dry-run=client -o yaml | kubectl apply -f - >/dev/null
+# apply replaces the Secret's data, so the tokens of before HAMSP-36 go too.
+kubectl -n admin create secret generic admin-zitadel --from-file=key.json=<(printf '%s' "${sa_key}") \
+  --dry-run=client -o yaml | kubectl apply -f - >/dev/null
 if kubectl -n admin get deployment admin &>/dev/null; then
   kubectl -n admin rollout restart deployment/admin >/dev/null
 fi
 
-# ── 7. Tenant Management: its project, its caller and its service account ─────
+# ── 7. the IAM admin's own key ─────────────────────────────────────────────────
+
+# A new key for iam-admin replaces the chart's (valid until 2029) and the one
+# of the last run; the script goes on with the new key before it deletes the
+# others. The chart's personal access token and its Secret go too.
+iam_admin_id=$(jq -r .userId <<<"${IAM_ADMIN_KEY}")
+iam_admin_key=$(new_key "${iam_admin_id}")
+kubectl -n zitadel create secret generic "${IAM_ADMIN}" --from-file="${IAM_ADMIN}.json"=<(printf '%s' "${iam_admin_key}") \
+  --dry-run=client -o yaml | kubectl apply -f - >/dev/null
+IAM_ADMIN_KEY=${iam_admin_key} TOKEN=""
+drop_credentials "${iam_admin_id}" "$(jq -r .keyId <<<"${iam_admin_key}")"
+kubectl -n zitadel delete secret "${IAM_ADMIN}-pat" --ignore-not-found >/dev/null
+echo "New ${KEY_DAYS}-day key for ${IAM_ADMIN}; its other keys and tokens are deleted"
+
+# ── 8. Tenant Management: its project, its caller and its service account ─────
 
 # The project's ID is the audience of the tokens Tenant Management accepts.
 # Role assertion puts the caller's roles into its access token.
@@ -371,6 +449,41 @@ if [[ "${grants}" == "0" ]]; then
   echo "  granted ${TM_ROLE} to ${TM_CLIENT}"
 fi
 tm_secret=$(zitadel PUT "/management/v1/users/${tm_client_id}/secret" '{}')
+
+# service_account NAME ROLE DESCRIPTION — a machine user with an instance
+# role and a new personal access token, printed. Tenant Management still
+# reads a static ZITADEL_TOKEN; moving it to a key like admin-app's
+# (HAMSP-36) is a follow-up.
+service_account() {
+  local name=$1 role=$2 description=$3 id count token_id token
+  id=$(zitadel POST /management/v1/users/_search "$(jq -nc --arg u "${name}" \
+    '{queries: [{userNameQuery: {userName: $u, method: "TEXT_QUERY_METHOD_EQUALS"}}]}')" \
+    | jq -r '.result[0].id // empty')
+  if [[ -z "${id}" ]]; then
+    id=$(zitadel POST /management/v1/users/machine "$(jq -nc --arg u "${name}" --arg d "${description}" \
+      '{userName: $u, name: $u, description: $d}')" | jq -r '.userId')
+    echo "Created machine user ${name} (${id})" >&2
+  else
+    echo "Reusing machine user ${name} (${id})" >&2
+  fi
+  count=$(zitadel POST /admin/v1/members/_search "$(jq -nc --arg u "${id}" \
+    '{queries: [{userIdQuery: {userId: $u}}]}')" | jq '.result // [] | length')
+  if [[ "${count}" == "0" ]]; then
+    zitadel POST /admin/v1/members "$(jq -nc --arg u "${id}" --arg r "${role}" \
+      '{userId: $u, roles: [$r]}')" >/dev/null
+    echo "  gave ${name} the instance role ${role}" >&2
+  fi
+  for token_id in $(zitadel POST "/management/v1/users/${id}/pats/_search" '{}' | jq -r '.result[]?.id'); do
+    zitadel DELETE "/management/v1/users/${id}/pats/${token_id}" >/dev/null
+  done
+  token=$(zitadel POST "/management/v1/users/${id}/pats" "$(jq -nc \
+    '{expirationDate: (now + 365 * 24 * 3600 | todate)}')" | jq -r '.token')
+  if [[ -z "${token}" || "${token}" == "null" ]]; then
+    echo "ERROR: creating the token of ${name} failed." >&2
+    return 1
+  fi
+  echo "${token}"
+}
 
 tm_sa_token=$(service_account "${TM_SA}" "${TM_SA_ROLE}" \
   "apps/tenants creates and deletes tenant organizations and their first admins as this user")
