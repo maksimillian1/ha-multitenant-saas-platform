@@ -29,14 +29,14 @@ func newFake(t *testing.T) (*fakeZitadel, *Client) {
 	f := &fakeZitadel{t: t, answers: map[string]func() (int, string){}}
 	srv := httptest.NewServer(f)
 	t.Cleanup(srv.Close)
-	return f, NewClient(srv.URL+"/", "pat-token", srv.Client())
+	return f, NewClient(srv.URL+"/", staticTokens("test-token"), srv.Client())
 }
 
 func (f *fakeZitadel) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		f.t.Errorf("%s %s: method %s", r.Method, r.URL.Path, r.Method)
 	}
-	if got := r.Header.Get("Authorization"); got != "Bearer pat-token" {
+	if got := r.Header.Get("Authorization"); got != "Bearer test-token" {
 		f.t.Errorf("%s: Authorization = %q", r.URL.Path, got)
 	}
 	if got := r.Header.Get("Content-Type"); got != "application/json" {

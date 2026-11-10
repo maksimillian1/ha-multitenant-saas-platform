@@ -18,9 +18,10 @@ type Config struct {
 	// Audience is the ID of the tenant-management project: callers' tokens
 	// must be issued for it and carry its role tenant-manager.
 	Audience string
-	// ZitadelToken is the personal access token of the service's own
-	// Zitadel service account (instance role IAM_ORG_MANAGER).
-	ZitadelToken string
+	// ZitadelKeyFile is the path of the JWT profile key of the service's own
+	// Zitadel machine user (instance role IAM_ORG_MANAGER). The service
+	// exchanges it for short-lived access tokens; it has no long-lived token.
+	ZitadelKeyFile string
 
 	// KubeAPI is the Kubernetes API server; empty means the in-cluster one.
 	KubeAPI string
@@ -52,7 +53,7 @@ func LoadConfig() Config {
 		Issuer:             GetEnv("ZITADEL_ISSUER", ""),
 		IssuerDialAddr:     GetEnv("ZITADEL_DIAL_ADDR", ""),
 		Audience:           GetEnv("TENANT_MANAGEMENT_AUDIENCE", ""),
-		ZitadelToken:       GetEnv("ZITADEL_TOKEN", ""),
+		ZitadelKeyFile:     GetEnv("ZITADEL_KEY_FILE", ""),
 		KubeAPI:            GetEnv("KUBE_API", ""),
 		QuotaCPU:           GetEnv("TENANT_QUOTA_CPU", "4"),
 		QuotaMemory:        GetEnv("TENANT_QUOTA_MEMORY", "8Gi"),

@@ -56,7 +56,6 @@ func serve(ctx context.Context, cfg core.Config, log *slog.Logger) error {
 		"DATABASE_URL", cfg.DatabaseURL,
 		"ZITADEL_ISSUER", cfg.Issuer,
 		"TENANT_MANAGEMENT_AUDIENCE", cfg.Audience,
-		"ZITADEL_TOKEN", cfg.ZitadelToken,
 	); err != nil {
 		return err
 	}
@@ -71,7 +70,15 @@ func serve(ctx context.Context, cfg core.Config, log *slog.Logger) error {
 		return err
 	}
 	verifier := auth.NewVerifier(cfg.Issuer, cfg.Audience, strings.TrimSuffix(cfg.Issuer, "/")+"/oauth/v2/keys", issuerClient)
-	zitadelClient := zitadel.NewClient(cfg.Issuer, cfg.ZitadelToken, issuerClient)
+	key, err := zitadel.LoadKey("ZITADEL_KEY_FILE", cfg.ZitadelKeyFile)
+	if err != nil {
+		return err
+	}
+	tokens, err := zitadel.NewKeyTokens(ctx, cfg.Issuer, key, issuerClient)
+	if err != nil {
+		return err
+	}
+	zitadelClient := zitadel.NewClient(cfg.Issuer, tokens, issuerClient)
 	kubeClient, err := kube.InCluster(cfg.KubeAPI, cfg.StepTimeout, kube.Quota{CPU: cfg.QuotaCPU, Memory: cfg.QuotaMemory, Pods: cfg.QuotaPods})
 	if err != nil {
 		return err
