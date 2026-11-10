@@ -41,17 +41,27 @@ spec:
             # Zitadel Service with the issuer as Host header.
             - name: ZITADEL_DIAL_ADDR
               value: zitadel.zitadel.svc:8080
+            # The project tenant-management: callers' tokens are issued for it.
+            - name: TENANT_MANAGEMENT_AUDIENCE
+              valueFrom:
+                secretKeyRef:
+                  name: tenants-zitadel
+                  key: TENANT_MANAGEMENT_AUDIENCE
+            # The JWT profile key of the machine user tenant-management
+            # (IAM_ORG_MANAGER). The service calls Zitadel with short-lived
+            # tokens it gets with this key; it has no long-lived token.
+            - name: ZITADEL_KEY_FILE
+              value: /var/run/secrets/zitadel/key.json
             - name: TENANT_QUOTA_CPU
               value: "2"
             - name: TENANT_QUOTA_MEMORY
               value: 2Gi
             - name: TENANT_QUOTA_PODS
               value: "10"
-          envFrom:
-            # ZITADEL_TOKEN (service account tenant-management, IAM_ORG_MANAGER)
-            # and TENANT_MANAGEMENT_AUDIENCE (the project tenant-management).
-            - secretRef:
-                name: tenants-zitadel
+          volumeMounts:
+            - name: zitadel-key
+              mountPath: /var/run/secrets/zitadel
+              readOnly: true
           readinessProbe:
             httpGet: {path: /readyz, port: http}
             periodSeconds: 5
@@ -65,6 +75,14 @@ spec:
             allowPrivilegeEscalation: false
             readOnlyRootFilesystem: true
             capabilities: {drop: ["ALL"]}
+      volumes:
+        - name: zitadel-key
+          secret:
+            secretName: tenants-zitadel
+            items:
+              - key: key.json
+                path: key.json
+            defaultMode: 0440
 ---
 apiVersion: v1
 kind: Service

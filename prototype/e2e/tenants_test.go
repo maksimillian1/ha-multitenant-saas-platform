@@ -1,8 +1,10 @@
 package e2e
 
 import (
+	"context"
 	"strings"
 	"testing"
+	"time"
 )
 
 // tenantsProbe calls Tenant Management without a token: 401 means the pod
@@ -35,5 +37,22 @@ func TestOnlyAdminNamespaceReachesTenantManagement(t *testing.T) {
 				t.Fatalf("pod in %s with labels %q reached Tenant Management: %q", tc.ns, tc.labels, out)
 			}
 		})
+	}
+}
+
+// Tenant Management's own machine user has only the key the bootstrap gave
+// it, valid at most 30 days, and no personal access token; its Secret holds
+// the key and the audience, no token.
+//
+// Verifies: tenant-management AC-16
+func TestTenantManagementHasOnlyShortKey(t *testing.T) {
+	iamAdmin := keyToken(t, loadServiceKey(t, iamAdminKeySecret, iamAdminKeyField))
+	k := loadServiceKey(t, "tenants/tenants-zitadel", "key.json")
+	checkOnlyShortKey(t, iamAdmin, "tenant-management", k.UserID, k.KeyID)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+	defer cancel()
+	if _, err := secretField(ctx, "tenants/tenants-zitadel", "ZITADEL_TOKEN"); err == nil {
+		t.Error("Secret tenants/tenants-zitadel still has ZITADEL_TOKEN, want only the key")
 	}
 }

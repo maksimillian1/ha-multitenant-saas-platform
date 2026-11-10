@@ -73,6 +73,10 @@ acceptance:
     text: "The admin app no longer creates or deletes Zitadel organizations directly: the Organizations page has no create or delete action, and the BFF has no routes for them (a request to the former routes answers 404 or 405 and calls no Zitadel API). Organizations are created and deleted only as tenants, through the Tenants page."
     level: unit
     planned: apps/admin/api/orgs_test.go:TestOrgCreateAndDeleteAreGone
+  AC-16:
+    text: "Tenant Management calls Zitadel only with short-lived access tokens that it gets with the JWT profile key of its machine user (ZITADEL_KEY_FILE); it has no personal access token. A token is reused until shortly before it expires; a call Zitadel answers with 401 drops the token and is sent once more with a new one. The bootstrap gives the machine user a new 30-day key on every run and deletes its other keys and tokens."
+    level: unit
+    planned: apps/tenants/zitadel/token_test.go:TestUnauthenticatedRetriesOnceWithNewToken
 
 checklist:
   T-01:

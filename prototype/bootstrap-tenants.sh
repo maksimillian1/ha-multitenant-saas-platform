@@ -27,8 +27,8 @@
 #
 # For Tenant Management (HAMSP-51) it creates the project tenant-management
 # with the role tenant-manager, the admin app's client of it (Secret
-# admin/admin-tenants) and the service's own account (Secret
-# tenants/tenants-zitadel).
+# admin/admin-tenants) and the service's own account with a new 30-day key
+# (Secret tenants/tenants-zitadel, field key.json; no personal access token).
 #
 # The tenants created here are test fixtures from before Tenant Management
 # (ADR-0012); tenants made in the admin app go through apps/tenants.
@@ -450,46 +450,37 @@ if [[ "${grants}" == "0" ]]; then
 fi
 tm_secret=$(zitadel PUT "/management/v1/users/${tm_client_id}/secret" '{}')
 
-# service_account NAME ROLE DESCRIPTION — a machine user with an instance
-# role and a new personal access token, printed. Tenant Management still
-# reads a static ZITADEL_TOKEN; moving it to a key like admin-app's
-# (HAMSP-36) is a follow-up.
-service_account() {
-  local name=$1 role=$2 description=$3 id count token_id token
-  id=$(zitadel POST /management/v1/users/_search "$(jq -nc --arg u "${name}" \
-    '{queries: [{userNameQuery: {userName: $u, method: "TEXT_QUERY_METHOD_EQUALS"}}]}')" \
-    | jq -r '.result[0].id // empty')
-  if [[ -z "${id}" ]]; then
-    id=$(zitadel POST /management/v1/users/machine "$(jq -nc --arg u "${name}" --arg d "${description}" \
-      '{userName: $u, name: $u, description: $d}')" | jq -r '.userId')
-    echo "Created machine user ${name} (${id})" >&2
-  else
-    echo "Reusing machine user ${name} (${id})" >&2
-  fi
-  count=$(zitadel POST /admin/v1/members/_search "$(jq -nc --arg u "${id}" \
-    '{queries: [{userIdQuery: {userId: $u}}]}')" | jq '.result // [] | length')
-  if [[ "${count}" == "0" ]]; then
-    zitadel POST /admin/v1/members "$(jq -nc --arg u "${id}" --arg r "${role}" \
-      '{userId: $u, roles: [$r]}')" >/dev/null
-    echo "  gave ${name} the instance role ${role}" >&2
-  fi
-  for token_id in $(zitadel POST "/management/v1/users/${id}/pats/_search" '{}' | jq -r '.result[]?.id'); do
-    zitadel DELETE "/management/v1/users/${id}/pats/${token_id}" >/dev/null
-  done
-  token=$(zitadel POST "/management/v1/users/${id}/pats" "$(jq -nc \
-    '{expirationDate: (now + 365 * 24 * 3600 | todate)}')" | jq -r '.token')
-  if [[ -z "${token}" || "${token}" == "null" ]]; then
-    echo "ERROR: creating the token of ${name} failed." >&2
-    return 1
-  fi
-  echo "${token}"
-}
-
-tm_sa_token=$(service_account "${TM_SA}" "${TM_SA_ROLE}" \
-  "apps/tenants creates and deletes tenant organizations and their first admins as this user")
+# Tenant Management's own machine user, in the IAM admin's organization, with
+# the instance role IAM_ORG_MANAGER. Like the admin app (section 6) it gets a
+# new key on every run and no personal access token: the service exchanges
+# the key for short-lived access tokens.
+tm_sa_id=$(user_id "${TM_SA}")
+if [[ -z "${tm_sa_id}" ]]; then
+  tm_sa_id=$(zitadel POST /management/v1/users/machine "$(jq -nc --arg u "${TM_SA}" \
+    '{userName: $u, name: $u, description: "apps/tenants creates and deletes tenant organizations and their first admins as this user"}')" \
+    | jq -r '.userId')
+  echo "Created machine user ${TM_SA} (${tm_sa_id})"
+else
+  echo "Reusing machine user ${TM_SA} (${tm_sa_id})"
+fi
+member=$(zitadel POST /admin/v1/members/_search "$(jq -nc --arg u "${tm_sa_id}" \
+  '{queries: [{userIdQuery: {userId: $u}}]}')" | jq -c '.result[0].roles // empty | sort')
+if [[ -z "${member}" ]]; then
+  zitadel POST /admin/v1/members "$(jq -nc --arg u "${tm_sa_id}" --arg r "${TM_SA_ROLE}" \
+    '{userId: $u, roles: [$r]}')" >/dev/null
+  echo "  gave ${TM_SA} the instance role ${TM_SA_ROLE}"
+elif [[ "${member}" != "$(jq -nc --arg r "${TM_SA_ROLE}" '[$r]')" ]]; then
+  zitadel PUT "/admin/v1/members/${tm_sa_id}" "$(jq -nc --arg r "${TM_SA_ROLE}" '{roles: [$r]}')" >/dev/null
+  echo "  changed the instance roles of ${TM_SA} from ${member} to [${TM_SA_ROLE}]"
+fi
+tm_sa_key=$(new_key "${tm_sa_id}")
+drop_credentials "${tm_sa_id}" "$(jq -r .keyId <<<"${tm_sa_key}")"
+echo "  new ${KEY_DAYS}-day key for ${TM_SA}; its other keys and tokens are deleted"
 
 kubectl create namespace tenants --dry-run=client -o yaml | kubectl apply -f - >/dev/null
-kubectl -n tenants create secret generic tenants-zitadel --from-literal=ZITADEL_TOKEN="${tm_sa_token}" \
+# apply replaces the Secret's data, so the personal access token of before
+# goes too.
+kubectl -n tenants create secret generic tenants-zitadel --from-file=key.json=<(printf '%s' "${tm_sa_key}") \
   --from-literal=TENANT_MANAGEMENT_AUDIENCE="${tm_project_id}" --dry-run=client -o yaml | kubectl apply -f - >/dev/null
 kubectl -n admin create secret generic admin-tenants --from-literal=TENANTS_URL="${TM_URL}" \
   --from-literal=TENANTS_AUDIENCE="${tm_project_id}" \

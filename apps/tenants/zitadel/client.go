@@ -35,6 +35,7 @@ const (
 	CodeAlreadyExists      = "already_exists"
 	CodeFailedPrecondition = "failed_precondition"
 	CodeDeadlineExceeded   = "deadline_exceeded"
+	CodeUnauthenticated    = "unauthenticated"
 )
 
 // OwnerRole makes a user the administrator of an organization.
@@ -43,16 +44,17 @@ const OwnerRole = "ORG_OWNER"
 // maxAnswer bounds what the client reads from one answer of Zitadel.
 const maxAnswer = 1 << 20
 
-// Client calls Zitadel as Tenant Management's service account.
+// Client calls Zitadel as Tenant Management's service account, with the
+// short-lived access tokens of tokens.
 type Client struct {
 	baseURL string
-	token   string
+	tokens  Tokens
 	http    *http.Client
 }
 
 // NewClient returns a client for the Zitadel instance at baseURL (the issuer).
-func NewClient(baseURL, token string, httpClient *http.Client) *Client {
-	return &Client{baseURL: strings.TrimSuffix(baseURL, "/"), token: token, http: httpClient}
+func NewClient(baseURL string, tokens Tokens, httpClient *http.Client) *Client {
+	return &Client{baseURL: strings.TrimSuffix(baseURL, "/"), tokens: tokens, http: httpClient}
 }
 
 // Error is an error answer of Zitadel.
@@ -249,15 +251,9 @@ func (c *Client) rest(ctx context.Context, method, path, orgID string, req any) 
 func (c *Client) do(req *http.Request, resp any) error {
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Accept", "application/json")
-	req.Header.Set("Authorization", "Bearer "+c.token)
-	res, err := c.http.Do(req)
+	res, data, err := c.send(req) //nolint:bodyclose // send reads and closes the body before it returns.
 	if err != nil {
-		return fmt.Errorf("zitadel: %w", err)
-	}
-	defer res.Body.Close()
-	data, err := io.ReadAll(io.LimitReader(res.Body, maxAnswer))
-	if err != nil {
-		return fmt.Errorf("zitadel: reading the answer to %s: %w", req.URL.Path, err)
+		return err
 	}
 	if res.StatusCode != http.StatusOK {
 		return parseError(res.StatusCode, data)
@@ -271,10 +267,52 @@ func (c *Client) do(req *http.Request, resp any) error {
 	return nil
 }
 
+// send sends req with the current access token. When Zitadel refuses the
+// token (401: revoked, or expired earlier than it said), send drops it and
+// sends req once more with a new one.
+func (c *Client) send(req *http.Request) (*http.Response, []byte, error) {
+	res, data, token, err := c.sendWithToken(req)
+	if err != nil || res.StatusCode != http.StatusUnauthorized {
+		return res, data, err
+	}
+	c.tokens.Invalidate(token)
+	retry := req.Clone(req.Context())
+	if req.Body != nil && req.Body != http.NoBody {
+		if req.GetBody == nil {
+			return res, data, nil
+		}
+		body, err := req.GetBody()
+		if err != nil {
+			return nil, nil, fmt.Errorf("zitadel: repeating %s: %w", req.URL.Path, err)
+		}
+		retry.Body = body
+	}
+	res, data, _, err = c.sendWithToken(retry)
+	return res, data, err
+}
+
+func (c *Client) sendWithToken(req *http.Request) (*http.Response, []byte, string, error) {
+	token, err := c.tokens.Token(req.Context())
+	if err != nil {
+		return nil, nil, "", err
+	}
+	req.Header.Set("Authorization", "Bearer "+token)
+	res, err := c.http.Do(req)
+	if err != nil {
+		return nil, nil, "", fmt.Errorf("zitadel: %w", err)
+	}
+	defer res.Body.Close()
+	data, err := io.ReadAll(io.LimitReader(res.Body, maxAnswer))
+	if err != nil {
+		return nil, nil, "", fmt.Errorf("zitadel: reading the answer to %s: %w", req.URL.Path, err)
+	}
+	return res, data, token, nil
+}
+
 // grpcCodes names the numeric gRPC codes of the v1 REST gateway's errors.
 var grpcCodes = []string{"ok", "canceled", "unknown", "invalid_argument", CodeDeadlineExceeded, CodeNotFound,
 	CodeAlreadyExists, "permission_denied", "resource_exhausted", CodeFailedPrecondition, "aborted",
-	"out_of_range", "unimplemented", "internal", "unavailable", "data_loss", "unauthenticated"}
+	"out_of_range", "unimplemented", "internal", "unavailable", "data_loss", CodeUnauthenticated}
 
 // parseError reads a Connect error ({"code": "not_found", ...}) or a gRPC
 // gateway error with a numeric code; without either, the code is "unknown".
