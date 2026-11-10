@@ -2,8 +2,9 @@
 # role assignments and projects, shown only after a Zitadel sign-in by a user
 # with the super-admin role of the platform-admin project (HAMSP-34).
 # prototype/bootstrap-tenants.sh creates the OIDC app and the Secret
-# admin-oidc, and the service account admin-app with its token in the Secret
-# admin-zitadel; until then the pods wait in CreateContainerConfigError.
+# admin-oidc, and the service account admin-app with its JWT profile key in
+# the Secret admin-zitadel (key.json, valid 30 days, HAMSP-36); until then the
+# pods wait in CreateContainerConfigError.
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -19,6 +20,14 @@ spec:
       labels:
         app.kubernetes.io/name: admin
     spec:
+      # The image runs as distroless nonroot (65532). The image names the user,
+      # not its number, so runAsUser gives the number runAsNonRoot can check;
+      # fsGroup lets it read the key file, which is not readable by others.
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        runAsGroup: 65532
+        fsGroup: 65532
       containers:
         - name: admin
           # Built and loaded into kind by prototype/create-cluster.sh.
@@ -36,13 +45,18 @@ spec:
               value: zitadel.zitadel.svc:8080
             - name: PUBLIC_URL
               value: http://admin.localtest.me:30080
+            # The admin app calls the Zitadel APIs at ISSUER (through
+            # ISSUER_DIAL_ADDR) as the service account admin-app, with
+            # short-lived tokens it gets with this key.
+            - name: ZITADEL_KEY_FILE
+              value: /var/run/secrets/zitadel/key.json
           envFrom:
             - secretRef:
                 name: admin-oidc
-            # ZITADEL_TOKEN: the admin app calls the Zitadel APIs at ISSUER
-            # (through ISSUER_DIAL_ADDR) as the service account admin-app.
-            - secretRef:
-                name: admin-zitadel
+          volumeMounts:
+            - name: zitadel-key
+              mountPath: /var/run/secrets/zitadel
+              readOnly: true
           readinessProbe:
             httpGet: {path: /healthz, port: http}
             periodSeconds: 5
@@ -56,6 +70,14 @@ spec:
             allowPrivilegeEscalation: false
             readOnlyRootFilesystem: true
             capabilities: {drop: ["ALL"]}
+      volumes:
+        - name: zitadel-key
+          secret:
+            secretName: admin-zitadel
+            items:
+              - key: key.json
+                path: key.json
+            defaultMode: 0440
 ---
 apiVersion: v1
 kind: Service

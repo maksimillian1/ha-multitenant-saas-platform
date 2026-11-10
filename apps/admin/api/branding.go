@@ -18,8 +18,8 @@ import (
 
 // BrandingClient is what the branding routes need from Zitadel for one kind of
 // scope. The organization routes use the Zitadel client with the admin app's
-// token; the platform routes use PlatformZitadel, a second client with the
-// instance token (HAMSP-37), and are the only ones that do.
+// account; the platform routes use PlatformZitadel, and are the only ones
+// that do. Since HAMSP-36 both are the admin-app client.
 type BrandingClient interface {
 	GetBranding(ctx context.Context, s zitadel.Scope, preview bool) (zitadel.Branding, error)
 	UpdateBranding(ctx context.Context, s zitadel.Scope, settings zitadel.BrandingSettings) error
@@ -29,8 +29,10 @@ type BrandingClient interface {
 	BrandingAsset(ctx context.Context, s zitadel.Scope, a zitadel.Asset, preview bool) (zitadel.AssetFile, error)
 }
 
-// PlatformZitadel is the client with the instance token. It is used only for
-// the instance's branding.
+// PlatformZitadel is the client for the instance's branding. Since HAMSP-36
+// it is the admin app's own client, whose account holds the custom role
+// IAM_BRANDING_MANAGER; the type keeps the platform routes' dependency
+// narrow.
 type PlatformZitadel interface {
 	BrandingClient
 }
