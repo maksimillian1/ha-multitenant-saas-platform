@@ -30,6 +30,7 @@ var (
 	ErrNoTenant      = errors.New("token has no valid tenant claim")
 	ErrWrongAudience = errors.New("token is not issued for the platform API")
 	ErrNotTenant     = errors.New("token belongs to the Zitadel admin organization, not to a tenant")
+	ErrTenantBlocked = errors.New("tenant is suspended or deleted")
 
 	tenantRe = regexp.MustCompile(`^[A-Za-z0-9_-]{1,64}$`)
 )
@@ -38,6 +39,8 @@ type Verifier struct {
 	verifier        *op.AccessTokenVerifier
 	audience        string
 	zitadelAdminOrg string
+	// Blocked reports a suspended or deleted tenant; nil blocks none.
+	Blocked func(tenant string) bool
 }
 
 // NewVerifier validates tokens of issuer that list audience in aud. Keys come
@@ -65,6 +68,9 @@ func (v *Verifier) Tenant(ctx context.Context, token string) (string, error) {
 	}
 	if tenant == v.zitadelAdminOrg {
 		return "", ErrNotTenant
+	}
+	if v.Blocked != nil && v.Blocked(tenant) {
+		return "", ErrTenantBlocked
 	}
 	return tenant, nil
 }
