@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"crypto/rsa"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -15,8 +16,9 @@ import (
 )
 
 const (
-	issuer   = "http://zitadel.test"
-	audience = "platform-api-project"
+	issuer          = "http://zitadel.test"
+	audience        = "platform-api-project"
+	zitadelAdminOrg = "100000000000000001"
 )
 
 func newKey(t *testing.T, kid string) jose.JSONWebKey {
@@ -54,7 +56,7 @@ func newTestVerifier(t *testing.T, key jose.JSONWebKey) *Verifier {
 		_ = json.NewEncoder(w).Encode(jwks)
 	}))
 	t.Cleanup(srv.Close)
-	return NewVerifier(issuer, audience, srv.URL, srv.Client())
+	return NewVerifier(issuer, audience, zitadelAdminOrg, srv.URL, srv.Client())
 }
 
 func claims(mod func(map[string]any)) map[string]any {
@@ -115,6 +117,16 @@ func TestInvalidTokensAreRejected(t *testing.T) {
 		if tenant, err := v.Tenant(context.Background(), tok); err == nil {
 			t.Errorf("%s: accepted, tenant %q", name, tenant)
 		}
+	}
+}
+
+// Verifies: gateway-auth AC-1
+func TestZitadelAdminOrgIsNotATenant(t *testing.T) {
+	key := newKey(t, "k1")
+	tok := sign(t, key, claims(func(c map[string]any) { c[TenantClaim] = zitadelAdminOrg }))
+	tenant, err := newTestVerifier(t, key).Tenant(context.Background(), tok)
+	if !errors.Is(err, ErrNotTenant) {
+		t.Fatalf("tenant %q, err %v; want ErrNotTenant", tenant, err)
 	}
 }
 
