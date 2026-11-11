@@ -47,10 +47,23 @@ spec:
         port: 9092
         type: internal
         tls: false
-        # Strimzi turns these into a NetworkPolicy: only UsageWriteAPI and
-        # Usage Writer reach the client listener (HAMSP-26 AC-8). Anyone else
-        # could write usage events for any tenant.
+        # Strimzi turns these into a NetworkPolicy: only these pods reach the
+        # client listener (HAMSP-26 AC-8). Anyone else could write usage
+        # events for any tenant or tenant states (HAMSP-52); topic ACLs are
+        # HAMSP-31.
         networkPolicyPeers:
+          - namespaceSelector:
+              matchLabels:
+                kubernetes.io/metadata.name: tenants
+            podSelector:
+              matchLabels:
+                app.kubernetes.io/name: tenants
+          - namespaceSelector:
+              matchLabels:
+                kubernetes.io/metadata.name: gateway
+            podSelector:
+              matchLabels:
+                app.kubernetes.io/name: api-gateway
           - namespaceSelector:
               matchLabels:
                 kubernetes.io/metadata.name: usage
@@ -93,3 +106,21 @@ spec:
   config:
     min.insync.replicas: 2
     retention.ms: 604800000
+---
+# Every tenant's latest state, key tenant_id, written by Tenant Management and
+# read in full by every API Gateway replica (ADR-0012, item 5, HAMSP-52).
+# Compacted: the latest state per tenant is kept forever.
+apiVersion: kafka.strimzi.io/v1
+kind: KafkaTopic
+metadata:
+  name: tenant-states
+  labels:
+    strimzi.io/cluster: usage-kafka
+  annotations:
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
+spec:
+  partitions: 3
+  replicas: 3
+  config:
+    cleanup.policy: compact
+    min.insync.replicas: 2

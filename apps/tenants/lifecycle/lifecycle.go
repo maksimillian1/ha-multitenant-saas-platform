@@ -71,6 +71,9 @@ type Service struct {
 	DeleteTimeout time.Duration
 	NewID         func() string
 	Now           func() time.Time
+	// Published gets the tenant after every operation, so its state reaches
+	// the API Gateway (ADR-0012, item 5); nil publishes nothing.
+	Published func(ctx context.Context, t core.Tenant)
 }
 
 func NewService(store Store, zitadel Zitadel, kube Kube, log *slog.Logger, newID func() string) *Service {
@@ -103,6 +106,7 @@ func (s *Service) Create(ctx context.Context, name, adminEmail, admin string) (c
 	defer unlock()
 	t, err = s.provision(ctx, t)
 	s.audit(ctx, "create", admin, t, err)
+	s.publish(ctx, t)
 	return t, err
 }
 
@@ -177,7 +181,14 @@ func (s *Service) locked(ctx context.Context, id, action, admin string, fn func(
 	}
 	t, err = fn(t)
 	s.audit(ctx, action, admin, t, err)
+	s.publish(ctx, t)
 	return t, err
+}
+
+func (s *Service) publish(ctx context.Context, t core.Tenant) {
+	if s.Published != nil && t.ID != "" {
+		s.Published(ctx, t)
+	}
 }
 
 // provision runs the steps not done yet, in order, recording each.

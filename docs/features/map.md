@@ -15,12 +15,12 @@ Each feature's stage and the gates behind it ([Feature stages](../process/featur
 | [`exampleapp`](exampleapp.yaml) | — |  |  |  |  |  |  |  |  | — | HAMSP-23 |
 | [`exampleapp-store`](exampleapp-store.yaml) **critical** | — |  |  |  |  |  |  |  |  | — | HAMSP-23 |
 | [`feature-map`](feature-map.yaml) | alpha | n/a | ✓ (owner) | n/a | ✓ basic | n/a |  | ✓ (owner) |  | 2026-11-07 ready for alpha | HAMSP-45 |
-| [`gateway-auth`](gateway-auth.yaml) **critical** | — |  |  |  |  |  |  |  |  | — | HAMSP-23, HAMSP-24 |
+| [`gateway-auth`](gateway-auth.yaml) **critical** | proto | n/a |  |  |  |  |  |  |  | 2026-11-11 ready for proto | HAMSP-23, HAMSP-24, HAMSP-52 |
 | [`gateway-routing`](gateway-routing.yaml) | — |  |  |  |  |  |  |  |  | — | HAMSP-23 |
 | [`gateway-tenant-header`](gateway-tenant-header.yaml) **critical** | — |  |  |  |  |  |  |  |  | — | HAMSP-23 |
 | [`gateway-usage-reporting`](gateway-usage-reporting.yaml) | — |  |  |  |  |  |  |  |  | — | HAMSP-23 |
 | [`network-policies`](network-policies.yaml) **critical** | — |  |  |  |  |  |  |  |  | — | HAMSP-23 |
-| [`tenant-management`](tenant-management.yaml) **critical** | alpha | n/a | ✓ | ✓ | ✓ basic | ✓ |  | ✓ (owner) |  | 2026-11-10 ready for alpha | HAMSP-51, HAMSP-6 |
+| [`tenant-management`](tenant-management.yaml) **critical** | alpha | n/a | ✓ | ✓ | ✓ basic | ✓ |  | ✓ (owner) |  | 2026-11-11 ready for alpha | HAMSP-51, HAMSP-6, HAMSP-52 |
 | [`usage-ingest`](usage-ingest.yaml) **critical** | — |  |  |  |  |  |  |  |  | — | HAMSP-23 |
 | [`usage-store`](usage-store.yaml) **critical** | — |  |  |  |  |  |  |  |  | — | HAMSP-23 |
 | [`usage-writer`](usage-writer.yaml) **critical** | — |  |  |  |  |  |  |  |  | — | HAMSP-23 |

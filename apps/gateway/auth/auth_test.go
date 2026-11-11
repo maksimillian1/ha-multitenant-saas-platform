@@ -130,6 +130,20 @@ func TestZitadelAdminOrgIsNotATenant(t *testing.T) {
 	}
 }
 
+// Verifies: gateway-auth AC-2
+func TestBlockedTenantIsRejected(t *testing.T) {
+	key := newKey(t, "k1")
+	v := newTestVerifier(t, key)
+	v.Blocked = func(tenant string) bool { return tenant == "396438053259838069" }
+	if _, err := v.Tenant(context.Background(), sign(t, key, claims(nil))); !errors.Is(err, ErrTenantBlocked) {
+		t.Fatalf("err %v, want ErrTenantBlocked", err)
+	}
+	tok := sign(t, key, claims(func(c map[string]any) { c[TenantClaim] = "other" }))
+	if _, err := v.Tenant(context.Background(), tok); err != nil {
+		t.Fatalf("other tenant: %v", err)
+	}
+}
+
 func TestBearerToken(t *testing.T) {
 	for header, want := range map[string]string{
 		"Bearer abc": "abc",

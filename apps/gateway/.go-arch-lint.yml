@@ -12,6 +12,7 @@ components:
   proxy:  { in: proxy }
   usage:  { in: usage }
   health: { in: health }
+  tenantstate: { in: tenantstate }
   core:   { in: core }
 deps:
   main:  { anyProjectDeps: true }
