@@ -44,7 +44,7 @@ workspace "HAMSP" "High-Availability Multi-Tenant SaaS Platform" {
             billing = container "Billing Service" "Invoices tenants by usage or subscription (FR-06)." "Go" "Planned"
 
             postgres = container "PostgreSQL" "Tenant and application data with RLS; separate database for Zitadel (ADR-0002, ADR-0003)." "CloudNativePG" "Database"
-            kafka = container "Kafka" "Usage events, partitioned by tenant_id (ADR-0001)." "Apache Kafka (Strimzi)" "Queue"
+            kafka = container "Kafka" "Usage events, partitioned by tenant_id (ADR-0001); every tenant's state in the compacted topic tenant-states (ADR-0012)." "Apache Kafka (Strimzi)" "Queue"
             usageStore = container "Usage Store" "Usage events per tenant, kept 13 months: hot and warm tiers in one hypertable, hourly aggregate. Platform-only (ADR-0006, ADR-0008)." "TimescaleDB on its own CNPG cluster; cold tier in S3 in v2" "Database"
             rateLimitStore = container "Rate Limit Store" "Shared per-tenant rate limit and quota counters (FR-07). Quota counters can be rebuilt from the usage store." "Redis, fit checked in HAMSP-15" "Database"
         }
@@ -81,6 +81,8 @@ workspace "HAMSP" "High-Availability Multi-Tenant SaaS Platform" {
         hamsp.tenantMgmt -> hamsp.authService "Creates the tenant's Organization" "gRPC"
         hamsp.tenantMgmt -> hamsp.postgres "Stores tenants and quotas" "SQL"
         hamsp.tenantMgmt -> kubernetes "Creates tenant namespaces and quotas" "HTTPS"
+        hamsp.tenantMgmt -> hamsp.kafka "Publishes tenant states (tenant-states), key tenant_id" "Kafka"
+        hamsp.apiGateway -> hamsp.kafka "Reads tenant states, rejects suspended tenants" "Kafka"
         hamsp.exampleApp -> hamsp.postgres "Reads and writes rows, SET LOCAL tenant_id" "SQL, RLS"
         hamsp.postgres -> s3 "Streams WAL, stores backups" "Barman Cloud"
 
@@ -121,7 +123,7 @@ workspace "HAMSP" "High-Availability Multi-Tenant SaaS Platform" {
         container hamsp "RequestPath" "L2: how a request reaches tenant data, and how tenants are kept apart." {
             include platformAdmin tenantAdmin endUser
             include hamsp.tenantWeb hamsp.adminPortal hamsp.apiGateway hamsp.authService hamsp.tenantMgmt hamsp.exampleApp
-            include hamsp.postgres hamsp.rateLimitStore
+            include hamsp.postgres hamsp.rateLimitStore hamsp.kafka
             include customerIdp kubernetes s3
             autoLayout lr
         }

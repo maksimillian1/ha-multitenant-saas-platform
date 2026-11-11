@@ -85,6 +85,8 @@ graph LR
       style 10 fill:#5a9e6f,stroke:#3e6e4d,color:#ffffff
       17[("<div style='font-weight: bold'>PostgreSQL</div><div style='font-size: 70%; margin-top: 0px'>[Container: CloudNativePG]</div><div style='font-size: 80%; margin-top:10px'>Tenant and application data<br />with RLS; separate database<br />for Zitadel (ADR-0002,<br />ADR-0003).</div>")]
       style 17 fill:#438dd5,stroke:#2e6295,color:#ffffff
+      18["<div style='font-weight: bold'>Kafka</div><div style='font-size: 70%; margin-top: 0px'>[Container: Apache Kafka (Strimzi)]</div><div style='font-size: 80%; margin-top:10px'>Usage events, partitioned by<br />tenant_id (ADR-0001); every<br />tenant's state in the<br />compacted topic tenant-states<br />(ADR-0012).</div>"]
+      style 18 fill:#438dd5,stroke:#2e6295,color:#ffffff
       20[("<div style='font-weight: bold'>Rate Limit Store</div><div style='font-size: 70%; margin-top: 0px'>[Container: Redis, fit checked in HAMSP-15]</div><div style='font-size: 80%; margin-top:10px'>Shared per-tenant rate limit<br />and quota counters (FR-07).<br />Quota counters can be rebuilt<br />from the usage store.</div>")]
       style 20 fill:#438dd5,stroke:#2e6295,color:#ffffff
       5["<div style='font-weight: bold'>Tenant Web App</div><div style='font-size: 70%; margin-top: 0px'>[Container: SPA, served via CDN]</div><div style='font-size: 80%; margin-top:10px'>UI for tenant admins and end<br />users.</div>"]
@@ -114,6 +116,8 @@ graph LR
     9-- "<div>Creates the tenant's<br />Organization</div><div style='font-size: 70%'>[gRPC]</div>" -->8
     9-- "<div>Stores tenants and quotas</div><div style='font-size: 70%'>[SQL]</div>" -->17
     9-- "<div>Creates tenant namespaces and<br />quotas</div><div style='font-size: 70%'>[HTTPS]</div>" -->22
+    9-- "<div>Publishes tenant states<br />(tenant-states), key<br />tenant_id</div><div style='font-size: 70%'>[Kafka]</div>" -->18
+    7-- "<div>Reads tenant states, rejects<br />suspended tenants</div><div style='font-size: 70%'>[Kafka]</div>" -->18
     10-- "<div>Reads and writes rows, SET<br />LOCAL tenant_id</div><div style='font-size: 70%'>[SQL, RLS]</div>" -->17
     17-- "<div>Streams WAL, stores backups</div><div style='font-size: 70%'>[Barman Cloud]</div>" -->23
 
@@ -147,7 +151,7 @@ graph LR
       style 15 fill:#438dd5,stroke:#2e6295,color:#ffffff
       16["<div style='font-weight: bold'>Billing Service</div><div style='font-size: 70%; margin-top: 0px'>[Container: Go]</div><div style='font-size: 80%; margin-top:10px'>Invoices tenants by usage or<br />subscription (FR-06).</div>"]
       style 16 fill:#438dd5,stroke:#2e6295,color:#ffffff
-      18["<div style='font-weight: bold'>Kafka</div><div style='font-size: 70%; margin-top: 0px'>[Container: Apache Kafka (Strimzi)]</div><div style='font-size: 80%; margin-top:10px'>Usage events, partitioned by<br />tenant_id (ADR-0001).</div>"]
+      18["<div style='font-weight: bold'>Kafka</div><div style='font-size: 70%; margin-top: 0px'>[Container: Apache Kafka (Strimzi)]</div><div style='font-size: 80%; margin-top:10px'>Usage events, partitioned by<br />tenant_id (ADR-0001); every<br />tenant's state in the<br />compacted topic tenant-states<br />(ADR-0012).</div>"]
       style 18 fill:#438dd5,stroke:#2e6295,color:#ffffff
       19[("<div style='font-weight: bold'>Usage Store</div><div style='font-size: 70%; margin-top: 0px'>[Container: TimescaleDB on its own CNPG cluster; cold tier in S3 in v2]</div><div style='font-size: 80%; margin-top:10px'>Usage events per tenant, kept<br />13 months: hot and warm tiers<br />in one hypertable, hourly<br />aggregate. Platform-only<br />(ADR-0006, ADR-0008).</div>")]
       style 19 fill:#438dd5,stroke:#2e6295,color:#ffffff
@@ -158,6 +162,7 @@ graph LR
     end
 
     7-- "<div>Checks per-tenant limits</div><div style='font-size: 70%'></div>" -->20
+    7-- "<div>Reads tenant states, rejects<br />suspended tenants</div><div style='font-size: 70%'>[Kafka]</div>" -->18
     7-- "<div>Reports API calls per tenant</div><div style='font-size: 70%'>[HTTPS]</div>" -->12
     11-- "<div>Sends token usage events,<br />tenant from pod identity</div><div style='font-size: 70%'>[HTTPS]</div>" -->12
     13-- "<div>Sends egress bytes per tenant</div><div style='font-size: 70%'>[HTTPS]</div>" -->12
@@ -189,35 +194,35 @@ graph LR
       subgraph 12 ["UsageWriteAPI"]
         style 12 fill:#ffffff,stroke:#2e6295,color:#2e6295
 
-        61["<div style='font-weight: bold'>main</div><div style='font-size: 70%; margin-top: 0px'>[Component: Go]</div><div style='font-size: 80%; margin-top:10px'>Reads the configuration,<br />wires the components and runs<br />the server.</div>"]
-        style 61 fill:#85bbf0,stroke:#5d82a8,color:#000000
-        62["<div style='font-weight: bold'>Core</div><div style='font-size: 70%; margin-top: 0px'>[Component]</div><div style='font-size: 80%; margin-top:10px'>Usage event model,<br />validation, configuration.</div>"]
-        style 62 fill:#85bbf0,stroke:#5d82a8,color:#000000
-        63["<div style='font-weight: bold'>Health</div><div style='font-size: 70%; margin-top: 0px'>[Component]</div><div style='font-size: 80%; margin-top:10px'>Liveness and readiness<br />endpoints.</div>"]
+        63["<div style='font-weight: bold'>main</div><div style='font-size: 70%; margin-top: 0px'>[Component: Go]</div><div style='font-size: 80%; margin-top:10px'>Reads the configuration,<br />wires the components and runs<br />the server.</div>"]
         style 63 fill:#85bbf0,stroke:#5d82a8,color:#000000
-        64["<div style='font-weight: bold'>HTTP helpers</div><div style='font-size: 70%; margin-top: 0px'>[Component: net/http]</div>"]
+        64["<div style='font-weight: bold'>Core</div><div style='font-size: 70%; margin-top: 0px'>[Component]</div><div style='font-size: 80%; margin-top:10px'>Usage event model,<br />validation, configuration.</div>"]
         style 64 fill:#85bbf0,stroke:#5d82a8,color:#000000
-        65["<div style='font-weight: bold'>Kafka client</div><div style='font-size: 70%; margin-top: 0px'>[Component: franz-go]</div><div style='font-size: 80%; margin-top:10px'>Produces and consumes usage<br />events.</div>"]
+        65["<div style='font-weight: bold'>Health</div><div style='font-size: 70%; margin-top: 0px'>[Component]</div><div style='font-size: 80%; margin-top:10px'>Liveness and readiness<br />endpoints.</div>"]
         style 65 fill:#85bbf0,stroke:#5d82a8,color:#000000
-        66["<div style='font-weight: bold'>Write API</div><div style='font-size: 70%; margin-top: 0px'>[Component: Go, net/http]</div><div style='font-size: 80%; margin-top:10px'>Accepts usage events over<br />HTTP, validates them, acks<br />once they are in Kafka.</div>"]
+        66["<div style='font-weight: bold'>HTTP helpers</div><div style='font-size: 70%; margin-top: 0px'>[Component: net/http]</div>"]
         style 66 fill:#85bbf0,stroke:#5d82a8,color:#000000
+        67["<div style='font-weight: bold'>Kafka client</div><div style='font-size: 70%; margin-top: 0px'>[Component: franz-go]</div><div style='font-size: 80%; margin-top:10px'>Produces and consumes usage<br />events.</div>"]
+        style 67 fill:#85bbf0,stroke:#5d82a8,color:#000000
+        68["<div style='font-weight: bold'>Write API</div><div style='font-size: 70%; margin-top: 0px'>[Component: Go, net/http]</div><div style='font-size: 80%; margin-top:10px'>Accepts usage events over<br />HTTP, validates them, acks<br />once they are in Kafka.</div>"]
+        style 68 fill:#85bbf0,stroke:#5d82a8,color:#000000
       end
 
-      18["<div style='font-weight: bold'>Kafka</div><div style='font-size: 70%; margin-top: 0px'>[Container: Apache Kafka (Strimzi)]</div><div style='font-size: 80%; margin-top:10px'>Usage events, partitioned by<br />tenant_id (ADR-0001).</div>"]
+      18["<div style='font-weight: bold'>Kafka</div><div style='font-size: 70%; margin-top: 0px'>[Container: Apache Kafka (Strimzi)]</div><div style='font-size: 80%; margin-top:10px'>Usage events, partitioned by<br />tenant_id (ADR-0001); every<br />tenant's state in the<br />compacted topic tenant-states<br />(ADR-0012).</div>"]
       style 18 fill:#438dd5,stroke:#2e6295,color:#ffffff
     end
 
-    61-- "<div>Uses</div><div style='font-size: 70%'>[Go import]</div>" -->62
-    61-- "<div>Uses</div><div style='font-size: 70%'>[Go import]</div>" -->63
-    61-- "<div>Uses</div><div style='font-size: 70%'>[Go import]</div>" -->64
-    61-- "<div>Uses</div><div style='font-size: 70%'>[Go import]</div>" -->65
-    61-- "<div>Uses</div><div style='font-size: 70%'>[Go import]</div>" -->66
-    65-- "<div>Uses</div><div style='font-size: 70%'>[Go import]</div>" -->62
-    66-- "<div>Uses</div><div style='font-size: 70%'>[Go import]</div>" -->62
-    66-- "<div>Uses</div><div style='font-size: 70%'>[Go import]</div>" -->64
-    65-- "<div>Uses</div><div style='font-size: 70%'>[franz-go]</div>" -->18
-    65-- "<div>Consumes topics: ? (in<br />NewConsumer)</div><div style='font-size: 70%'></div>" -->18
-    65-- "<div>Produces topics: ? (in<br />NewProducer)</div><div style='font-size: 70%'></div>" -->18
+    63-- "<div>Uses</div><div style='font-size: 70%'>[Go import]</div>" -->64
+    63-- "<div>Uses</div><div style='font-size: 70%'>[Go import]</div>" -->65
+    63-- "<div>Uses</div><div style='font-size: 70%'>[Go import]</div>" -->66
+    63-- "<div>Uses</div><div style='font-size: 70%'>[Go import]</div>" -->67
+    63-- "<div>Uses</div><div style='font-size: 70%'>[Go import]</div>" -->68
+    67-- "<div>Uses</div><div style='font-size: 70%'>[Go import]</div>" -->64
+    68-- "<div>Uses</div><div style='font-size: 70%'>[Go import]</div>" -->64
+    68-- "<div>Uses</div><div style='font-size: 70%'>[Go import]</div>" -->66
+    67-- "<div>Uses</div><div style='font-size: 70%'>[franz-go]</div>" -->18
+    67-- "<div>Consumes topics: ? (in<br />NewConsumer)</div><div style='font-size: 70%'></div>" -->18
+    67-- "<div>Produces topics: ? (in<br />NewProducer)</div><div style='font-size: 70%'></div>" -->18
 
   end
 ```
@@ -237,44 +242,44 @@ graph LR
       subgraph 14 ["Usage Writer"]
         style 14 fill:#ffffff,stroke:#2e6295,color:#2e6295
 
-        78["<div style='font-weight: bold'>main</div><div style='font-size: 70%; margin-top: 0px'>[Component: Go]</div><div style='font-size: 80%; margin-top:10px'>Reads the configuration,<br />wires the components and runs<br />the server.</div>"]
-        style 78 fill:#85bbf0,stroke:#5d82a8,color:#000000
-        79["<div style='font-weight: bold'>Core</div><div style='font-size: 70%; margin-top: 0px'>[Component]</div><div style='font-size: 80%; margin-top:10px'>Usage event model,<br />validation, configuration.</div>"]
-        style 79 fill:#85bbf0,stroke:#5d82a8,color:#000000
-        80["<div style='font-weight: bold'>Health</div><div style='font-size: 70%; margin-top: 0px'>[Component]</div><div style='font-size: 80%; margin-top:10px'>Liveness and readiness<br />endpoints.</div>"]
+        80["<div style='font-weight: bold'>main</div><div style='font-size: 70%; margin-top: 0px'>[Component: Go]</div><div style='font-size: 80%; margin-top:10px'>Reads the configuration,<br />wires the components and runs<br />the server.</div>"]
         style 80 fill:#85bbf0,stroke:#5d82a8,color:#000000
-        81["<div style='font-weight: bold'>HTTP helpers</div><div style='font-size: 70%; margin-top: 0px'>[Component: net/http]</div>"]
+        81["<div style='font-weight: bold'>Core</div><div style='font-size: 70%; margin-top: 0px'>[Component]</div><div style='font-size: 80%; margin-top:10px'>Usage event model,<br />validation, configuration.</div>"]
         style 81 fill:#85bbf0,stroke:#5d82a8,color:#000000
-        82["<div style='font-weight: bold'>Kafka client</div><div style='font-size: 70%; margin-top: 0px'>[Component: franz-go]</div><div style='font-size: 80%; margin-top:10px'>Produces and consumes usage<br />events.</div>"]
+        82["<div style='font-weight: bold'>Health</div><div style='font-size: 70%; margin-top: 0px'>[Component]</div><div style='font-size: 80%; margin-top:10px'>Liveness and readiness<br />endpoints.</div>"]
         style 82 fill:#85bbf0,stroke:#5d82a8,color:#000000
-        83["<div style='font-weight: bold'>Store</div><div style='font-size: 70%; margin-top: 0px'>[Component: pgx]</div><div style='font-size: 80%; margin-top:10px'>Writes usage events to the<br />usage store.</div>"]
+        83["<div style='font-weight: bold'>HTTP helpers</div><div style='font-size: 70%; margin-top: 0px'>[Component: net/http]</div>"]
         style 83 fill:#85bbf0,stroke:#5d82a8,color:#000000
-        84["<div style='font-weight: bold'>Writer</div><div style='font-size: 70%; margin-top: 0px'>[Component: Go]</div><div style='font-size: 80%; margin-top:10px'>Consumes usage events, drops<br />duplicates, writes batches.</div>"]
+        84["<div style='font-weight: bold'>Kafka client</div><div style='font-size: 70%; margin-top: 0px'>[Component: franz-go]</div><div style='font-size: 80%; margin-top:10px'>Produces and consumes usage<br />events.</div>"]
         style 84 fill:#85bbf0,stroke:#5d82a8,color:#000000
+        85["<div style='font-weight: bold'>Store</div><div style='font-size: 70%; margin-top: 0px'>[Component: pgx]</div><div style='font-size: 80%; margin-top:10px'>Writes usage events to the<br />usage store.</div>"]
+        style 85 fill:#85bbf0,stroke:#5d82a8,color:#000000
+        86["<div style='font-weight: bold'>Writer</div><div style='font-size: 70%; margin-top: 0px'>[Component: Go]</div><div style='font-size: 80%; margin-top:10px'>Consumes usage events, drops<br />duplicates, writes batches.</div>"]
+        style 86 fill:#85bbf0,stroke:#5d82a8,color:#000000
       end
 
-      18["<div style='font-weight: bold'>Kafka</div><div style='font-size: 70%; margin-top: 0px'>[Container: Apache Kafka (Strimzi)]</div><div style='font-size: 80%; margin-top:10px'>Usage events, partitioned by<br />tenant_id (ADR-0001).</div>"]
+      18["<div style='font-weight: bold'>Kafka</div><div style='font-size: 70%; margin-top: 0px'>[Container: Apache Kafka (Strimzi)]</div><div style='font-size: 80%; margin-top:10px'>Usage events, partitioned by<br />tenant_id (ADR-0001); every<br />tenant's state in the<br />compacted topic tenant-states<br />(ADR-0012).</div>"]
       style 18 fill:#438dd5,stroke:#2e6295,color:#ffffff
       19[("<div style='font-weight: bold'>Usage Store</div><div style='font-size: 70%; margin-top: 0px'>[Container: TimescaleDB on its own CNPG cluster; cold tier in S3 in v2]</div><div style='font-size: 80%; margin-top:10px'>Usage events per tenant, kept<br />13 months: hot and warm tiers<br />in one hypertable, hourly<br />aggregate. Platform-only<br />(ADR-0006, ADR-0008).</div>")]
       style 19 fill:#438dd5,stroke:#2e6295,color:#ffffff
     end
 
-    83-- "<div>Calls functions:<br />write_usage_events()</div><div style='font-size: 70%'></div>" -->19
-    78-- "<div>Uses</div><div style='font-size: 70%'>[Go import]</div>" -->79
-    78-- "<div>Uses</div><div style='font-size: 70%'>[Go import]</div>" -->80
-    78-- "<div>Uses</div><div style='font-size: 70%'>[Go import]</div>" -->81
-    78-- "<div>Uses</div><div style='font-size: 70%'>[Go import]</div>" -->82
-    78-- "<div>Uses</div><div style='font-size: 70%'>[Go import]</div>" -->83
-    78-- "<div>Uses</div><div style='font-size: 70%'>[Go import]</div>" -->84
-    82-- "<div>Uses</div><div style='font-size: 70%'>[Go import]</div>" -->79
-    83-- "<div>Uses</div><div style='font-size: 70%'>[Go import]</div>" -->79
-    84-- "<div>Uses</div><div style='font-size: 70%'>[Go import]</div>" -->79
-    84-- "<div>Uses</div><div style='font-size: 70%'>[Go import]</div>" -->82
-    82-- "<div>Uses</div><div style='font-size: 70%'>[franz-go]</div>" -->18
-    83-- "<div>Uses</div><div style='font-size: 70%'>[pgx]</div>" -->19
+    84-- "<div>Consumes topics: ? (in<br />NewConsumer)</div><div style='font-size: 70%'></div>" -->18
+    84-- "<div>Produces topics: ? (in<br />NewProducer)</div><div style='font-size: 70%'></div>" -->18
+    85-- "<div>Calls functions:<br />write_usage_events()</div><div style='font-size: 70%'></div>" -->19
+    80-- "<div>Uses</div><div style='font-size: 70%'>[Go import]</div>" -->81
+    80-- "<div>Uses</div><div style='font-size: 70%'>[Go import]</div>" -->82
+    80-- "<div>Uses</div><div style='font-size: 70%'>[Go import]</div>" -->83
+    80-- "<div>Uses</div><div style='font-size: 70%'>[Go import]</div>" -->84
+    80-- "<div>Uses</div><div style='font-size: 70%'>[Go import]</div>" -->85
+    80-- "<div>Uses</div><div style='font-size: 70%'>[Go import]</div>" -->86
+    84-- "<div>Uses</div><div style='font-size: 70%'>[Go import]</div>" -->81
+    85-- "<div>Uses</div><div style='font-size: 70%'>[Go import]</div>" -->81
+    86-- "<div>Uses</div><div style='font-size: 70%'>[Go import]</div>" -->81
+    86-- "<div>Uses</div><div style='font-size: 70%'>[Go import]</div>" -->84
     84-- "<div>Uses</div><div style='font-size: 70%'>[franz-go]</div>" -->18
-    82-- "<div>Consumes topics: ? (in<br />NewConsumer)</div><div style='font-size: 70%'></div>" -->18
-    82-- "<div>Produces topics: ? (in<br />NewProducer)</div><div style='font-size: 70%'></div>" -->18
+    85-- "<div>Uses</div><div style='font-size: 70%'>[pgx]</div>" -->19
+    86-- "<div>Uses</div><div style='font-size: 70%'>[franz-go]</div>" -->18
 
   end
 ```
@@ -294,32 +299,32 @@ graph LR
       subgraph 10 ["ExampleApp"]
         style 10 fill:#ffffff,stroke:#3e6e4d,color:#3e6e4d
 
-        101["<div style='font-weight: bold'>Core</div><div style='font-size: 70%; margin-top: 0px'>[Component]</div><div style='font-size: 80%; margin-top:10px'>Tenant context, errors,<br />configuration.</div>"]
-        style 101 fill:#85bbf0,stroke:#5d82a8,color:#000000
-        102["<div style='font-weight: bold'>Health</div><div style='font-size: 70%; margin-top: 0px'>[Component]</div><div style='font-size: 80%; margin-top:10px'>Liveness and readiness<br />endpoints.</div>"]
-        style 102 fill:#85bbf0,stroke:#5d82a8,color:#000000
-        103["<div style='font-weight: bold'>Items API</div><div style='font-size: 70%; margin-top: 0px'>[Component: Go, net/http]</div><div style='font-size: 80%; margin-top:10px'>CRUD for a tenant's items<br />over HTTP.</div>"]
+        103["<div style='font-weight: bold'>Core</div><div style='font-size: 70%; margin-top: 0px'>[Component]</div><div style='font-size: 80%; margin-top:10px'>Tenant context, errors,<br />configuration.</div>"]
         style 103 fill:#85bbf0,stroke:#5d82a8,color:#000000
-        104["<div style='font-weight: bold'>main</div><div style='font-size: 70%; margin-top: 0px'>[Component: Go]</div><div style='font-size: 80%; margin-top:10px'>Reads the configuration,<br />wires the components and runs<br />the server.</div>"]
+        104["<div style='font-weight: bold'>Health</div><div style='font-size: 70%; margin-top: 0px'>[Component]</div><div style='font-size: 80%; margin-top:10px'>Liveness and readiness<br />endpoints.</div>"]
         style 104 fill:#85bbf0,stroke:#5d82a8,color:#000000
-        105["<div style='font-weight: bold'>Store</div><div style='font-size: 70%; margin-top: 0px'>[Component: pgx]</div><div style='font-size: 80%; margin-top:10px'>Reads and writes items as the<br />tenant, under RLS.</div>"]
+        105["<div style='font-weight: bold'>Items API</div><div style='font-size: 70%; margin-top: 0px'>[Component: Go, net/http]</div><div style='font-size: 80%; margin-top:10px'>CRUD for a tenant's items<br />over HTTP.</div>"]
         style 105 fill:#85bbf0,stroke:#5d82a8,color:#000000
+        106["<div style='font-weight: bold'>main</div><div style='font-size: 70%; margin-top: 0px'>[Component: Go]</div><div style='font-size: 80%; margin-top:10px'>Reads the configuration,<br />wires the components and runs<br />the server.</div>"]
+        style 106 fill:#85bbf0,stroke:#5d82a8,color:#000000
+        107["<div style='font-weight: bold'>Store</div><div style='font-size: 70%; margin-top: 0px'>[Component: pgx]</div><div style='font-size: 80%; margin-top:10px'>Reads and writes items as the<br />tenant, under RLS.</div>"]
+        style 107 fill:#85bbf0,stroke:#5d82a8,color:#000000
       end
 
       17[("<div style='font-weight: bold'>PostgreSQL</div><div style='font-size: 70%; margin-top: 0px'>[Container: CloudNativePG]</div><div style='font-size: 80%; margin-top:10px'>Tenant and application data<br />with RLS; separate database<br />for Zitadel (ADR-0002,<br />ADR-0003).</div>")]
       style 17 fill:#438dd5,stroke:#2e6295,color:#ffffff
     end
 
-    103-- "<div>Uses</div><div style='font-size: 70%'>[Go import]</div>" -->101
-    104-- "<div>Uses</div><div style='font-size: 70%'>[Go import]</div>" -->101
-    104-- "<div>Uses</div><div style='font-size: 70%'>[Go import]</div>" -->102
-    104-- "<div>Uses</div><div style='font-size: 70%'>[Go import]</div>" -->103
-    104-- "<div>Uses</div><div style='font-size: 70%'>[Go import]</div>" -->105
-    105-- "<div>Uses</div><div style='font-size: 70%'>[Go import]</div>" -->101
-    105-- "<div>Uses</div><div style='font-size: 70%'>[pgx]</div>" -->17
-    105-- "<div>Defines tables:<br />schema_migrations</div><div style='font-size: 70%'></div>" -->17
-    105-- "<div>Reads tables: ? (in Migrate),<br />items, schema_migrations</div><div style='font-size: 70%'></div>" -->17
-    105-- "<div>Writes tables: items,<br />schema_migrations</div><div style='font-size: 70%'></div>" -->17
+    105-- "<div>Uses</div><div style='font-size: 70%'>[Go import]</div>" -->103
+    106-- "<div>Uses</div><div style='font-size: 70%'>[Go import]</div>" -->103
+    106-- "<div>Uses</div><div style='font-size: 70%'>[Go import]</div>" -->104
+    106-- "<div>Uses</div><div style='font-size: 70%'>[Go import]</div>" -->105
+    106-- "<div>Uses</div><div style='font-size: 70%'>[Go import]</div>" -->107
+    107-- "<div>Uses</div><div style='font-size: 70%'>[Go import]</div>" -->103
+    107-- "<div>Uses</div><div style='font-size: 70%'>[pgx]</div>" -->17
+    107-- "<div>Defines tables:<br />schema_migrations</div><div style='font-size: 70%'></div>" -->17
+    107-- "<div>Reads tables: ? (in Migrate),<br />items, schema_migrations</div><div style='font-size: 70%'></div>" -->17
+    107-- "<div>Writes tables: items,<br />schema_migrations</div><div style='font-size: 70%'></div>" -->17
 
   end
 ```
