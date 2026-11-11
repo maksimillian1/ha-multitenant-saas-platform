@@ -169,7 +169,7 @@ func routes(id string) []route {
 	}
 }
 
-// Verifies: tenant-management AC-9; T-04, T-12
+// Verifies: tenant-management AC-9; T-04
 func TestEveryRouteRequiresTenantManager(t *testing.T) {
 	e := newEnv(t)
 	a := e.create(t, "acme")

@@ -77,6 +77,7 @@ func TestTenantRoutes(t *testing.T) {
 	}
 }
 
+// Verifies: tenant-management AC-14
 func TestTenantErrorsAreMapped(t *testing.T) {
 	failed := &tenants.Tenant{ID: "t-prov", Name: "Initech", State: "provisioning", Parts: []string{"organization"},
 		LastError: "admin: zitadel: unavailable", CreatedBy: "admin", CreatedAt: created1, UpdatedAt: created1}

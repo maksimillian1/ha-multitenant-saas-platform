@@ -20,7 +20,7 @@ Each feature's stage and the gates behind it ([Feature stages](../process/featur
 | [`gateway-tenant-header`](gateway-tenant-header.yaml) **critical** | — |  |  |  |  |  |  |  |  | — | HAMSP-23 |
 | [`gateway-usage-reporting`](gateway-usage-reporting.yaml) | — |  |  |  |  |  |  |  |  | — | HAMSP-23 |
 | [`network-policies`](network-policies.yaml) **critical** | — |  |  |  |  |  |  |  |  | — | HAMSP-23 |
-| [`tenant-management`](tenant-management.yaml) **critical** | — |  |  |  |  |  |  | ✓ (owner) |  | — | HAMSP-51, HAMSP-6 |
+| [`tenant-management`](tenant-management.yaml) **critical** | alpha | n/a | ✓ | ✓ | ✓ basic | ✓ |  | ✓ (owner) |  | 2026-11-10 ready for alpha | HAMSP-51, HAMSP-6 |
 | [`usage-ingest`](usage-ingest.yaml) **critical** | — |  |  |  |  |  |  |  |  | — | HAMSP-23 |
 | [`usage-store`](usage-store.yaml) **critical** | — |  |  |  |  |  |  |  |  | — | HAMSP-23 |
 | [`usage-writer`](usage-writer.yaml) **critical** | — |  |  |  |  |  |  |  |  | — | HAMSP-23 |

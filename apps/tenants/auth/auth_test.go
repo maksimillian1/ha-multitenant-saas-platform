@@ -133,7 +133,7 @@ func TestTokenChecks(t *testing.T) {
 	}
 }
 
-// Verifies: tenant-management AC-9; T-04
+// Verifies: tenant-management AC-9; T-04, T-12
 func TestRequire(t *testing.T) {
 	key := newKey(t, "k1")
 	v := newTestVerifier(t, key)
