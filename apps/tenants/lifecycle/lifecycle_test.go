@@ -315,7 +315,7 @@ func TestNameTakenCreatesNothing(t *testing.T) {
 	}
 }
 
-// Verifies: tenant-management AC-18
+// Verifies: tenant-management AC-18; T-12
 func TestEveryOperationPublishesTheState(t *testing.T) {
 	s, _ := newService(t)
 	var got []string
