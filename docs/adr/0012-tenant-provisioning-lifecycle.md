@@ -45,7 +45,7 @@ Today the admin app creates and deletes Zitadel Organizations directly (HAMSP-34
    |---|---|---|---|
    | `provisioning` | Tenant Management is creating the tenant's parts, or a step failed. | Organization may exist, no users yet. | Being created. |
    | `active` | Every part exists. | Accepted. | Kept. |
-   | `suspended` | Blocked by a platform admin, reversible. | Organization deactivated: no logins, no new tokens. The API Gateway rejects tokens already issued (HAMSP-52). | Kept. |
+   | `suspended` | Blocked by a platform admin, reversible. | Organization deactivated: no logins, no new tokens. The API Gateway rejects tokens already issued within seconds (item 5). | Kept. |
    | `deleting` | Tenant Management is removing the tenant from every store, or a step failed. | Rejected. | Being deleted. |
    | `deleted` | Tombstone: `tenant_id`, timestamps, who deleted it. No other data. | Rejected. | Gone (QS-18). |
 
@@ -59,6 +59,10 @@ Today the admin app creates and deletes Zitadel Organizations directly (HAMSP-34
    * Two requests on the same tenant do not run at once: a request holds the tenant's lock (a PostgreSQL session advisory lock, released when the request ends or its process dies) and a second one gets `409`.
 
 5. **Suspend and resume** are state changes with two effects: Tenant Management deactivates or reactivates the Organization in Zitadel, and the API Gateway reads the state and rejects a suspended tenant (HAMSP-52). Suspending keeps every piece of data.
+   * Tenant Management publishes every tenant's state to the compacted Kafka topic `tenant-states`, keyed by `tenant_id`. It publishes after every operation and again once a minute for all tenants. A failed publish never fails the admin's request.
+   * Every API Gateway replica reads the whole topic into memory and answers 403 to a tenant that is `suspended`, `deleting` or `deleted`. The request path makes no call. While Kafka is down, the last state read stays.
+   * The deactivated Organization is the second layer. It gets no new tokens, so a token issued before the suspension stops working at the latest when it expires (`ACCESS_TOKEN_LIFETIME`, 60 s on kind), even if the event is lost.
+   * Until Kafka has ACLs (HAMSP-31), only the network policy of the Kafka listener limits who may write to the topic.
 
 6. **Deletion** runs the provisioning steps backwards, synchronously, the same way. Only a `suspended` tenant (or one stuck in `provisioning`) can be deleted, so deleting is always two steps and cannot happen by a single wrong click. Each store has an idempotent delete step: PostgreSQL rows, namespace, limits config and counters, usage events, Zitadel Organization last. When every step is done it writes the tombstone; when a step fails the tenant stays in `deleting` with its error until an admin retries. QS-18 sets the limit: 24 hours, so a tenant stuck in `deleting` is an alert, not a state to leave. Whether usage events of a deleted tenant are kept for billing disputes is decided in HAMSP-20; until then, deletion removes them.
 
