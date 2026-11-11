@@ -1,0 +1,128 @@
+# One KafkaUser per Kafka client (HAMSP-31): UsageWriteAPI, Usage Writer,
+# Tenant Management and the API Gateway. usage migrate has none: it needs no
+# Kafka. Local kind prototype passwords only; the same values are in
+# the Secrets of each client's namespace, because a Strimzi user lives in the
+# Kafka namespace and the pods read their password in the usage namespace.
+apiVersion: v1
+kind: Secret
+metadata:
+  name: usage-writeapi-kafka-password
+type: Opaque
+stringData:
+  password: dev-usage-writeapi-kafka # gitleaks:allow
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: usage-writer-kafka-password
+type: Opaque
+stringData:
+  password: dev-usage-writer-kafka # gitleaks:allow
+---
+# UsageWriteAPI: produce to usage-events, nothing else. IdempotentWrite on the
+# cluster is what the idempotent producer needs (ADR-0005).
+apiVersion: kafka.strimzi.io/v1
+kind: KafkaUser
+metadata:
+  name: usage-writeapi
+  labels:
+    strimzi.io/cluster: usage-kafka
+  annotations:
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
+spec:
+  authentication:
+    type: scram-sha-512
+    password:
+      valueFrom:
+        secretKeyRef: {name: usage-writeapi-kafka-password, key: password}
+  authorization:
+    type: simple
+    acls:
+      - resource: {type: topic, name: usage-events, patternType: literal}
+        operations: [Write, Describe]
+      - resource: {type: cluster}
+        operations: [IdempotentWrite]
+---
+# Usage Writer: read usage-events with its own consumer group only.
+apiVersion: kafka.strimzi.io/v1
+kind: KafkaUser
+metadata:
+  name: usage-writer
+  labels:
+    strimzi.io/cluster: usage-kafka
+  annotations:
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
+spec:
+  authentication:
+    type: scram-sha-512
+    password:
+      valueFrom:
+        secretKeyRef: {name: usage-writer-kafka-password, key: password}
+  authorization:
+    type: simple
+    acls:
+      - resource: {type: topic, name: usage-events, patternType: literal}
+        operations: [Read, Describe]
+      - resource: {type: group, name: usage-writer, patternType: literal}
+        operations: [Read]
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: tenants-kafka-password
+type: Opaque
+stringData:
+  password: dev-tenants-kafka # gitleaks:allow
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: api-gateway-kafka-password
+type: Opaque
+stringData:
+  password: dev-api-gateway-kafka # gitleaks:allow
+---
+# Tenant Management: publishes every tenant's state to tenant-states (HAMSP-52).
+apiVersion: kafka.strimzi.io/v1
+kind: KafkaUser
+metadata:
+  name: tenants
+  labels:
+    strimzi.io/cluster: usage-kafka
+  annotations:
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
+spec:
+  authentication:
+    type: scram-sha-512
+    password:
+      valueFrom:
+        secretKeyRef: {name: tenants-kafka-password, key: password}
+  authorization:
+    type: simple
+    acls:
+      - resource: {type: topic, name: tenant-states, patternType: literal}
+        operations: [Write, Describe]
+      - resource: {type: cluster}
+        operations: [IdempotentWrite]
+---
+# API Gateway: reads tenant-states without a consumer group (HAMSP-52), so it
+# needs no group ACL.
+apiVersion: kafka.strimzi.io/v1
+kind: KafkaUser
+metadata:
+  name: api-gateway
+  labels:
+    strimzi.io/cluster: usage-kafka
+  annotations:
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
+spec:
+  authentication:
+    type: scram-sha-512
+    password:
+      valueFrom:
+        secretKeyRef: {name: api-gateway-kafka-password, key: password}
+  authorization:
+    type: simple
+    acls:
+      - resource: {type: topic, name: tenant-states, patternType: literal}
+        operations: [Read, Describe]
