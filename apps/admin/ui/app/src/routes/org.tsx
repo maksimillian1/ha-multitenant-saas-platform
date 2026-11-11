@@ -1,6 +1,6 @@
-import { useQuery, useQueryClient, useSuspenseQuery } from '@tanstack/react-query'
-import { getRouteApi, Link, useNavigate } from '@tanstack/react-router'
-import { CirclePause, CirclePlay, Trash2 } from 'lucide-react'
+import { useQuery, useSuspenseQuery } from '@tanstack/react-query'
+import { getRouteApi, Link } from '@tanstack/react-router'
+import { CirclePause, CirclePlay } from 'lucide-react'
 import { api, unwrap } from '@/api/client'
 import { meQuery, orgQuery, projectsQuery, useChange, userQuery, usersQuery } from '@/api/queries'
 import { StateBadge, UserTypeBadge } from '@/components/badges'
@@ -23,8 +23,6 @@ const PREVIEW = 10
 export function OrgPage() {
   const { orgId } = route.useParams()
   const { tab = 'overview' } = route.useSearch()
-  const navigate = useNavigate()
-  const queryClient = useQueryClient()
   const { data: org } = useSuspenseQuery(orgQuery(orgId))
   const { data: me } = useSuspenseQuery(meQuery)
   const self = useQuery(userQuery(me.subject))
@@ -35,13 +33,6 @@ export function OrgPage() {
   })
   const activate = useChange(() => unwrap(api.POST('/api/orgs/{orgId}/activate', path)), {
     success: `${org.name} activated`,
-  })
-  const remove = useChange(() => unwrap(api.DELETE('/api/orgs/{orgId}', path)), {
-    success: `${org.name} deleted`,
-    onSuccess: async () => {
-      queryClient.removeQueries({ queryKey: orgQuery(orgId).queryKey })
-      await navigate({ to: '/orgs' })
-    },
   })
 
   // The server refuses these too (409); the page says why up front.
@@ -81,25 +72,6 @@ export function OrgPage() {
                 onConfirm={() => deactivate.mutateAsync()}
               />
             )}
-            <ConfirmButton
-              label="Delete"
-              icon={<Trash2 />}
-              destructive
-              title={`Delete ${org.name}?`}
-              description={
-                <>
-                  <p>Zitadel deletes the organization with its users, projects and grants; its users can no longer sign in.</p>
-                  <p className="mt-2">
-                    The tenant&apos;s data in other stores (PostgreSQL, usage events) stays: deleting a tenant is part of the
-                    tenant lifecycle (HAMSP-6).
-                  </p>
-                </>
-              }
-              confirmText={org.name}
-              disabled={org.is_default || ownOrg}
-              disabledReason={org.is_default ? 'Zitadel keeps the default organization.' : lockout}
-              onConfirm={() => remove.mutateAsync()}
-            />
           </>
         }
       />

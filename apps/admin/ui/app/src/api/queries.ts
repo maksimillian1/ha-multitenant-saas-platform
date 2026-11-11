@@ -1,6 +1,6 @@
 import { keepPreviousData, queryOptions, useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
-import { api, message, unwrap } from './client'
+import { api, ApiError, message, unwrap } from './client'
 import type { components, operations } from './schema'
 
 export type Schemas = components['schemas']
@@ -13,6 +13,9 @@ export type UserType = Schemas['UserType']
 export type Authorization = Schemas['Authorization']
 export type Project = Schemas['Project']
 export type ProjectRole = Schemas['ProjectRole']
+export type Tenant = Schemas['Tenant']
+export type TenantState = Schemas['TenantState']
+export type TenantPart = Schemas['TenantPart']
 
 export type OrgListParams = NonNullable<operations['listOrgs']['parameters']['query']>
 export type UserListParams = NonNullable<operations['listUsers']['parameters']['query']>
@@ -94,6 +97,30 @@ export const projectAuthorizationsQuery = (projectId: string) =>
     queryFn: ({ signal }) =>
       unwrap(api.GET('/api/projects/{projectId}/authorizations', { params: { path: { projectId } }, signal })),
   })
+
+// Tenants come from Tenant Management; the list has no paging (a few
+// thousand tenants at most).
+export const tenantsQuery = (includeDeleted: boolean) =>
+  queryOptions({
+    queryKey: ['tenants', 'list', { includeDeleted }],
+    queryFn: ({ signal }) =>
+      unwrap(api.GET('/api/tenants', { params: { query: includeDeleted ? { include_deleted: true } : {} }, signal })),
+  })
+
+export const tenantQuery = (tenantId: string) =>
+  queryOptions({
+    queryKey: ['tenants', 'detail', tenantId],
+    queryFn: ({ signal }) => unwrap(api.GET('/api/tenants/{tenantId}', { params: { path: { tenantId } }, signal })),
+  })
+
+// failedTenant is the tenant in the answer of a failed tenant change: the
+// change stopped at a step and the tenant is as the failure left it.
+export function failedTenant(error: unknown): Tenant | undefined {
+  if (error instanceof ApiError && error.body && typeof error.body === 'object' && 'tenant' in error.body) {
+    return (error.body as { tenant?: Tenant }).tenant
+  }
+  return undefined
+}
 
 // useChange runs a change against the API. On success it refreshes every
 // cached query (a rename shows up in lists, a new user in the counts) and

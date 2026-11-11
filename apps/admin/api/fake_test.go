@@ -206,17 +206,6 @@ func (z *fakeZitadel) DefaultOrganizationID(context.Context) (string, error) {
 	return z.defaultOrg, z.record("DefaultOrganizationID")
 }
 
-func (z *fakeZitadel) AddOrganization(_ context.Context, name string) (string, error) {
-	z.mu.Lock()
-	defer z.mu.Unlock()
-	if err := z.record("AddOrganization"); err != nil {
-		return "", err
-	}
-	id := z.id("org")
-	z.orgs[id] = &zitadel.Organization{ID: id, Name: name, State: zitadel.OrganizationActive}
-	return id, nil
-}
-
 func (z *fakeZitadel) changeOrg(method, id string, change func(*zitadel.Organization)) error {
 	z.mu.Lock()
 	defer z.mu.Unlock()
@@ -241,10 +230,6 @@ func (z *fakeZitadel) DeactivateOrganization(_ context.Context, id string) error
 
 func (z *fakeZitadel) ActivateOrganization(_ context.Context, id string) error {
 	return z.changeOrg("ActivateOrganization", id, func(o *zitadel.Organization) { o.State = zitadel.OrganizationActive })
-}
-
-func (z *fakeZitadel) DeleteOrganization(_ context.Context, id string) error {
-	return z.changeOrg("DeleteOrganization", id, func(o *zitadel.Organization) { delete(z.orgs, o.ID) })
 }
 
 func (z *fakeZitadel) ListUsers(_ context.Context, f zitadel.UserFilter, p zitadel.Page) (zitadel.UserList, error) {
@@ -463,6 +448,7 @@ func (z *fakeZitadel) ListProjectRoles(_ context.Context, projectID string, _ zi
 type env struct {
 	t    *testing.T
 	z    *fakeZitadel
+	tm   *fakeTenants
 	mux  *http.ServeMux
 	logs *bytes.Buffer
 }
@@ -478,10 +464,12 @@ func newEnvWith(t *testing.T, sessions fakeSessions) *env {
 	t.Helper()
 	logs := &bytes.Buffer{}
 	z := newFakeZitadel()
+	tm := newFakeTenants()
 	svc := NewService(sessions, z, fakePlatform{z}, "super-admin", testOrigin+"/", slog.New(slog.NewJSONHandler(logs, nil)))
+	svc.Tenants = tm
 	mux := http.NewServeMux()
 	svc.Register(mux)
-	return &env{t: t, z: z, mux: mux, logs: logs}
+	return &env{t: t, z: z, tm: tm, mux: mux, logs: logs}
 }
 
 func newEnv(t *testing.T) *env { return newEnvWith(t, adminSession()) }

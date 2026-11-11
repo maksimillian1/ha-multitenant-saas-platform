@@ -24,10 +24,8 @@ var apiRoutes = []struct {
 }{
 	{"GET", "/api/overview", nil},
 	{"GET", "/api/orgs", nil},
-	{"POST", "/api/orgs", OrgCreate{Name: "tenant-c"}},
 	{"GET", "/api/orgs/org-a", nil},
 	{"PATCH", "/api/orgs/org-a", OrgUpdate{Name: "tenant-a2"}},
-	{"DELETE", "/api/orgs/org-b", nil},
 	{"POST", "/api/orgs/org-a/deactivate", nil},
 	{"POST", "/api/orgs/org-b/activate", nil},
 	{"GET", "/api/users", nil},
@@ -65,6 +63,14 @@ var apiRoutes = []struct {
 	{"GET", "/api/platform/branding/assets/logo?version=draft", nil},
 	{"PUT", "/api/platform/branding/assets/font", fileBody(woffFile)},
 	{"DELETE", "/api/platform/branding/assets/logo", nil},
+
+	{"GET", "/api/tenants", nil},
+	{"POST", "/api/tenants", TenantCreate{Name: "Umbrella", AdminEmail: "it@umbrella.test"}},
+	{"GET", "/api/tenants/t-active", nil},
+	{"DELETE", "/api/tenants/t-suspended", nil},
+	{"POST", "/api/tenants/t-prov/retry", nil},
+	{"POST", "/api/tenants/t-active/suspend", nil},
+	{"POST", "/api/tenants/t-suspended/resume", nil},
 }
 
 func isChange(method string) bool { return method != http.MethodGet }
@@ -141,6 +147,9 @@ func TestEveryRouteRequiresAdmin(t *testing.T) {
 				if calls := e.z.called(); len(calls) > 0 {
 					t.Errorf("%s %s called Zitadel: %v", route.method, route.path, calls)
 				}
+				if calls := e.tm.called(); len(calls) > 0 {
+					t.Errorf("%s %s called Tenant Management: %v", route.method, route.path, calls)
+				}
 			}
 		})
 	}
@@ -169,6 +178,9 @@ func TestMutationsNeedCSRFHeader(t *testing.T) {
 				if calls := e.z.called(); len(calls) > 0 {
 					t.Errorf("%s %s called Zitadel: %v", route.method, route.path, calls)
 				}
+				if calls := e.tm.called(); len(calls) > 0 {
+					t.Errorf("%s %s called Tenant Management: %v", route.method, route.path, calls)
+				}
 			}
 		})
 	}
@@ -178,14 +190,14 @@ func TestMutationsNeedCSRFHeader(t *testing.T) {
 		t.Errorf("GET without X-Requested-With: status %d", rec.Code)
 	}
 	// Without Origin and Sec-Fetch-Site (not a browser) the header is enough.
-	rec := newEnv(t).do("POST", "/api/orgs", OrgCreate{Name: "x"}, [2]string{"Origin", ""}, [2]string{"Sec-Fetch-Site", ""})
-	if rec.Code != http.StatusCreated {
+	rec := newEnv(t).do("POST", "/api/users/ann/lock", nil, [2]string{"Origin", ""}, [2]string{"Sec-Fetch-Site", ""})
+	if rec.Code != http.StatusNoContent {
 		t.Errorf("POST with only X-Requested-With: status %d", rec.Code)
 	}
 }
 
 func TestSelfLockoutIsRefused(t *testing.T) {
-	mutations := []string{"LockUser", "DeactivateUser", "DeleteUser", "DeactivateOrganization", "DeleteOrganization",
+	mutations := []string{"LockUser", "DeactivateUser", "DeleteUser", "DeactivateOrganization",
 		"UpdateAuthorization", "DeleteAuthorization"}
 	for _, tc := range []struct {
 		method, path string
@@ -199,7 +211,6 @@ func TestSelfLockoutIsRefused(t *testing.T) {
 		{"POST", "/api/users/sa/deactivate", nil, "You cannot deactivate the admin app's service account."},
 		{"DELETE", "/api/users/sa", nil, "You cannot delete the admin app's service account."},
 		{"POST", "/api/orgs/org-zitadel/deactivate", nil, "You cannot deactivate your own organization."},
-		{"DELETE", "/api/orgs/org-zitadel", nil, "You cannot delete your own organization."},
 		{"PATCH", "/api/authorizations/grant-admin", AuthorizationUpdate{RoleKeys: []string{"viewer"}}, "You cannot change your own role assignments."},
 		{"DELETE", "/api/authorizations/grant-admin", nil, "You cannot change your own role assignments."},
 	} {
@@ -218,12 +229,12 @@ func TestSelfLockoutIsRefused(t *testing.T) {
 	// The service account's organization, when it is not the admin's.
 	e := newEnv(t)
 	e.z.account.OrganizationID = "org-a"
-	rec := e.do("DELETE", "/api/orgs/org-a", nil)
+	rec := e.do("POST", "/api/orgs/org-a/deactivate", nil)
 	if rec.Code != http.StatusConflict || !strings.Contains(errorText(t, rec), "service account") {
-		t.Errorf("deleting the service account's organization: status %d, body %s", rec.Code, rec.Body)
+		t.Errorf("deactivating the service account's organization: status %d, body %s", rec.Code, rec.Body)
 	}
-	if slices.Contains(e.z.called(), "DeleteOrganization") {
-		t.Error("the service account's organization was deleted")
+	if slices.Contains(e.z.called(), "DeactivateOrganization") {
+		t.Error("the service account's organization was deactivated")
 	}
 
 	// Other users, organizations and role assignments can be changed.
@@ -235,8 +246,8 @@ func TestSelfLockoutIsRefused(t *testing.T) {
 
 func TestMutationsAreLogged(t *testing.T) {
 	e := newEnv(t)
-	var org Created
-	expect(t, e.do("POST", "/api/orgs", OrgCreate{Name: "tenant-c"}), http.StatusCreated, &org)
+	var tenant Tenant
+	expect(t, e.do("POST", "/api/tenants", TenantCreate{Name: "Umbrella", AdminEmail: "it@umbrella.test"}), http.StatusCreated, &tenant)
 	expect(t, e.do("POST", "/api/users/ann/lock", nil), http.StatusNoContent, nil)
 	expect(t, e.do("DELETE", "/api/users/admin", nil), http.StatusConflict, nil)
 	expect(t, e.do("GET", "/api/users/ann", nil), http.StatusOK, nil)
@@ -256,7 +267,7 @@ func TestMutationsAreLogged(t *testing.T) {
 		}
 	}
 	want := []entry{
-		{"admin change", "admin", "POST /api/orgs", org.Id, http.StatusCreated},
+		{"admin change", "admin", "POST /api/tenants", tenant.Id, http.StatusCreated},
 		{"admin change", "admin", "POST /api/users/{userId}/lock", "ann", http.StatusNoContent},
 		{"admin change", "admin", "DELETE /api/users/{userId}", "admin", http.StatusConflict},
 	}

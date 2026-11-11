@@ -7,11 +7,14 @@
 # (POST, PUT, PATCH, DELETE) also need the header `X-Requested-With: XMLHttpRequest`
 # and must come from the app's own origin (CSRF). The data comes from Zitadel,
 # which the app calls with its own service account (HAMSP-34); the platform
-# branding routes use a second one with instance rights (HAMSP-37).
+# branding routes use a second one with instance rights (HAMSP-37). Tenants
+# come from Tenant Management (ADR-0012, HAMSP-51), which the app calls with
+# its machine token and the admin's user ID; organizations are created and
+# deleted only as tenants.
 openapi: 3.0.3
 info:
   title: Admin API
-  version: 0.3.0
+  version: 0.4.0
 paths:
   /api/me:
     get:
@@ -79,30 +82,6 @@ paths:
           $ref: "#/components/responses/Error"
         "504":
           $ref: "#/components/responses/Error"
-    post:
-      operationId: createOrg
-      summary: Create an organization without admin users
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/OrgCreate"
-      responses:
-        "201":
-          $ref: "#/components/responses/Created"
-        "400":
-          $ref: "#/components/responses/Error"
-        "401":
-          $ref: "#/components/responses/Error"
-        "403":
-          $ref: "#/components/responses/Error"
-        "409":
-          $ref: "#/components/responses/Error"
-        "502":
-          $ref: "#/components/responses/Error"
-        "504":
-          $ref: "#/components/responses/Error"
 
   /api/orgs/{orgId}:
     parameters:
@@ -141,28 +120,6 @@ paths:
           description: Renamed
         "400":
           $ref: "#/components/responses/Error"
-        "401":
-          $ref: "#/components/responses/Error"
-        "403":
-          $ref: "#/components/responses/Error"
-        "404":
-          $ref: "#/components/responses/Error"
-        "409":
-          $ref: "#/components/responses/Error"
-        "502":
-          $ref: "#/components/responses/Error"
-        "504":
-          $ref: "#/components/responses/Error"
-    delete:
-      operationId: deleteOrg
-      summary: >-
-        Delete an organization with its users, projects and grants in Zitadel.
-        The tenant's data in other stores stays (FR-01 and QS-18 are HAMSP-6).
-        Refused (409) for the admin's own organization and the service
-        account's organization.
-      responses:
-        "204":
-          description: Deleted
         "401":
           $ref: "#/components/responses/Error"
         "403":
@@ -406,6 +363,205 @@ paths:
           $ref: "#/components/responses/Error"
         "504":
           $ref: "#/components/responses/Error"
+
+  /api/tenants:
+    get:
+      operationId: listTenants
+      summary: Tenants from Tenant Management, newest first
+      parameters:
+        - name: include_deleted
+          in: query
+          description: Also list the tombstones of deleted tenants
+          schema:
+            type: boolean
+            default: false
+      responses:
+        "200":
+          description: The tenants
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TenantList"
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "502":
+          $ref: "#/components/responses/TenantError"
+        "503":
+          $ref: "#/components/responses/Error"
+        "504":
+          $ref: "#/components/responses/TenantError"
+    post:
+      operationId: createTenant
+      summary: >-
+        Create a tenant: its organization, its first admin (invited by email
+        with ORG_OWNER) and its namespace, in one request
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TenantCreate"
+      responses:
+        "201":
+          description: The tenant, active
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Tenant"
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/TenantError"
+        "502":
+          $ref: "#/components/responses/TenantError"
+        "503":
+          $ref: "#/components/responses/Error"
+        "504":
+          $ref: "#/components/responses/TenantError"
+
+  /api/tenants/{tenantId}:
+    parameters:
+      - $ref: "#/components/parameters/TenantId"
+    get:
+      operationId: getTenant
+      summary: One tenant with its state, steps done and last error
+      responses:
+        "200":
+          description: The tenant
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Tenant"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "502":
+          $ref: "#/components/responses/TenantError"
+        "503":
+          $ref: "#/components/responses/Error"
+        "504":
+          $ref: "#/components/responses/TenantError"
+    delete:
+      operationId: deleteTenant
+      summary: >-
+        Delete a suspended tenant (or one left in provisioning or deleting)
+        in every store and leave a tombstone
+      responses:
+        "200":
+          description: The tombstone
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Tenant"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/TenantError"
+        "502":
+          $ref: "#/components/responses/TenantError"
+        "503":
+          $ref: "#/components/responses/Error"
+        "504":
+          $ref: "#/components/responses/TenantError"
+
+  /api/tenants/{tenantId}/retry:
+    parameters:
+      - $ref: "#/components/parameters/TenantId"
+    post:
+      operationId: retryTenant
+      summary: Resume a tenant left in provisioning or deleting at its first step not done
+      responses:
+        "200":
+          description: The tenant after the change
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Tenant"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/TenantError"
+        "502":
+          $ref: "#/components/responses/TenantError"
+        "503":
+          $ref: "#/components/responses/Error"
+        "504":
+          $ref: "#/components/responses/TenantError"
+
+  /api/tenants/{tenantId}/suspend:
+    parameters:
+      - $ref: "#/components/parameters/TenantId"
+    post:
+      operationId: suspendTenant
+      summary: Suspend an active tenant, which deactivates its organization
+      responses:
+        "200":
+          description: The tenant after the change
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Tenant"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/TenantError"
+        "502":
+          $ref: "#/components/responses/TenantError"
+        "503":
+          $ref: "#/components/responses/Error"
+        "504":
+          $ref: "#/components/responses/TenantError"
+
+  /api/tenants/{tenantId}/resume:
+    parameters:
+      - $ref: "#/components/parameters/TenantId"
+    post:
+      operationId: resumeTenant
+      summary: Make a suspended tenant active again
+      responses:
+        "200":
+          description: The tenant after the change
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Tenant"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/TenantError"
+        "502":
+          $ref: "#/components/responses/TenantError"
+        "503":
+          $ref: "#/components/responses/Error"
+        "504":
+          $ref: "#/components/responses/TenantError"
 
   /api/users:
     get:
@@ -1134,6 +1290,12 @@ components:
       required: true
       schema:
         type: string
+    TenantId:
+      name: tenantId
+      in: path
+      required: true
+      schema:
+        type: string
     UserId:
       name: userId
       in: path
@@ -1180,6 +1342,17 @@ components:
         application/json:
           schema:
             $ref: "#/components/schemas/Error"
+    TenantError:
+      description: >-
+        An error of Tenant Management: the name is taken, another request is
+        changing the tenant or its state does not allow the change (409), a
+        step failed (502) or timed out (504). When the tenant was changed
+        before the failure, the answer has the tenant as the failure left it.
+        503 when the app has no connection to Tenant Management configured.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/TenantError"
     Created:
       description: Created; the ID of the new resource
       content:
@@ -1281,14 +1454,6 @@ components:
           type: integer
           format: int64
 
-    OrgCreate:
-      type: object
-      required: [name]
-      properties:
-        name:
-          type: string
-          minLength: 1
-          maxLength: 200
 
     OrgUpdate:
       type: object
@@ -1298,6 +1463,83 @@ components:
           type: string
           minLength: 1
           maxLength: 200
+
+    TenantState:
+      type: string
+      enum: [provisioning, active, suspended, deleting, deleted]
+
+    TenantPart:
+      type: string
+      enum: [organization, admin, namespace]
+
+    Tenant:
+      type: object
+      required: [id, state, parts, created_by, created_at, updated_at]
+      properties:
+        id:
+          type: string
+          description: The tenant_id, also the ID of its Zitadel organization
+        name:
+          type: string
+          description: Empty on a tombstone
+        admin_email:
+          type: string
+          description: The first admin's email; empty on a tombstone
+        state:
+          $ref: "#/components/schemas/TenantState"
+        parts:
+          type: array
+          description: The parts created so far
+          items:
+            $ref: "#/components/schemas/TenantPart"
+        last_error:
+          type: string
+          description: The error of the last failed step, until a step succeeds
+        created_by:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+        deleted_by:
+          type: string
+        deleted_at:
+          type: string
+          format: date-time
+
+    TenantList:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/Tenant"
+
+    TenantCreate:
+      type: object
+      required: [name, admin_email]
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 100
+        admin_email:
+          type: string
+          description: The first admin's email; Tenant Management checks its form
+          minLength: 1
+          maxLength: 254
+
+    TenantError:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: string
+        tenant:
+          $ref: "#/components/schemas/Tenant"
 
     UserType:
       type: string

@@ -21,6 +21,15 @@ type Config struct {
 	// IAM_BRANDING_MANAGER, HAMSP-36). The app gets short-lived access tokens
 	// with it.
 	ZitadelKeyFile string
+
+	// Tenant Management (ADR-0012): its URL, and the client credentials of
+	// the machine user whose token has the role tenant-manager in the
+	// project whose ID is TenantsAudience. Without TENANTS_URL the tenant
+	// routes answer 503.
+	TenantsURL          string
+	TenantsAudience     string
+	TenantsClientID     string
+	TenantsClientSecret string
 }
 
 func GetEnv(key, defaultVal string) string {
@@ -42,6 +51,11 @@ func LoadConfig() Config {
 		AdminRole:      GetEnv("ADMIN_ROLE", "super-admin"),
 		ZitadelURL:     GetEnv("ZITADEL_API_URL", GetEnv("ISSUER", "")),
 		ZitadelKeyFile: GetEnv("ZITADEL_KEY_FILE", ""),
+
+		TenantsURL:          GetEnv("TENANTS_URL", ""),
+		TenantsAudience:     GetEnv("TENANTS_AUDIENCE", ""),
+		TenantsClientID:     GetEnv("TENANTS_CLIENT_ID", ""),
+		TenantsClientSecret: GetEnv("TENANTS_CLIENT_SECRET", ""),
 	}
 }
 
@@ -52,6 +66,15 @@ func (c Config) Validate() error {
 	} {
 		if setting[1] == "" {
 			return fmt.Errorf("%s is required", setting[0])
+		}
+	}
+	if c.TenantsURL != "" {
+		for _, setting := range [][2]string{
+			{"TENANTS_AUDIENCE", c.TenantsAudience}, {"TENANTS_CLIENT_ID", c.TenantsClientID}, {"TENANTS_CLIENT_SECRET", c.TenantsClientSecret},
+		} {
+			if setting[1] == "" {
+				return fmt.Errorf("%s is required with TENANTS_URL", setting[0])
+			}
 		}
 	}
 	if len(c.SessionKey) < 32 {

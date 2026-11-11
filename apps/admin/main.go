@@ -17,6 +17,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
@@ -24,6 +25,7 @@ import (
 	"github.com/maksimillian1/ha-multitenant-saas-platform/apps/admin/auth"
 	"github.com/maksimillian1/ha-multitenant-saas-platform/apps/admin/core"
 	"github.com/maksimillian1/ha-multitenant-saas-platform/apps/admin/health"
+	"github.com/maksimillian1/ha-multitenant-saas-platform/apps/admin/tenants"
 	"github.com/maksimillian1/ha-multitenant-saas-platform/apps/admin/ui"
 	"github.com/maksimillian1/ha-multitenant-saas-platform/apps/admin/zitadel"
 )
@@ -84,7 +86,7 @@ func bootstrapServices(ctx context.Context, cfg core.Config, log *slog.Logger) (
 	if err != nil {
 		return nil, nil, nil, nil, err
 	}
-	apiService := newAPIService(cfg, authService, tokens, issuerClient, log)
+	apiService := newAPIService(ctx, cfg, authService, tokens, issuerClient, log)
 	// Both service accounts are checked for credentials they should not
 	// have (a PAT, a second key, a long key); a finding is an ERROR event.
 	drift := &zitadel.DriftCheck{
@@ -107,7 +109,26 @@ const driftInterval = 5 * time.Minute
 
 // newAPIService builds the API with one Zitadel client, the admin app's
 // account, for every route; the platform branding uses it too (HAMSP-36).
-func newAPIService(cfg core.Config, sessions core.SessionReader, tokens zitadel.Tokens, httpClient *http.Client, log *slog.Logger) *api.Service {
+// Tenant Management gets the app's machine token from the issuer.
+func newAPIService(ctx context.Context, cfg core.Config, sessions core.SessionReader, tokens zitadel.Tokens, httpClient *http.Client, log *slog.Logger) *api.Service {
 	client := zitadel.NewClient(cfg.ZitadelURL, tokens, httpClient)
-	return api.NewService(sessions, client, client, cfg.AdminRole, cfg.PublicURL, log)
+	svc := api.NewService(sessions, client, client, cfg.AdminRole, cfg.PublicURL, log)
+	if cfg.TenantsURL != "" {
+		svc.Tenants = tenants.New(ctx, tenants.Config{
+			URL:          cfg.TenantsURL,
+			TokenURL:     strings.TrimRight(cfg.Issuer, "/") + "/oauth/v2/token",
+			ClientID:     cfg.TenantsClientID,
+			ClientSecret: cfg.TenantsClientSecret,
+			Audience:     cfg.TenantsAudience,
+			// A create or delete runs every step in the request (ADR-0012).
+			Timeout: tenantsTimeout,
+		}, httpClient)
+	} else {
+		log.Warn("TENANTS_URL is not set: the tenant routes answer 503")
+	}
+	return svc
 }
+
+// tenantsTimeout is above Tenant Management's own limit for a deletion,
+// which waits for the namespace to go.
+const tenantsTimeout = 4 * time.Minute

@@ -1,6 +1,6 @@
 import { useSuspenseQuery } from '@tanstack/react-query'
 import { Link, Outlet } from '@tanstack/react-router'
-import { Building2, ChevronLeft, ChevronRight, FolderKanban, LayoutDashboard, Menu, Palette, Users } from 'lucide-react'
+import { Boxes, Building2, ChevronLeft, ChevronRight, FolderKanban, LayoutDashboard, Menu, Palette, Users } from 'lucide-react'
 import { Dialog as DialogPrimitive } from 'radix-ui'
 import { useCallback, useEffect, useState } from 'react'
 import { meQuery, type Me } from '@/api/queries'
@@ -12,6 +12,7 @@ import { useBrand, type Brand } from '@/lib/brand'
 
 const nav = [
   { to: '/', label: 'Overview', icon: LayoutDashboard, exact: true },
+  { to: '/tenants', label: 'Tenants', icon: Boxes, exact: false },
   { to: '/orgs', label: 'Organizations', icon: Building2, exact: false },
   { to: '/users', label: 'Users', icon: Users, exact: false },
   { to: '/projects', label: 'Projects', icon: FolderKanban, exact: false },

@@ -1,4 +1,4 @@
-import type { Authorization, BrandingSettings, BrandingState, Me, Org, Project, User } from '@/api/queries'
+import type { Authorization, BrandingSettings, BrandingState, Me, Org, Project, Tenant, User } from '@/api/queries'
 
 // The instance after bootstrap-tenants.sh, as the API returns it.
 
@@ -174,4 +174,47 @@ export const tenantBBranding: BrandingState = {
   inherited: false,
   active: { settings: { ...platformSettings, primary_color: '#16a34a' }, assets: noAssets, changed_at: created },
   draft: { settings: { ...platformSettings, primary_color: '#dc2626' }, assets: noAssets, changed_at: created },
+}
+
+// Tenants as Tenant Management returns them (ADR-0012).
+const allParts: Tenant['parts'] = ['organization', 'admin', 'namespace']
+
+export const tenantActive: Tenant = {
+  id: '0b9a5c1e-7d2f-4e8a-9c3b-5f6a7d8e9f01',
+  name: 'Acme',
+  admin_email: 'it@acme.test',
+  state: 'active',
+  parts: allParts,
+  created_by: 'admin',
+  created_at: created,
+  updated_at: created,
+}
+
+export const tenantSuspended: Tenant = {
+  ...tenantActive,
+  id: '1c2d3e4f-5a6b-4c7d-8e9f-0a1b2c3d4e5f',
+  name: 'Globex',
+  admin_email: 'ops@globex.test',
+  state: 'suspended',
+}
+
+export const tenantStuck: Tenant = {
+  ...tenantActive,
+  id: '2d3e4f5a-6b7c-4d8e-9f0a-1b2c3d4e5f6a',
+  name: 'Initech',
+  admin_email: 'it@initech.test',
+  state: 'provisioning',
+  parts: ['organization'],
+  last_error: 'admin: zitadel: 503: unavailable',
+}
+
+export const tenantDeleted: Tenant = {
+  id: '3e4f5a6b-7c8d-4e9f-0a1b-2c3d4e5f6a7b',
+  state: 'deleted',
+  parts: [],
+  created_by: 'admin',
+  created_at: created,
+  updated_at: created,
+  deleted_by: 'admin',
+  deleted_at: created,
 }
