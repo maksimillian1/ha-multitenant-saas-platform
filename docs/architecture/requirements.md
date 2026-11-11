@@ -11,7 +11,7 @@ Core requirements for system architecture
 
 | ID | Requirement | Source |
 |---|---|---|
-| FR-01 | A platform admin creates, suspends and deletes a tenant through the API, with no manual steps. Deleting a tenant removes all of its data. | C4 model, ADR-0001; HAMSP-6 |
+| FR-01 | A platform admin creates, suspends and deletes a tenant through the API, with no manual steps. Deleting a tenant removes all of its data. | C4 model, ADR-0001, ADR-0012; HAMSP-6 |
 | FR-02 | A tenant admin manages the tenant's own users, roles, SSO and login branding. | ADR-0003 |
 | FR-03 | A tenant's end users and API clients call the platform through the API Gateway with a token that identifies the tenant. | ADR-0001 |
 | FR-04 | A tenant can start isolated agent workloads in the cluster. | C4 model, ADR-0001 |

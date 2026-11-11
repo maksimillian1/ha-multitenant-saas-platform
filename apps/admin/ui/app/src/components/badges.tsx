@@ -17,12 +17,15 @@ const states: Record<string, { label: string; tone: Tone }> = {
   locked: { label: 'Locked', tone: 'bad' },
   initial: { label: 'Initial', tone: 'none' },
   deleted: { label: 'Deleted', tone: 'bad' },
+  provisioning: { label: 'Provisioning', tone: 'warn' },
+  suspended: { label: 'Suspended', tone: 'warn' },
+  deleting: { label: 'Deleting', tone: 'bad' },
   removed: { label: 'Removed', tone: 'bad' },
   unspecified: { label: 'Unknown', tone: 'none' },
 }
 
-// StateBadge shows the state of an organization, user, project or role
-// assignment.
+// StateBadge shows the state of a tenant, organization, user, project or
+// role assignment.
 export function StateBadge({ state }: { state: string }) {
   const { label, tone } = states[state] ?? states.unspecified
   return (

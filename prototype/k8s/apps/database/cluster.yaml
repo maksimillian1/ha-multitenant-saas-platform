@@ -42,6 +42,29 @@ stringData:
   username: exampleapp
   password: dev-exampleapp
 ---
+# Owner of the tenants database of Tenant Management (HAMSP-51). Only its
+# migration job uses it.
+apiVersion: v1
+kind: Secret
+metadata:
+  name: tenants-owner
+  namespace: database
+type: kubernetes.io/basic-auth
+stringData:
+  username: tenants_owner
+  password: dev-tenants-owner
+---
+# Runtime role of Tenant Management: not the owner, NOSUPERUSER, NOBYPASSRLS.
+apiVersion: v1
+kind: Secret
+metadata:
+  name: tenants-db
+  namespace: database
+type: kubernetes.io/basic-auth
+stringData:
+  username: tenants
+  password: dev-tenants
+---
 apiVersion: postgresql.cnpg.io/v1
 kind: Cluster
 metadata:
@@ -75,6 +98,24 @@ spec:
         inherit: false
         passwordSecret:
           name: exampleapp-db
+      - name: tenants_owner
+        ensure: present
+        login: true
+        superuser: false
+        createdb: false
+        createrole: false
+        passwordSecret:
+          name: tenants-owner
+      - name: tenants
+        ensure: present
+        login: true
+        superuser: false
+        bypassrls: false
+        createdb: false
+        createrole: false
+        inherit: false
+        passwordSecret:
+          name: tenants-db
       # The usage database moved to its own cluster (ADR-0008, usage-db). These
       # drop what HAMSP-26 left here on clusters created before the move.
       - name: usage_writer
@@ -150,5 +191,18 @@ metadata:
   name: main-pg-cluster-manual-backup
   namespace: database
 spec:
+  cluster:
+    name: main-pg-cluster
+---
+# The tenant registry of Tenant Management (ADR-0012), its own database in the
+# main cluster.
+apiVersion: postgresql.cnpg.io/v1
+kind: Database
+metadata:
+  name: tenants
+  namespace: database
+spec:
+  name: tenants
+  owner: tenants_owner
   cluster:
     name: main-pg-cluster

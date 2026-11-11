@@ -25,7 +25,13 @@
 # client secrets, the keys and the admin test users' passwords are
 # regenerated.
 #
-# Tenant lifecycle as a feature is HAMSP-6; this script only seeds test data.
+# For Tenant Management (HAMSP-51) it creates the project tenant-management
+# with the role tenant-manager, the admin app's client of it (Secret
+# admin/admin-tenants) and the service's own account with a new 30-day key
+# (Secret tenants/tenants-zitadel, field key.json; no personal access token).
+#
+# The tenants created here are test fixtures from before Tenant Management
+# (ADR-0012); tenants made in the admin app go through apps/tenants.
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -58,6 +64,15 @@ OLD_INSTANCE_SA="admin-app-instance"
 IAM_ADMIN="iam-admin"
 # How long a service account key lives.
 KEY_DAYS=30
+# Tenant Management (apps/tenants, HAMSP-51): its callers need the role
+# tenant-manager of this project; the admin app calls it as TM_CLIENT. The
+# service itself calls Zitadel as TM_SA.
+TM_PROJECT="tenant-management"
+TM_ROLE="tenant-manager"
+TM_CLIENT="admin-tenants-client"
+TM_SA="tenant-management"
+TM_SA_ROLE="IAM_ORG_MANAGER"
+TM_URL="http://tenants.tenants.svc:8080"
 
 # Access tokens live 60 s, so the e2e tests can prove that an expired token is
 # rejected (HAMSP-5 AC-5) without waiting hours.
@@ -393,6 +408,95 @@ drop_credentials "${iam_admin_id}" "$(jq -r .keyId <<<"${iam_admin_key}")"
 kubectl -n zitadel delete secret "${IAM_ADMIN}-pat" --ignore-not-found >/dev/null
 echo "New ${KEY_DAYS}-day key for ${IAM_ADMIN}; its other keys and tokens are deleted"
 
+# ── 8. Tenant Management: its project, its caller and its service account ─────
+
+# The project's ID is the audience of the tokens Tenant Management accepts.
+# Role assertion puts the caller's roles into its access token.
+tm_project=$(jq -nc --arg n "${TM_PROJECT}" '{name: $n, projectRoleAssertion: true}')
+tm_project_id=$(zitadel POST /management/v1/projects/_search "$(jq -nc --arg n "${TM_PROJECT}" \
+  '{queries: [{nameQuery: {name: $n, method: "TEXT_QUERY_METHOD_EQUALS"}}]}')" \
+  | jq -r '.result[0].id // empty')
+if [[ -z "${tm_project_id}" ]]; then
+  tm_project_id=$(zitadel POST /management/v1/projects "${tm_project}" | jq -r '.id')
+  echo "Created project ${TM_PROJECT} (${tm_project_id})"
+else
+  echo "Reusing project ${TM_PROJECT} (${tm_project_id})"
+fi
+role_count=$(zitadel POST "/management/v1/projects/${tm_project_id}/roles/_search" "$(jq -nc --arg r "${TM_ROLE}" \
+  '{queries: [{keyQuery: {key: $r, method: "TEXT_QUERY_METHOD_EQUALS"}}]}')" | jq '.result // [] | length')
+if [[ "${role_count}" == "0" ]]; then
+  zitadel POST "/management/v1/projects/${tm_project_id}/roles" "$(jq -nc --arg r "${TM_ROLE}" \
+    '{roleKey: $r, displayName: $r}')" >/dev/null
+  echo "  created role ${TM_ROLE}"
+fi
+
+# The admin app's client: a machine user with JWT access tokens (validated
+# locally by Tenant Management) and the role tenant-manager.
+tm_client_id=$(zitadel POST /management/v1/users/_search "$(jq -nc --arg u "${TM_CLIENT}" \
+  '{queries: [{userNameQuery: {userName: $u, method: "TEXT_QUERY_METHOD_EQUALS"}}]}')" \
+  | jq -r '.result[0].id // empty')
+if [[ -z "${tm_client_id}" ]]; then
+  tm_client_id=$(zitadel POST /management/v1/users/machine "$(jq -nc --arg u "${TM_CLIENT}" \
+    '{userName: $u, name: $u, description: "apps/admin calls Tenant Management as this user",
+      accessTokenType: "ACCESS_TOKEN_TYPE_JWT"}')" | jq -r '.userId')
+  echo "Created machine user ${TM_CLIENT} (${tm_client_id})"
+fi
+grants=$(zitadel POST /management/v1/users/grants/_search "$(jq -nc --arg u "${tm_client_id}" --arg p "${tm_project_id}" \
+  '{queries: [{userIdQuery: {userId: $u}}, {projectIdQuery: {projectId: $p}}]}')" | jq '.result // [] | length')
+if [[ "${grants}" == "0" ]]; then
+  zitadel POST "/management/v1/users/${tm_client_id}/grants" "$(jq -nc --arg p "${tm_project_id}" --arg r "${TM_ROLE}" \
+    '{projectId: $p, roleKeys: [$r]}')" >/dev/null
+  echo "  granted ${TM_ROLE} to ${TM_CLIENT}"
+fi
+tm_secret=$(zitadel PUT "/management/v1/users/${tm_client_id}/secret" '{}')
+
+# Tenant Management's own machine user, in the IAM admin's organization, with
+# the instance role IAM_ORG_MANAGER. Like the admin app (section 6) it gets a
+# new key on every run and no personal access token: the service exchanges
+# the key for short-lived access tokens.
+tm_sa_id=$(user_id "${TM_SA}")
+if [[ -z "${tm_sa_id}" ]]; then
+  tm_sa_id=$(zitadel POST /management/v1/users/machine "$(jq -nc --arg u "${TM_SA}" \
+    '{userName: $u, name: $u, description: "apps/tenants creates and deletes tenant organizations and their first admins as this user"}')" \
+    | jq -r '.userId')
+  echo "Created machine user ${TM_SA} (${tm_sa_id})"
+else
+  echo "Reusing machine user ${TM_SA} (${tm_sa_id})"
+fi
+member=$(zitadel POST /admin/v1/members/_search "$(jq -nc --arg u "${tm_sa_id}" \
+  '{queries: [{userIdQuery: {userId: $u}}]}')" | jq -c '.result[0].roles // empty | sort')
+if [[ -z "${member}" ]]; then
+  zitadel POST /admin/v1/members "$(jq -nc --arg u "${tm_sa_id}" --arg r "${TM_SA_ROLE}" \
+    '{userId: $u, roles: [$r]}')" >/dev/null
+  echo "  gave ${TM_SA} the instance role ${TM_SA_ROLE}"
+elif [[ "${member}" != "$(jq -nc --arg r "${TM_SA_ROLE}" '[$r]')" ]]; then
+  zitadel PUT "/admin/v1/members/${tm_sa_id}" "$(jq -nc --arg r "${TM_SA_ROLE}" '{roles: [$r]}')" >/dev/null
+  echo "  changed the instance roles of ${TM_SA} from ${member} to [${TM_SA_ROLE}]"
+fi
+tm_sa_key=$(new_key "${tm_sa_id}")
+drop_credentials "${tm_sa_id}" "$(jq -r .keyId <<<"${tm_sa_key}")"
+echo "  new ${KEY_DAYS}-day key for ${TM_SA}; its other keys and tokens are deleted"
+
+kubectl create namespace tenants --dry-run=client -o yaml | kubectl apply -f - >/dev/null
+# apply replaces the Secret's data, so the personal access token of before
+# goes too.
+kubectl -n tenants create secret generic tenants-zitadel --from-file=key.json=<(printf '%s' "${tm_sa_key}") \
+  --from-literal=TENANT_MANAGEMENT_AUDIENCE="${tm_project_id}" --dry-run=client -o yaml | kubectl apply -f - >/dev/null
+kubectl -n admin create secret generic admin-tenants --from-literal=TENANTS_URL="${TM_URL}" \
+  --from-literal=TENANTS_AUDIENCE="${tm_project_id}" \
+  --from-literal=TENANTS_CLIENT_ID="$(jq -r '.clientId' <<<"${tm_secret}")" \
+  --from-literal=TENANTS_CLIENT_SECRET="$(jq -r '.clientSecret' <<<"${tm_secret}")" \
+  --dry-run=client -o yaml | kubectl apply -f - >/dev/null
+for d in tenants/tenants admin/admin; do
+  if kubectl -n "${d%/*}" get deployment "${d#*/}" &>/dev/null; then
+    kubectl -n "${d%/*}" rollout restart "deployment/${d#*/}" >/dev/null
+  fi
+done
+
+tm_json=$(jq -nc --arg aud "${tm_project_id}" --arg role "${TM_ROLE}" \
+  --arg cid "$(jq -r '.clientId' <<<"${tm_secret}")" --arg cs "$(jq -r '.clientSecret' <<<"${tm_secret}")" \
+  '{audience: $aud, role: $role, client_id: $cid, client_secret: $cs}')
+
 admin_json=$(jq -nc --arg url "${ADMIN_URL}" --arg role "${ADMIN_ROLE}" --arg vrole "${VIEWER_ROLE}" \
   --arg sp "${super_admin_password}" --arg vp "${viewer_password}" --arg rp "${regular_user_password}" \
   '{url: $url, role: $role, users: [{username: "super-admin", password: $sp, roles: [$role]},
@@ -400,8 +504,8 @@ admin_json=$(jq -nc --arg url "${ADMIN_URL}" --arg role "${ADMIN_ROLE}" --arg vr
                                     {username: "regular-user", password: $rp, roles: []}]}')
 
 jq -n --arg issuer "${ISSUER}" --arg gw "${GATEWAY}" --arg aud "${project_id}" --argjson t "${tenants_json}" \
-  --argjson admin "${admin_json}" \
-  '{issuer: $issuer, gateway: $gw, audience: $aud, tenants: $t, admin: $admin}' >"${OUT}"
+  --argjson admin "${admin_json}" --argjson tm "${tm_json}" \
+  '{issuer: $issuer, gateway: $gw, audience: $aud, tenants: $t, admin: $admin, tenant_management: $tm}' >"${OUT}"
 chmod 600 "${OUT}"
 echo ""
 echo "Wrote ${OUT}. Super admin page: ${ADMIN_URL} (users: jq .admin.users ${OUT})"

@@ -6,7 +6,7 @@ import {
   type RouterHistory,
 } from '@tanstack/react-router'
 import { ApiError } from '@/api/client'
-import { meQuery, orgQuery, projectQuery, userQuery } from '@/api/queries'
+import { meQuery, orgQuery, projectQuery, tenantQuery, userQuery } from '@/api/queries'
 import { PlatformBrandingPage } from '@/routes/branding'
 import { OrgPage } from '@/routes/org'
 import { OrgsPage } from '@/routes/orgs'
@@ -15,6 +15,8 @@ import { ProjectPage } from '@/routes/project'
 import { ProjectsPage } from '@/routes/projects'
 import { RootLayout } from '@/routes/root'
 import { NotFound, PageError, PagePending, RouteError, RoutePending } from '@/routes/status'
+import { TenantPage } from '@/routes/tenant'
+import { TenantsPage } from '@/routes/tenants'
 import { UserPage } from '@/routes/user'
 import { UsersPage } from '@/routes/users'
 
@@ -59,6 +61,7 @@ export type UsersSearch = {
   offset?: number
 }
 export type ProjectsSearch = { q?: string; org?: string; offset?: number }
+export type TenantsSearch = { deleted?: boolean }
 export const orgTabs = ['overview', 'branding'] as const
 export type OrgSearch = { tab?: (typeof orgTabs)[number] }
 const orgTab = oneOf(...orgTabs)
@@ -77,6 +80,22 @@ const overviewRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/',
   component: OverviewPage,
+})
+
+const tenantsRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/tenants',
+  validateSearch: (search: Record<string, unknown>): TenantsSearch => ({
+    deleted: search.deleted === true || search.deleted === 'true' ? true : undefined,
+  }),
+  component: TenantsPage,
+})
+
+const tenantRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/tenants/$tenantId',
+  loader: ({ context, params }) => context.queryClient.ensureQueryData(tenantQuery(params.tenantId)),
+  component: TenantPage,
 })
 
 const orgsRoute = createRoute({
@@ -144,6 +163,8 @@ const platformBrandingRoute = createRoute({
 
 export const routeTree = rootRoute.addChildren([
   overviewRoute,
+  tenantsRoute,
+  tenantRoute,
   orgsRoute,
   orgRoute,
   usersRoute,
