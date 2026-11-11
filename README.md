@@ -17,6 +17,7 @@ For specific design justifications, performance baselines, and cost optimization
 * [ADR-0001: System Boundaries & Multi-Tenant Core Components](./docs/adr/0001-system-boundaries.md)
 * [ADR-0002: Data Isolation Strategy for Multi-Tenant Architecture](./docs/adr/0002-data-isolation-strategy.md)
 * [ADR-0003: Auth Service Implementation (Zitadel)](./docs/adr/0003-auth-service-implementation.md)
+* [ADR-0004: API Gateway as a Go service behind Cilium Gateway API](./docs/adr/0004-api-gateway-go-service.md)
 
 ---
 
@@ -34,6 +35,16 @@ Architectural changes must be peer-reviewed via the `adr-tools` standard before 
 * **Supersede an existing policy:** `adr new -supersedes 0004 "Migrating Framework"`
 
 ## Setup
+
+### Pre-commit checks
+`lefthook.yml` checks staged files before each commit: Go formatting and lint (the shared `.golangci.yml`), oxlint and `tsc` for the admin SPA, and gitleaks for secrets. CI runs the same linters (`.github/workflows/lint.yml`, `admin.yml`).
+
+* brew install lefthook golangci-lint gitleaks
+* lefthook install
+
+Claude Code has its own step before every `git commit` (`.claude/hooks/pre-commit.sh`): it formats the fully staged Go files, stages them, runs the same lefthook checks and blocks the commit if one fails; `--no-verify` is refused.
+
+A `//nolint` names the linter and the reason: `//nolint:gosec // G704: configured base URL`. A fake secret in a test is marked with a `// gitleaks:allow` comment on its line.
 
 ### Terraform
 * terraform init

@@ -1,0 +1,53 @@
+name: tenants
+
+on:
+  pull_request:
+    paths:
+      - "apps/tenants/**"
+      - ".github/workflows/tenants.yml"
+  push:
+    branches: [master]
+    paths:
+      - "apps/tenants/**"
+      - ".github/workflows/tenants.yml"
+
+jobs:
+  test:
+    # Tenant Management (HAMSP-51, ADR-0012): the store tests apply the
+    # migrations to a clean PostgreSQL and check the RLS guardrail with its
+    # platform-table list; the other tests run against fake Zitadel and
+    # Kubernetes APIs.
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      TEST_DATABASE_URL: postgres://postgres:postgres@localhost:5432/postgres?sslmode=disable
+    defaults:
+      run:
+        # An explicit bash shell adds -o pipefail, so `go test | tee` fails on test failures.
+        shell: bash
+        working-directory: apps/tenants
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: apps/tenants/go.mod
+          cache-dependency-path: apps/tenants/go.sum
+      - run: go vet ./...
+      - name: Fuzz the create request decoder (T-11)
+        run: go test -run '^$' -fuzz FuzzDecodeCreate -fuzztime 30s ./api/
+      - name: Build for arm64 (C-06)
+        run: CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -o /dev/null .
+      # -count=1 disables the test cache; a skipped DB test must not pass silently.
+      - run: go test -count=1 -v ./... 2>&1 | tee test.log
+      - name: Fail if database tests were skipped
+        run: "! grep -q -- '--- SKIP' test.log"

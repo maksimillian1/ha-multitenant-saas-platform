@@ -1,0 +1,9 @@
+feature: gateway-tenant-header
+title: The x-tenant-id header the API Gateway sets for services behind it
+critical: true
+code:
+  - apps/gateway/proxy/**
+  - docs/contracts/gateway-headers.md
+c4: [apiGateway]
+links:
+  issues: [HAMSP-23]

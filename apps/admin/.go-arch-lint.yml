@@ -1,0 +1,22 @@
+# Components of the admin BFF and the imports allowed between them.
+# c4sync draws these components; the allowed edges are refined in HAMSP-70.
+version: 3
+workdir: .
+allow:
+  depOnAnyVendor: true
+excludeFiles:
+  - "^.*_test\\.go$"
+components:
+  main:    { in: . }
+  api:     { in: api }
+  auth:    { in: auth }
+  ui:      { in: ui }
+  zitadel: { in: zitadel }
+  tenants: { in: tenants }
+  health:  { in: health }
+  core:    { in: core }
+deps:
+  main: { anyProjectDeps: true }
+  api:  { mayDependOn: [core, zitadel, tenants] }
+  auth: { mayDependOn: [core] }
+  ui:   { mayDependOn: [core, auth] }   # auth: injected in main (deepScan)

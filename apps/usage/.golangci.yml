@@ -1,0 +1,63 @@
+# Import boundaries between the three binaries of apps/usage (README.md).
+# depguard sees the direct imports of each file; scripts/check-linked-deps.sh
+# checks what each binary links through other packages.
+version: "2"
+linters:
+  default: none
+  enable: [depguard]
+  settings:
+    depguard:
+      rules:
+        # core is in every binary: anything it imports is linked everywhere.
+        core-stdlib-only:
+          list-mode: strict
+          files: ["**/internal/core/**", "!$test"]
+          allow: ["$gostd", "github.com/google/uuid"]
+        writeapi-no-db:
+          files:
+            - "**/cmd/writeapi/**"
+            - "**/internal/writeapi/**"
+            - "**/internal/kafka/**"
+            - "**/internal/health/**"
+            - "**/internal/httpx/**"
+          deny:
+            - pkg: "github.com/jackc/pgx"
+              desc: "edge-facing code must not link the database driver"
+            - pkg: "github.com/maksimillian1/ha-multitenant-saas-platform/apps/usage/internal/store"
+              desc: "only writer owns the store"
+            - pkg: "github.com/maksimillian1/ha-multitenant-saas-platform/apps/usage/internal/writer"
+              desc: "the consumer loop belongs to writer"
+            - pkg: "github.com/maksimillian1/ha-multitenant-saas-platform/apps/usage/internal/migrations"
+              desc: "only migrate applies the schema"
+            - pkg: "github.com/maksimillian1/ha-multitenant-saas-platform/apps/usage/internal/testpg"
+              desc: "test helper, links pgx"
+        # Store tests use testpg and the migrations' isolation check, hence !$test.
+        writer-no-edge:
+          files: ["**/cmd/writer/**", "**/internal/writer/**", "**/internal/store/**", "!$test"]
+          deny:
+            - pkg: "github.com/maksimillian1/ha-multitenant-saas-platform/apps/usage/internal/writeapi"
+              desc: "writer must not contain the HTTP ingestion code"
+            - pkg: "github.com/maksimillian1/ha-multitenant-saas-platform/apps/usage/internal/migrations"
+              desc: "schema changes run only in the migrate Job"
+            - pkg: "github.com/maksimillian1/ha-multitenant-saas-platform/apps/usage/internal/testpg"
+              desc: "test helper"
+        store-no-kafka:
+          files: ["**/internal/store/**"]
+          deny:
+            - pkg: "github.com/twmb/franz-go"
+              desc: "the store knows only the database"
+            - pkg: "github.com/maksimillian1/ha-multitenant-saas-platform/apps/usage/internal/kafka"
+              desc: "the store knows only the database"
+        migrate-schema-only:
+          files: ["**/cmd/migrate/**", "**/internal/migrations/**"]
+          deny:
+            - pkg: "github.com/twmb/franz-go"
+              desc: "migrate has no Kafka access"
+            - pkg: "github.com/maksimillian1/ha-multitenant-saas-platform/apps/usage/internal/kafka"
+              desc: "migrate has no Kafka access"
+            - pkg: "github.com/maksimillian1/ha-multitenant-saas-platform/apps/usage/internal/writeapi"
+              desc: "migrate only applies the schema"
+            - pkg: "github.com/maksimillian1/ha-multitenant-saas-platform/apps/usage/internal/writer"
+              desc: "migrate only applies the schema"
+            - pkg: "github.com/maksimillian1/ha-multitenant-saas-platform/apps/usage/internal/store"
+              desc: "migrate only applies the schema"

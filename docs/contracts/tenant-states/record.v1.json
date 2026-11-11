@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "tenant-states record value v1",
+  "description": "The value of one record in topic tenant-states, written by Tenant Management. Key: tenant_id as UTF-8 bytes. The examples are what Tenant Management's and the API Gateway's tests run against (README.md).",
+  "type": "object",
+  "required": ["tenant_id", "state", "at"],
+  "additionalProperties": false,
+  "properties": {
+    "tenant_id": {"type": "string", "pattern": "^[A-Za-z0-9_-]{1,64}$", "description": "Zitadel Organization ID of the tenant; equals the record key."},
+    "state": {"enum": ["provisioning", "active", "suspended", "deleting", "deleted"], "description": "The tenant's state in Tenant Management (ADR-0012, item 3)."},
+    "at": {"type": "string", "format": "date-time", "description": "When Tenant Management published the record, UTC."}
+  },
+  "examples": [
+    {"tenant_id": "396438053259838069", "state": "active", "at": "2026-11-11T17:02:11.482Z"},
+    {"tenant_id": "396438053259838069", "state": "suspended", "at": "2026-11-11T17:05:40.019Z"},
+    {"tenant_id": "396438053259838070", "state": "deleting", "at": "2026-11-11T17:06:00Z"},
+    {"tenant_id": "396438053259838071", "state": "deleted", "at": "2026-11-11T17:06:02Z"},
+    {"tenant_id": "396438053259838072", "state": "provisioning", "at": "2026-11-11T17:07:00Z"}
+  ]
+}

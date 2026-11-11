@@ -1,0 +1,54 @@
+# Shared lint rules for every Go module under apps/ (HAMSP-40).
+# Run from a module directory with an explicit config, because golangci-lint
+# would otherwise pick up the nearest .golangci.yml (apps/usage has its own,
+# for the depguard boundaries):
+#
+#   golangci-lint run --config ../../.golangci.yml ./...
+version: "2"
+
+linters:
+  default: none
+  enable:
+    - errcheck
+    - staticcheck
+    - govet
+    - gosec
+    - bodyclose
+    - sqlclosecheck
+    - contextcheck
+    - errorlint
+    - exhaustive
+    - nolintlint
+  settings:
+    nolintlint:
+      # Every //nolint names the linter and says why: //nolint:gosec // reason
+      require-specific: true
+      require-explanation: true
+      allow-unused: false
+    exhaustive:
+      # A switch with a default case is exhaustive on purpose.
+      default-signifies-exhaustive: true
+    gosec:
+      excludes:
+        # Unhandled errors: errcheck owns this rule. G104 repeats it without
+        # errcheck's exclusions (deferred Close and the like).
+        - G104
+  exclusions:
+    generated: strict
+    presets:
+      - std-error-handling
+    rules:
+      # Tests use fake tokens, plain cookies, and requests to the httptest
+      # servers they start themselves.
+      - path: _test\.go
+        linters: [gosec]
+        text: "G101|G124|G704|G705"
+
+formatters:
+  enable:
+    - gofmt
+    - goimports
+
+issues:
+  max-issues-per-linter: 0
+  max-same-issues: 0

@@ -1,0 +1,9 @@
+feature: admin-auth
+title: Admin app sign-in, session and CSRF protection
+critical: true
+code:
+  - apps/admin/auth/**
+  - apps/admin/api/guard.go
+c4: [adminPortal]
+links:
+  issues: [HAMSP-23]

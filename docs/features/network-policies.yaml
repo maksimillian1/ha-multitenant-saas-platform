@@ -1,0 +1,7 @@
+feature: network-policies
+title: Cilium network policies that admit only the expected callers
+critical: true
+code:
+  - prototype/k8s/apps/*/network-policy.yaml
+links:
+  issues: [HAMSP-23]

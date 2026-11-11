@@ -1,0 +1,43 @@
+name: contracts
+
+on:
+  pull_request:
+    paths:
+      - "docs/contracts/usage-event/**"
+      - "prototype/k8s/apps/gateway/api-gateway.yaml"
+      - ".github/contract-check/**"
+      - ".github/workflows/contracts.yml"
+  push:
+    branches: [master]
+    paths:
+      - "docs/contracts/usage-event/**"
+      - "prototype/k8s/apps/gateway/api-gateway.yaml"
+      - ".github/contract-check/**"
+      - ".github/workflows/contracts.yml"
+
+jobs:
+  usage-event:
+    # The OpenAPI and JSON Schemas of usage events, their examples, the version
+    # matrix of participants.json, breaking changes and immutable versions
+    # (ADR-0010). The Go tests against the same examples run in gateway.yml and
+    # usage.yml. jq is preinstalled on ubuntu-latest.
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # the base branch, for oasdiff and the immutability check
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.26"
+          cache: false
+      - run: go install github.com/santhosh-tekuri/jsonschema/cmd/jv@v0.7.0
+      - run: go install github.com/oasdiff/oasdiff@v1.34.1
+      - name: Check against the base branch
+        if: github.event_name == 'pull_request'
+        run: .github/contract-check/usage-event.sh "origin/${{ github.base_ref }}"
+      - name: Check
+        if: github.event_name != 'pull_request'
+        run: .github/contract-check/usage-event.sh
