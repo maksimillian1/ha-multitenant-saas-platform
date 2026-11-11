@@ -40,6 +40,9 @@ spec:
             - name: AUDIENCE
               valueFrom:
                 configMapKeyRef: {name: api-gateway-audience, key: audience}
+            - name: ZITADEL_ADMIN_ORG_ID
+              valueFrom:
+                configMapKeyRef: {name: api-gateway-audience, key: zitadel_admin_org}
             - name: ROUTES
               value: /items=http://exampleapp.exampleapp.svc:8080
             # Every API call becomes a usage event (HAMSP-26).

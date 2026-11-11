@@ -5,4 +5,10 @@ code:
   - apps/gateway/auth/**
 c4: [apiGateway]
 links:
-  issues: [HAMSP-23]
+  issues: [HAMSP-23, HAMSP-24]
+
+acceptance:
+  AC-1:
+    text: A valid token for the platform API whose user belongs to the Zitadel admin organization (root and IAM admins, the platform's machine users) gets 401 at the API Gateway; a tenant organization's token still passes.
+    level: unit
+    planned: apps/gateway/auth/auth_test.go:TestZitadelAdminOrgIsNotATenant
