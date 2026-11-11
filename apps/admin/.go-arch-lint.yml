@@ -12,10 +12,11 @@ components:
   auth:    { in: auth }
   ui:      { in: ui }
   zitadel: { in: zitadel }
+  tenants: { in: tenants }
   health:  { in: health }
   core:    { in: core }
 deps:
   main: { anyProjectDeps: true }
-  api:  { mayDependOn: [core, zitadel] }
+  api:  { mayDependOn: [core, zitadel, tenants] }
   auth: { mayDependOn: [core] }
   ui:   { mayDependOn: [core, auth] }   # auth: injected in main (deepScan)
