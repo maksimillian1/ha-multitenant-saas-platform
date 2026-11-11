@@ -40,12 +40,9 @@ spec:
             - name: AUDIENCE
               valueFrom:
                 configMapKeyRef: {name: api-gateway-audience, key: audience}
-            # The platform's own Zitadel organization (root and IAM admins,
-            # machine users). Its tokens are not a tenant's and get 401
-            # (HAMSP-24). Written by the same bootstrap step.
-            - name: PLATFORM_ORG_ID
+            - name: ZITADEL_ADMIN_ORG_ID
               valueFrom:
-                configMapKeyRef: {name: api-gateway-audience, key: platform_org}
+                configMapKeyRef: {name: api-gateway-audience, key: zitadel_admin_org}
             - name: ROUTES
               value: /items=http://exampleapp.exampleapp.svc:8080
             # Every API call becomes a usage event (HAMSP-26).

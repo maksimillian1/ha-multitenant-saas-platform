@@ -73,7 +73,7 @@ func bootstrapServices(cfg core.Config, log *slog.Logger) (*proxy.Service, *usag
 	if err != nil {
 		return nil, nil, nil, err
 	}
-	verifier := auth.NewVerifier(cfg.Issuer, cfg.Audience, cfg.PlatformOrg, cfg.JWKSURL, issuerClient)
+	verifier := auth.NewVerifier(cfg.Issuer, cfg.Audience, cfg.ZitadelAdminOrg, cfg.JWKSURL, issuerClient)
 
 	var reporter core.UsageReporter
 	var usageService *usage.Service

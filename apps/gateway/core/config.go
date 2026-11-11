@@ -12,7 +12,7 @@ type Config struct {
 	MetricsAddr     string
 	Issuer          string
 	Audience        string
-	PlatformOrg     string
+	ZitadelAdminOrg string
 	JWKSURL         string
 	IssuerDialAddr  string
 	Routes          string
@@ -35,7 +35,7 @@ func LoadConfig() Config {
 		MetricsAddr:     GetEnv("METRICS_ADDR", ":9090"),
 		Issuer:          issuer,
 		Audience:        GetEnv("AUDIENCE", ""),
-		PlatformOrg:     GetEnv("PLATFORM_ORG_ID", ""),
+		ZitadelAdminOrg: GetEnv("ZITADEL_ADMIN_ORG_ID", ""),
 		JWKSURL:         GetEnv("JWKS_URL", issuer+"/oauth/v2/keys"),
 		IssuerDialAddr:  GetEnv("ISSUER_DIAL_ADDR", ""),
 		Routes:          GetEnv("ROUTES", ""),
@@ -45,7 +45,7 @@ func LoadConfig() Config {
 }
 
 func (c Config) Validate() error {
-	for _, setting := range [][2]string{{"ISSUER", c.Issuer}, {"AUDIENCE", c.Audience}, {"PLATFORM_ORG_ID", c.PlatformOrg}} {
+	for _, setting := range [][2]string{{"ISSUER", c.Issuer}, {"AUDIENCE", c.Audience}, {"ZITADEL_ADMIN_ORG_ID", c.ZitadelAdminOrg}} {
 		if setting[1] == "" {
 			return fmt.Errorf("%s is required", setting[0])
 		}
