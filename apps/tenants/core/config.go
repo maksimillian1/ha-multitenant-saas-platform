@@ -3,6 +3,7 @@ package core
 import (
 	"fmt"
 	"os"
+	"strings"
 	"time"
 )
 
@@ -32,6 +33,11 @@ type Config struct {
 
 	// StepTimeout bounds one call to Zitadel or Kubernetes.
 	StepTimeout time.Duration
+
+	// KafkaBrokers and TenantStates: where every tenant's state is published
+	// for the API Gateway (ADR-0012, item 5).
+	KafkaBrokers []string
+	TenantStates string
 }
 
 func GetEnv(key, defaultVal string) string {
@@ -59,6 +65,8 @@ func LoadConfig() Config {
 		QuotaMemory:        GetEnv("TENANT_QUOTA_MEMORY", "8Gi"),
 		QuotaPods:          GetEnv("TENANT_QUOTA_PODS", "20"),
 		StepTimeout:        timeout,
+		KafkaBrokers:       splitList(GetEnv("KAFKA_BROKERS", "")),
+		TenantStates:       GetEnv("TENANT_STATES_TOPIC", "tenant-states"),
 	}
 }
 
@@ -69,4 +77,14 @@ func Required(pairs ...string) error {
 		}
 	}
 	return nil
+}
+
+func splitList(s string) []string {
+	var out []string
+	for _, p := range strings.Split(s, ",") {
+		if p = strings.TrimSpace(p); p != "" {
+			out = append(out, p)
+		}
+	}
+	return out
 }

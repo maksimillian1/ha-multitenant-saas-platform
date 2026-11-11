@@ -314,3 +314,28 @@ func TestNameTakenCreatesNothing(t *testing.T) {
 		t.Fatalf("a refused create called %v", got)
 	}
 }
+
+// Verifies: tenant-management AC-18
+func TestEveryOperationPublishesTheState(t *testing.T) {
+	s, _ := newService(t)
+	var got []string
+	s.Published = func(_ context.Context, t core.Tenant) { got = append(got, t.ID+" "+string(t.State)) }
+
+	a := mustCreate(t, s, "acme")
+	if _, err := s.Suspend(ctx, a.ID, "admin-1"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.Resume(ctx, a.ID, "admin-1"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.Suspend(ctx, a.ID, "admin-1"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.Delete(ctx, a.ID, "admin-1"); err != nil {
+		t.Fatal(err)
+	}
+	want := []string{a.ID + " active", a.ID + " suspended", a.ID + " active", a.ID + " suspended", a.ID + " deleted"}
+	if !slices.Equal(got, want) {
+		t.Fatalf("published %v, want %v", got, want)
+	}
+}
