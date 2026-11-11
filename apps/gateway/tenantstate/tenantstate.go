@@ -19,7 +19,12 @@ type Event struct {
 	State    string `json:"state"`
 }
 
-var blocked = map[string]bool{"suspended": true, "deleting": true, "deleted": true}
+// blocked holds every state of docs/contracts/tenant-states; true blocks.
+// A state not listed is ignored, so the tenant keeps its earlier state.
+var blocked = map[string]bool{
+	"provisioning": false, "active": false,
+	"suspended": true, "deleting": true, "deleted": true,
+}
 
 type States struct {
 	mu      sync.RWMutex
@@ -37,9 +42,13 @@ func (s *States) Blocked(tenant string) bool {
 }
 
 func (s *States) apply(e Event) {
+	block, known := blocked[e.State]
+	if !known {
+		return
+	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	if blocked[e.State] {
+	if block {
 		s.blocked[e.TenantID] = true
 	} else {
 		delete(s.blocked, e.TenantID)
