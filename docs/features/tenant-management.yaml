@@ -10,7 +10,7 @@ code:
   - .github/workflows/tenants.yml
 c4: [tenantMgmt, adminPortal, authService]
 links:
-  issues: [HAMSP-51, HAMSP-6]
+  issues: [HAMSP-51, HAMSP-6, HAMSP-52]
 requirements: [FR-01, QS-02, QS-18, C-03, C-04, C-06]
 
 acceptance:
@@ -121,6 +121,14 @@ acceptance:
       - apps/tenants/zitadel/token_test.go:TestShortTokenRenewedBeforeExpiry
       - apps/tenants/zitadel/key_test.go:TestLoadKeyRejectsMissingOrInvalid
       - prototype/e2e/tenants_test.go:TestTenantManagementHasOnlyShortKey
+  AC-17:
+    text: "After POST /tenants/{id}/suspend, requests with a token issued before the suspension get 403 at the API Gateway within 10 s, and the tenant's users get no new tokens; after resume a new token is accepted again."
+    level: e2e
+    planned: prototype/e2e/tenants_test.go:TestSuspendedTenantLosesAPIAccess
+  AC-18:
+    text: "Every operation and a resync once a minute publish {tenant_id, state, at} to the compacted Kafka topic tenant-states, keyed by tenant_id. A failed publish is logged, never fails the request and never blocks it longer than 5 s."
+    level: unit
+    planned: apps/tenants/events/events_test.go:TestStateChangesArePublished
 
 checklist:
   T-01:

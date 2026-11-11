@@ -3,12 +3,17 @@ title: JWT validation and tenant context in the API Gateway
 critical: true
 code:
   - apps/gateway/auth/**
+  - apps/gateway/tenantstate/**
 c4: [apiGateway]
 links:
-  issues: [HAMSP-23, HAMSP-24]
+  issues: [HAMSP-23, HAMSP-24, HAMSP-52]
 
 acceptance:
   AC-1:
     text: A valid token for the platform API whose user belongs to the Zitadel admin organization (root and IAM admins, the platform's machine users) gets 401 at the API Gateway; a tenant organization's token still passes.
     level: unit
     planned: apps/gateway/auth/auth_test.go:TestZitadelAdminOrgIsNotATenant
+  AC-2:
+    text: The API Gateway reads the topic tenant-states and answers 403 to a tenant whose latest state is suspended, deleting or deleted; an active or unknown tenant passes, and while Kafka is down the last state read stays.
+    level: unit
+    planned: apps/gateway/tenantstate/tenantstate_test.go:TestSuspendedTenantIsBlocked
