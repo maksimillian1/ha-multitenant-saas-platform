@@ -42,11 +42,11 @@ pre-commit:
     - name: spa-oxlint
       root: apps/admin/ui/app/
       glob: "*.{ts,tsx}"
-      run: npx --no-install oxlint {staged_files}
+      run: ./node.sh npx --no-install oxlint {staged_files}
     - name: spa-tsc
       root: apps/admin/ui/app/
       glob: "*.{ts,tsx}"
-      run: npx --no-install tsc -b --noEmit
+      run: ./node.sh npx --no-install tsc -b --noEmit
 
     - name: gitleaks
       run: gitleaks git --staged --redact --no-banner
