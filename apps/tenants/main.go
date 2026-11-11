@@ -19,6 +19,7 @@ import (
 	"github.com/maksimillian1/ha-multitenant-saas-platform/apps/tenants/api"
 	"github.com/maksimillian1/ha-multitenant-saas-platform/apps/tenants/auth"
 	"github.com/maksimillian1/ha-multitenant-saas-platform/apps/tenants/core"
+	"github.com/maksimillian1/ha-multitenant-saas-platform/apps/tenants/events"
 	"github.com/maksimillian1/ha-multitenant-saas-platform/apps/tenants/health"
 	"github.com/maksimillian1/ha-multitenant-saas-platform/apps/tenants/kube"
 	"github.com/maksimillian1/ha-multitenant-saas-platform/apps/tenants/lifecycle"
@@ -56,6 +57,7 @@ func serve(ctx context.Context, cfg core.Config, log *slog.Logger) error {
 		"DATABASE_URL", cfg.DatabaseURL,
 		"ZITADEL_ISSUER", cfg.Issuer,
 		"TENANT_MANAGEMENT_AUDIENCE", cfg.Audience,
+		"KAFKA_BROKERS", strings.Join(cfg.KafkaBrokers, ","),
 	); err != nil {
 		return err
 	}
@@ -86,6 +88,14 @@ func serve(ctx context.Context, cfg core.Config, log *slog.Logger) error {
 
 	tenants := lifecycle.NewService(st, zitadelClient, kubeClient, log, core.NewID)
 	tenants.StepTimeout = cfg.StepTimeout
+
+	publisher, err := events.NewPublisher(cfg.KafkaBrokers, cfg.TenantStates, log)
+	if err != nil {
+		return err
+	}
+	defer publisher.Close()
+	tenants.Published = publisher.Publish
+	go publisher.Run(ctx, time.Minute, func(ctx context.Context) ([]core.Tenant, error) { return st.List(ctx, true) })
 
 	mux := http.NewServeMux()
 	healthService := health.NewService(st.Ping)

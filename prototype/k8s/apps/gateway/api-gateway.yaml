@@ -45,6 +45,9 @@ spec:
                 configMapKeyRef: {name: api-gateway-audience, key: zitadel_admin_org}
             - name: ROUTES
               value: /items=http://exampleapp.exampleapp.svc:8080
+            # Suspended tenants are read from the topic tenant-states (HAMSP-52).
+            - name: KAFKA_BROKERS
+              value: usage-kafka-kafka-bootstrap.kafka.svc:9092
             # Every API call becomes a usage event (HAMSP-26).
             - name: USAGE_URL
               value: http://usage-writeapi.usage.svc:8080/v1/events

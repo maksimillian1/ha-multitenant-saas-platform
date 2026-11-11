@@ -38,6 +38,9 @@ spec:
             - name: http
               containerPort: 8080
           env:
+            # Every tenant's state goes to the topic tenant-states (HAMSP-52).
+            - name: KAFKA_BROKERS
+              value: usage-kafka-kafka-bootstrap.kafka.svc:9092
             - name: DATABASE_URL
               valueFrom:
                 secretKeyRef:

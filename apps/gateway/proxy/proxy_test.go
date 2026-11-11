@@ -13,6 +13,7 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/maksimillian1/ha-multitenant-saas-platform/apps/gateway/auth"
 	"github.com/maksimillian1/ha-multitenant-saas-platform/apps/gateway/core"
 )
 
@@ -20,6 +21,9 @@ import (
 type fakeAuth struct{}
 
 func (fakeAuth) Tenant(_ context.Context, token string) (string, error) {
+	if token == "token-suspended" {
+		return "", auth.ErrTenantBlocked
+	}
 	tenant, ok := strings.CutPrefix(token, "token-")
 	if !ok {
 		return "", errors.New("bad token")
@@ -225,5 +229,14 @@ func TestRejectedRequestsAreNotReported(t *testing.T) {
 	}
 	if len(rep.events) != 0 {
 		t.Fatalf("rejected requests produced usage events: %+v", rep.events)
+	}
+}
+
+// Verifies: gateway-auth AC-2
+func TestBlockedTenantGets403(t *testing.T) {
+	g, items, _ := newGateway(t)
+	rec := send(g, "/items", "Bearer token-suspended")
+	if rec.Code != http.StatusForbidden || items.calls != 0 {
+		t.Fatalf("status %d, upstream calls %d; want 403 and none", rec.Code, items.calls)
 	}
 }

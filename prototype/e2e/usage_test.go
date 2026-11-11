@@ -379,8 +379,8 @@ if curl -s -m 5 -o /dev/null http://usage-writeapi.usage.svc:8080/healthz; then 
 	}
 }
 
-// AC-8: only UsageWriteAPI and Usage Writer can connect to the Kafka client
-// listener. The control pod carries Usage Writer's label and gets through.
+// AC-8: only UsageWriteAPI, Usage Writer, the API Gateway and Tenant
+// Management can connect to the Kafka client listener. The control pod carries Usage Writer's label and gets through.
 func TestDirectAccessToKafkaIsBlocked(t *testing.T) {
 	// time_connect is 0 when the TCP connection was never established.
 	script := `curl -s -m 8 --connect-timeout 4 -o /dev/null -w 'connect=%{time_connect}' telnet://usage-kafka-kafka-bootstrap.kafka.svc:9092 </dev/null; true`
@@ -392,7 +392,9 @@ func TestDirectAccessToKafkaIsBlocked(t *testing.T) {
 	if out := directAccess(t, "usage", "app.kubernetes.io/name=usage-writer", script); !connected(out) {
 		t.Fatalf("a pod with Usage Writer's label could not connect, so the check proves nothing: %q", out)
 	}
-	for _, ns := range []string{"default", "usage"} {
+	// The Gateway and Tenant Management reach it only from their own pods
+	// (HAMSP-52), not from any pod of their namespace.
+	for _, ns := range []string{"default", "usage", "gateway", "tenants"} {
 		if out := directAccess(t, ns, "", script); connected(out) {
 			t.Fatalf("pod in %s connected to Kafka: %q", ns, out)
 		}

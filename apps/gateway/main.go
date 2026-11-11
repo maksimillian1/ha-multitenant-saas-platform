@@ -16,6 +16,7 @@ import (
 	"github.com/maksimillian1/ha-multitenant-saas-platform/apps/gateway/core"
 	"github.com/maksimillian1/ha-multitenant-saas-platform/apps/gateway/health"
 	"github.com/maksimillian1/ha-multitenant-saas-platform/apps/gateway/proxy"
+	"github.com/maksimillian1/ha-multitenant-saas-platform/apps/gateway/tenantstate"
 	"github.com/maksimillian1/ha-multitenant-saas-platform/apps/gateway/usage"
 )
 
@@ -25,7 +26,7 @@ func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 
-	proxyService, usageService, healthService, err := bootstrapServices(cfg, log)
+	proxyService, usageService, healthService, err := bootstrapServices(ctx, cfg, log)
 	if err != nil {
 		log.Error("bootstrap failed", "err", err)
 		os.Exit(1)
@@ -61,7 +62,7 @@ func main() {
 }
 
 // bootstrapServices returns a nil usage service when USAGE_URL is not set.
-func bootstrapServices(cfg core.Config, log *slog.Logger) (*proxy.Service, *usage.Service, *health.Service, error) {
+func bootstrapServices(ctx context.Context, cfg core.Config, log *slog.Logger) (*proxy.Service, *usage.Service, *health.Service, error) {
 	if err := cfg.Validate(); err != nil {
 		return nil, nil, nil, err
 	}
@@ -74,6 +75,13 @@ func bootstrapServices(cfg core.Config, log *slog.Logger) (*proxy.Service, *usag
 		return nil, nil, nil, err
 	}
 	verifier := auth.NewVerifier(cfg.Issuer, cfg.Audience, cfg.ZitadelAdminOrg, cfg.JWKSURL, issuerClient)
+	states := tenantstate.New()
+	verifier.Blocked = states.Blocked
+	go func() {
+		if err := states.Follow(ctx, cfg.KafkaBrokers, cfg.TenantStates, log); err != nil && ctx.Err() == nil {
+			log.Error("tenant-states follower stopped", "err", err)
+		}
+	}()
 
 	var reporter core.UsageReporter
 	var usageService *usage.Service
