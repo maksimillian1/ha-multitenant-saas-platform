@@ -30,6 +30,8 @@ spec:
           env:
             - name: KAFKA_BROKERS
               value: usage-kafka-kafka-bootstrap.kafka.svc:9092
+          envFrom:
+            - secretRef: {name: usage-writeapi-kafka}
           readinessProbe:
             httpGet: {path: /readyz, port: http}
             periodSeconds: 5

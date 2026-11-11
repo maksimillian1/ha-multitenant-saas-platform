@@ -43,7 +43,11 @@ func run(ctx context.Context, cfg core.Config, log *slog.Logger) error {
 		return err
 	}
 	defer st.Close()
-	consumer, err := kafka.NewConsumer(brokers, cfg.KafkaTopic, cfg.KafkaGroup)
+	auth, err := kafka.SCRAM(cfg.KafkaUsername, cfg.KafkaPassword)
+	if err != nil {
+		return err
+	}
+	consumer, err := kafka.NewConsumer(brokers, cfg.KafkaTopic, cfg.KafkaGroup, auth...)
 	if err != nil {
 		return err
 	}

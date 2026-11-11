@@ -77,8 +77,12 @@ func bootstrapServices(ctx context.Context, cfg core.Config, log *slog.Logger) (
 	verifier := auth.NewVerifier(cfg.Issuer, cfg.Audience, cfg.ZitadelAdminOrg, cfg.JWKSURL, issuerClient)
 	states := tenantstate.New()
 	verifier.Blocked = states.Blocked
+	kafkaAuth, err := tenantstate.KafkaSCRAM(cfg.KafkaUsername, cfg.KafkaPassword)
+	if err != nil {
+		return nil, nil, nil, err
+	}
 	go func() {
-		if err := states.Follow(ctx, cfg.KafkaBrokers, cfg.TenantStates, log); err != nil && ctx.Err() == nil {
+		if err := states.Follow(ctx, cfg.KafkaBrokers, cfg.TenantStates, log, kafkaAuth...); err != nil && ctx.Err() == nil {
 			log.Error("tenant-states follower stopped", "err", err)
 		}
 	}()

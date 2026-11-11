@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/twmb/franz-go/pkg/kgo"
+	"github.com/twmb/franz-go/pkg/sasl/scram"
 
 	"github.com/maksimillian1/ha-multitenant-saas-platform/apps/usage/internal/core"
 )
@@ -68,6 +69,21 @@ func NewConsumer(brokers []string, topic, group string, extra ...kgo.Opt) (*kgo.
 		kgo.ConsumeResetOffset(kgo.NewOffset().AtStart()),
 	}, extra...)
 	return kgo.NewClient(opts...)
+}
+
+// SCRAM authenticates the client as its own KafkaUser with SCRAM-SHA-512
+// (HAMSP-31): the brokers' ACLs then decide what that identity may do. No
+// username means no authentication, for local tests against kfake; a username
+// without a password is a configuration error.
+func SCRAM(username, password string) ([]kgo.Opt, error) {
+	if username == "" {
+		return nil, nil
+	}
+	if password == "" {
+		return nil, errors.New("KAFKA_PASSWORD is required when KAFKA_USERNAME is set")
+	}
+	auth := scram.Auth{User: username, Pass: password}
+	return []kgo.Opt{kgo.SASL(auth.AsSha512Mechanism())}, nil
 }
 
 // Encode is the value of e's Kafka record in the current schema version.

@@ -11,6 +11,8 @@ type Config struct {
 	KafkaBrokers       string
 	KafkaTopic         string
 	KafkaGroup         string
+	KafkaUsername      string
+	KafkaPassword      string
 	DatabaseURL        string
 	MigrateDatabaseURL string
 }
@@ -28,6 +30,8 @@ func LoadConfig() Config {
 		KafkaBrokers:       GetEnv("KAFKA_BROKERS", ""),
 		KafkaTopic:         GetEnv("KAFKA_TOPIC", "usage-events"),
 		KafkaGroup:         GetEnv("KAFKA_GROUP", "usage-writer"),
+		KafkaUsername:      GetEnv("KAFKA_USERNAME", ""),
+		KafkaPassword:      GetEnv("KAFKA_PASSWORD", ""),
 		DatabaseURL:        GetEnv("DATABASE_URL", ""),
 		MigrateDatabaseURL: GetEnv("MIGRATE_DATABASE_URL", ""),
 	}

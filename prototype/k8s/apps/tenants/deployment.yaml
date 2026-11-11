@@ -69,6 +69,8 @@ spec:
               value: 2Gi
             - name: TENANT_QUOTA_PODS
               value: "10"
+          envFrom:
+            - secretRef: {name: tenants-kafka}
           volumeMounts:
             - name: zitadel-key
               mountPath: /var/run/secrets/zitadel

@@ -33,7 +33,11 @@ func run(ctx context.Context, cfg core.Config, log *slog.Logger) error {
 	if err != nil {
 		return err
 	}
-	producer, err := kafka.NewProducer(brokers, cfg.KafkaTopic)
+	auth, err := kafka.SCRAM(cfg.KafkaUsername, cfg.KafkaPassword)
+	if err != nil {
+		return err
+	}
+	producer, err := kafka.NewProducer(brokers, cfg.KafkaTopic, auth...)
 	if err != nil {
 		return err
 	}

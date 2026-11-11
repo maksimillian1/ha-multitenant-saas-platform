@@ -51,6 +51,8 @@ spec:
             # Every API call becomes a usage event (HAMSP-26).
             - name: USAGE_URL
               value: http://usage-writeapi.usage.svc:8080/v1/events
+          envFrom:
+            - secretRef: {name: api-gateway-kafka}
           readinessProbe:
             httpGet: {path: /healthz, port: http}
             periodSeconds: 5

@@ -31,6 +31,8 @@ spec:
               value: usage-kafka-kafka-bootstrap.kafka.svc:9092
             - name: DATABASE_URL
               valueFrom: {secretKeyRef: {name: usage-writer-db, key: DATABASE_URL}}
+          envFrom:
+            - secretRef: {name: usage-writer-kafka}
           livenessProbe:
             httpGet: {path: /healthz, port: http}
             periodSeconds: 10
