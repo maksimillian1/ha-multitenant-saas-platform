@@ -110,6 +110,11 @@ func (s *Service) Handler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	tenant, err := s.Auth.Tenant(r.Context(), token)
+	if errors.Is(err, auth.ErrTenantBlocked) {
+		s.Log.InfoContext(r.Context(), "rejected suspended tenant", "path", r.URL.Path)
+		core.WriteError(w, http.StatusForbidden, "tenant suspended")
+		return
+	}
 	if err != nil {
 		s.Log.InfoContext(r.Context(), "rejected token", "path", r.URL.Path, "err", err)
 		core.WriteError(w, http.StatusUnauthorized, "invalid token")

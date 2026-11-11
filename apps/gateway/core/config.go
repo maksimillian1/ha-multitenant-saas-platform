@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"strconv"
+	"strings"
 )
 
 type Config struct {
@@ -18,6 +19,8 @@ type Config struct {
 	Routes          string
 	UsageURL        string
 	UsageMaxPending int
+	KafkaBrokers    []string
+	TenantStates    string
 }
 
 func GetEnv(key, defaultVal string) string {
@@ -41,6 +44,8 @@ func LoadConfig() Config {
 		Routes:          GetEnv("ROUTES", ""),
 		UsageURL:        GetEnv("USAGE_URL", ""),
 		UsageMaxPending: maxPending,
+		KafkaBrokers:    splitList(GetEnv("KAFKA_BROKERS", "")),
+		TenantStates:    GetEnv("TENANT_STATES_TOPIC", "tenant-states"),
 	}
 }
 
@@ -50,8 +55,21 @@ func (c Config) Validate() error {
 			return fmt.Errorf("%s is required", setting[0])
 		}
 	}
+	if len(c.KafkaBrokers) == 0 {
+		return errors.New("KAFKA_BROKERS is required: suspended tenants are rejected from the tenant-states topic")
+	}
 	if c.UsageURL != "" && c.UsageMaxPending <= 0 {
 		return errors.New("USAGE_MAX_PENDING must be a positive integer")
 	}
 	return nil
+}
+
+func splitList(s string) []string {
+	var out []string
+	for _, p := range strings.Split(s, ",") {
+		if p = strings.TrimSpace(p); p != "" {
+			out = append(out, p)
+		}
+	}
+	return out
 }
