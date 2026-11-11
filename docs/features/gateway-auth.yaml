@@ -1,6 +1,7 @@
 feature: gateway-auth
 title: JWT validation and tenant context in the API Gateway
 critical: true
+stage: proto
 code:
   - apps/gateway/auth/**
   - apps/gateway/tenantstate/**
@@ -13,7 +14,25 @@ acceptance:
     text: A valid token for the platform API whose user belongs to the Zitadel admin organization (root and IAM admins, the platform's machine users) gets 401 at the API Gateway; a tenant organization's token still passes.
     level: unit
     planned: apps/gateway/auth/auth_test.go:TestZitadelAdminOrgIsNotATenant
+    verified:
+      - apps/gateway/auth/auth_test.go:TestZitadelAdminOrgIsNotATenant
   AC-2:
     text: The API Gateway reads the topic tenant-states and answers 403 to a tenant whose latest state is suspended, deleting or deleted; an active or unknown tenant passes, and while Kafka is down the last state read stays.
     level: unit
     planned: apps/gateway/tenantstate/tenantstate_test.go:TestSuspendedTenantIsBlocked
+    verified:
+      - apps/gateway/tenantstate/tenantstate_test.go:TestSuspendedTenantIsBlocked
+      - apps/gateway/tenantstate/contract_test.go:TestContractExamples
+      - apps/gateway/auth/auth_test.go:TestBlockedTenantIsRejected
+      - apps/gateway/proxy/proxy_test.go:TestBlockedTenantGets403
+
+gates:
+  G-01: {status: n/a, by: verify, date: 2026-11-11, note: no release flag}
+
+runs:
+  - date: 2026-11-11
+    commit: a5d82a6
+    stage_checked: proto
+    verdict: ready
+    failed: []
+    not_checked: []
