@@ -4,10 +4,9 @@ import { apiError, json, mockApi } from '@/test/api'
 import { signedIn, tenantActive, tenantDeleted, tenantStuck, tenantSuspended } from '@/test/fixtures'
 import { renderApp } from '@/test/render'
 
-// Verifies: tenant-management AC-13
-
 const tenants = { items: [tenantActive, tenantSuspended, tenantStuck] }
 
+// Verifies: tenant-management AC-13
 describe('tenants list', () => {
   it('lists tenants with their state and shows deleted ones on request', async () => {
     const api = mockApi({
@@ -96,6 +95,7 @@ describe('tenants list', () => {
   })
 })
 
+// Verifies: tenant-management AC-13
 describe('tenant page', () => {
   const at = (tenant: typeof tenantActive) => `/tenants/${tenant.id}`
   const apiAt = (tenant: typeof tenantActive) => `/api/tenants/${tenant.id}`
