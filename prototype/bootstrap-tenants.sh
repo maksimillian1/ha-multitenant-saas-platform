@@ -156,9 +156,9 @@ fi
 
 # ── 3. the platform API project: its ID is the token audience ──────────────────
 
-# Created in the IAM admin's organization. Tenant organizations get no project
-# grants yet, so any user of the instance can still ask for this audience;
-# restricting it is part of the tenant lifecycle (HAMSP-6).
+# Created in the IAM admin's organization. Any user of the instance can ask for
+# this audience; the API Gateway turns away the users of the IAM admin's own
+# organization, so only tenant organizations get through (HAMSP-24).
 project_id=$(zitadel POST /management/v1/projects/_search "$(jq -nc --arg n "${PROJECT}" \
   '{queries: [{nameQuery: {name: $n, method: "TEXT_QUERY_METHOD_EQUALS"}}]}')" \
   | jq -r '.result[0].id // empty')
@@ -169,13 +169,17 @@ else
   echo "Reusing project ${PROJECT} (${project_id})"
 fi
 
-# The API Gateway reads the audience from this ConfigMap (k8s/apps/gateway).
+# The API Gateway reads the audience and the platform's own organization (the
+# IAM admin's, whose users are not a tenant) from this ConfigMap
+# (k8s/apps/gateway).
+platform_org=$(zitadel GET /management/v1/orgs/me | jq -r '.org.id')
 wait_for "API Gateway Deployment (ArgoCD)" 60 kubectl -n gateway get deployment api-gateway
-current=$(kubectl -n gateway get configmap api-gateway-audience -o jsonpath='{.data.audience}' 2>/dev/null || true)
-if [[ "${current}" != "${project_id}" ]]; then
-  echo "Setting the API Gateway audience to ${project_id}..."
+current=$(kubectl -n gateway get configmap api-gateway-audience \
+  -o jsonpath='{.data.audience}/{.data.platform_org}' 2>/dev/null || true)
+if [[ "${current}" != "${project_id}/${platform_org}" ]]; then
+  echo "Setting the API Gateway audience to ${project_id}, platform organization ${platform_org}..."
   kubectl -n gateway create configmap api-gateway-audience --from-literal=audience="${project_id}" \
-    --dry-run=client -o yaml | kubectl apply -f -
+    --from-literal=platform_org="${platform_org}" --dry-run=client -o yaml | kubectl apply -f -
   kubectl -n gateway rollout restart deployment/api-gateway
 fi
 kubectl -n gateway rollout status deployment/api-gateway --timeout=3m
