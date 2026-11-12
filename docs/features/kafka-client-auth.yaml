@@ -1,0 +1,26 @@
+feature: kafka-client-auth
+title: Every Kafka client connects over TLS as its own KafkaUser, limited by ACLs
+critical: true
+links:
+  issues: [HAMSP-31]
+requirements: [FR-05, QS-17, C-04, C-05]
+
+acceptance:
+  AC-1:
+    text: The usage-kafka client listener accepts only TLS connections that log in with SCRAM-SHA-512. A connection without credentials, with a wrong password or without TLS is rejected.
+    level: e2e
+  AC-2:
+    text: UsageWriteAPI, Usage Writer, Tenant Management and the API Gateway each connect over TLS, verify the broker certificate against the usage-kafka cluster CA, and log in as their own KafkaUser; usage events and tenant states still flow end to end.
+    level: e2e
+  AC-3:
+    text: The usage-writeapi user can produce to usage-events; reading usage-events and producing to any other topic is denied.
+    level: e2e
+  AC-4:
+    text: The usage-writer user can consume usage-events with the consumer group usage-writer; producing to usage-events and consuming with any other group is denied.
+    level: e2e
+  AC-5:
+    text: The usage migrate Job has no Kafka credentials.
+    level: e2e
+  AC-6:
+    text: The switch from the plain listener to TLS with SCRAM keeps both listeners while the clients move and then removes the plain one. Under steady traffic through UsageWriteAPI during the whole switch, no event that got a 2xx is lost and fewer than 1% of requests get a 5xx (the QS-17 bar).
+    level: e2e
