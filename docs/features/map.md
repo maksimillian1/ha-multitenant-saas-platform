@@ -19,7 +19,7 @@ Each feature's stage and the gates behind it ([Feature stages](../process/featur
 | [`gateway-routing`](gateway-routing.yaml) | — |  |  |  |  |  |  |  |  | — | HAMSP-23 |
 | [`gateway-tenant-header`](gateway-tenant-header.yaml) **critical** | — |  |  |  |  |  |  |  |  | — | HAMSP-23 |
 | [`gateway-usage-reporting`](gateway-usage-reporting.yaml) | — |  |  |  |  |  |  |  |  | — | HAMSP-23 |
-| [`kafka-client-auth`](kafka-client-auth.yaml) **critical** | — |  |  |  |  |  |  |  |  | — | HAMSP-31 |
+| [`kafka-client-auth`](kafka-client-auth.yaml) **critical** | — |  |  |  |  |  |  | ✓ (owner) |  | — | HAMSP-31 |
 | [`network-policies`](network-policies.yaml) **critical** | — |  |  |  |  |  |  |  |  | — | HAMSP-23 |
 | [`tenant-management`](tenant-management.yaml) **critical** | alpha | n/a | ✓ | ✓ | ✓ basic | ✓ |  | ✓ (owner) |  | 2026-11-11 ready for alpha | HAMSP-51, HAMSP-6, HAMSP-52 |
 | [`usage-ingest`](usage-ingest.yaml) **critical** | — |  |  |  |  |  |  |  |  | — | HAMSP-23 |
