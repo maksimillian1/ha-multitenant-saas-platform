@@ -24,4 +24,4 @@ Each feature's stage and the gates behind it ([Feature stages](../process/featur
 | [`tenant-management`](tenant-management.yaml) **critical** | alpha | n/a | ✓ | ✓ | ✓ basic | ✓ |  | ✓ (owner) |  | 2026-11-11 ready for alpha | HAMSP-51, HAMSP-6, HAMSP-52 |
 | [`usage-ingest`](usage-ingest.yaml) **critical** | — |  |  |  |  |  |  |  |  | — | HAMSP-23 |
 | [`usage-store`](usage-store.yaml) **critical** | — |  |  |  |  |  |  |  |  | — | HAMSP-23 |
-| [`usage-writer`](usage-writer.yaml) **critical** | — |  |  |  |  |  |  |  |  | — | HAMSP-23 |
+| [`usage-writer`](usage-writer.yaml) **critical** | — |  |  |  |  |  |  |  |  | — | HAMSP-23, HAMSP-30 |

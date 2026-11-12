@@ -7,4 +7,31 @@ code:
   - apps/usage/internal/core/**
 c4: [usageWriter]
 links:
-  issues: [HAMSP-23]
+  issues: [HAMSP-23, HAMSP-30]
+requirements: [FR-05, FR-06, QS-06, QS-09]
+
+acceptance:
+  AC-1:
+    text: "A record that does not decode (bad JSON, missing event_id, tenant_id or event_time, schema_version newer than the writer) goes to the DLQ topic with its key and value byte for byte and the headers dlq-reason, dlq-source (topic/partition/offset) and dlq-time. The next records of the partition are written."
+    level: integration
+  AC-2:
+    text: "A record that fails core.Validate without the time window (for example quantity <= 0) goes to the DLQ before the database. The other records of the same fetch are written."
+    level: integration
+  AC-3:
+    text: "When the database returns an error of SQLSTATE class 22 or 23, the batch is split in halves until the bad record is found. That record goes to the DLQ; every other event of the batch is stored exactly once."
+    level: integration
+  AC-4:
+    text: "A transient database error (connection lost) sends nothing to the DLQ: the partition stops and retries. After the database is back every event is stored exactly once (QS-09)."
+    level: integration
+  AC-5:
+    text: "When writing to the DLQ fails, the offset is not committed and the event is not lost."
+    level: integration
+  AC-6:
+    text: "Usage Writer exports a counter of records sent to the DLQ, and an alert rule fires when it is above 0."
+    level: unit
+  AC-7:
+    text: "writer replay sends the chosen DLQ records to the main topic with the value unchanged and the header replayed-from=dlq. The event is stored once; replaying it again adds no second row."
+    level: integration
+  AC-8:
+    text: "The DLQ topic has a retention of 7 days, set in its GitOps KafkaTopic manifest."
+    level: manual
