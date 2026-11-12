@@ -23,6 +23,7 @@ type Config struct {
 	TenantStates    string
 	KafkaUsername   string
 	KafkaPassword   string
+	KafkaCAFile     string
 }
 
 func GetEnv(key, defaultVal string) string {
@@ -50,6 +51,7 @@ func LoadConfig() Config {
 		TenantStates:    GetEnv("TENANT_STATES_TOPIC", "tenant-states"),
 		KafkaUsername:   GetEnv("KAFKA_USERNAME", ""),
 		KafkaPassword:   GetEnv("KAFKA_PASSWORD", ""),
+		KafkaCAFile:     GetEnv("KAFKA_CA_FILE", ""),
 	}
 }
 
