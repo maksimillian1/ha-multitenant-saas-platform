@@ -43,7 +43,7 @@ func run(ctx context.Context, cfg core.Config, log *slog.Logger) error {
 		return err
 	}
 	defer st.Close()
-	auth, err := kafka.SCRAM(cfg.KafkaUsername, cfg.KafkaPassword)
+	auth, err := kafka.ClientAuth(cfg.KafkaCAFile, cfg.KafkaUsername, cfg.KafkaPassword)
 	if err != nil {
 		return err
 	}

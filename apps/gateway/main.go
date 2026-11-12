@@ -77,7 +77,7 @@ func bootstrapServices(ctx context.Context, cfg core.Config, log *slog.Logger) (
 	verifier := auth.NewVerifier(cfg.Issuer, cfg.Audience, cfg.ZitadelAdminOrg, cfg.JWKSURL, issuerClient)
 	states := tenantstate.New()
 	verifier.Blocked = states.Blocked
-	kafkaAuth, err := tenantstate.KafkaSCRAM(cfg.KafkaUsername, cfg.KafkaPassword)
+	kafkaAuth, err := tenantstate.ClientAuth(cfg.KafkaCAFile, cfg.KafkaUsername, cfg.KafkaPassword)
 	if err != nil {
 		return nil, nil, nil, err
 	}

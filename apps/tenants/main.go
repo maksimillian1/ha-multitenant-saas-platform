@@ -89,7 +89,7 @@ func serve(ctx context.Context, cfg core.Config, log *slog.Logger) error {
 	tenants := lifecycle.NewService(st, zitadelClient, kubeClient, log, core.NewID)
 	tenants.StepTimeout = cfg.StepTimeout
 
-	kafkaAuth, err := events.KafkaSCRAM(cfg.KafkaUsername, cfg.KafkaPassword)
+	kafkaAuth, err := events.ClientAuth(cfg.KafkaCAFile, cfg.KafkaUsername, cfg.KafkaPassword)
 	if err != nil {
 		return err
 	}

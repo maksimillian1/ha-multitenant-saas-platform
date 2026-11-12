@@ -41,6 +41,8 @@ type Config struct {
 	// KafkaUsername and KafkaPassword: the SCRAM login of the tenants KafkaUser (HAMSP-31).
 	KafkaUsername string
 	KafkaPassword string
+	// KafkaCAFile: the usage-kafka cluster CA the client trusts (HAMSP-31).
+	KafkaCAFile string
 }
 
 func GetEnv(key, defaultVal string) string {
@@ -72,6 +74,7 @@ func LoadConfig() Config {
 		TenantStates:       GetEnv("TENANT_STATES_TOPIC", "tenant-states"),
 		KafkaUsername:      GetEnv("KAFKA_USERNAME", ""),
 		KafkaPassword:      GetEnv("KAFKA_PASSWORD", ""),
+		KafkaCAFile:        GetEnv("KAFKA_CA_FILE", ""),
 	}
 }
 

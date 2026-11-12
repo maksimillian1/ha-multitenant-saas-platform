@@ -7,12 +7,10 @@ package tenantstate
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"log/slog"
 	"sync"
 
 	"github.com/twmb/franz-go/pkg/kgo"
-	"github.com/twmb/franz-go/pkg/sasl/scram"
 )
 
 // Event is one record of tenant-states, keyed by tenant_id.
@@ -86,17 +84,4 @@ func (s *States) Follow(ctx context.Context, brokers []string, topic string, log
 		})
 	}
 	return ctx.Err()
-}
-
-// KafkaSCRAM is the SCRAM-SHA-512 login of this binary's KafkaUser (HAMSP-31).
-// No username means no authentication, for tests against kfake.
-func KafkaSCRAM(username, password string) ([]kgo.Opt, error) {
-	if username == "" {
-		return nil, nil
-	}
-	if password == "" {
-		return nil, errors.New("KAFKA_PASSWORD is required when KAFKA_USERNAME is set")
-	}
-	auth := scram.Auth{User: username, Pass: password}
-	return []kgo.Opt{kgo.SASL(auth.AsSha512Mechanism())}, nil
 }
