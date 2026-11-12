@@ -8,11 +8,13 @@ package events
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"log/slog"
 	"sync"
 	"time"
 
 	"github.com/twmb/franz-go/pkg/kgo"
+	"github.com/twmb/franz-go/pkg/sasl/scram"
 
 	"github.com/maksimillian1/ha-multitenant-saas-platform/apps/tenants/core"
 )
@@ -33,13 +35,14 @@ type Publisher struct {
 	client *kgo.Client
 }
 
-func NewPublisher(brokers []string, topic string, log *slog.Logger) (*Publisher, error) {
+func NewPublisher(brokers []string, topic string, log *slog.Logger, extra ...kgo.Opt) (*Publisher, error) {
 	opts := []kgo.Opt{
 		kgo.SeedBrokers(brokers...),
 		kgo.DefaultProduceTopic(topic),
 		kgo.RequiredAcks(kgo.AllISRAcks()),
 		kgo.RecordDeliveryTimeout(publishTimeout),
 	}
+	opts = append(opts, extra...)
 	client, err := kgo.NewClient(opts...)
 	if err != nil {
 		return nil, err
@@ -118,4 +121,17 @@ func (p *Publisher) send(ctx context.Context, tenants []core.Tenant) error {
 		go client.Close()
 		return ctx.Err()
 	}
+}
+
+// KafkaSCRAM is the SCRAM-SHA-512 login of this binary's KafkaUser (HAMSP-31).
+// No username means no authentication, for tests against kfake.
+func KafkaSCRAM(username, password string) ([]kgo.Opt, error) {
+	if username == "" {
+		return nil, nil
+	}
+	if password == "" {
+		return nil, errors.New("KAFKA_PASSWORD is required when KAFKA_USERNAME is set")
+	}
+	auth := scram.Auth{User: username, Pass: password}
+	return []kgo.Opt{kgo.SASL(auth.AsSha512Mechanism())}, nil
 }

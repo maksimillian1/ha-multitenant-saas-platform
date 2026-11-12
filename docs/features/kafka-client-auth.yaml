@@ -1,0 +1,65 @@
+feature: kafka-client-auth
+title: Every Kafka client connects over TLS as its own KafkaUser, limited by ACLs
+critical: true
+code:
+  - prototype/k8s/apps/kafka/**
+  - prototype/k8s/apps/usage/kafka-auth.yaml
+  - prototype/k8s/apps/gateway/kafka-auth.yaml
+  - prototype/k8s/apps/tenants/kafka-auth.yaml
+  - apps/usage/internal/kafka/auth.go
+  - apps/gateway/tenantstate/auth.go
+  - apps/tenants/events/auth.go
+  - prototype/e2e/kafka_auth_test.go
+c4: [kafka]
+links:
+  issues: [HAMSP-31]
+requirements: [FR-05, QS-17, C-04, C-05]
+
+acceptance:
+  AC-1:
+    text: The usage-kafka client listener accepts only TLS connections that log in with SCRAM-SHA-512. A connection without credentials, with a wrong password or without TLS is rejected.
+    level: e2e
+    planned: prototype/e2e/kafka_auth_test.go:TestKafkaRejectsClientWithoutValidLogin
+  AC-2:
+    text: UsageWriteAPI, Usage Writer, Tenant Management and the API Gateway each connect over TLS, verify the broker certificate against the usage-kafka cluster CA, and log in as their own KafkaUser; usage events and tenant states still flow end to end.
+    level: e2e
+    planned: prototype/e2e/kafka_auth_test.go:TestKafkaHasOnlyTheTLSListener, prototype/e2e/usage_test.go:TestAPICallIsStoredAsUsageEvent, prototype/e2e/tenants_test.go:TestSuspendedTenantLosesAPIAccess, apps/usage/internal/kafka/auth_test.go:TestClientAuthOptions, apps/gateway/tenantstate/auth_test.go:TestClientAuthOptions, apps/tenants/events/auth_test.go:TestClientAuthOptions
+  AC-3:
+    text: The usage-writeapi user can produce to usage-events; reading usage-events and producing to any other topic is denied.
+    level: e2e
+    planned: prototype/e2e/kafka_auth_test.go:TestWriteAPIUserOnlyProducesUsageEvents
+  AC-4:
+    text: The usage-writer user can consume usage-events with the consumer group usage-writer; producing to usage-events and consuming with any other group is denied.
+    level: e2e
+    planned: prototype/e2e/kafka_auth_test.go:TestWriterUserOnlyConsumesWithItsGroup
+  AC-5:
+    text: The usage migrate Job has no Kafka credentials.
+    level: e2e
+    planned: prototype/e2e/kafka_auth_test.go:TestUsageMigrateHasNoKafkaCredentials
+  AC-6:
+    text: The switch from the plain listener to TLS with SCRAM keeps both listeners while the clients move and then removes the plain one. Under steady traffic through UsageWriteAPI during the whole switch, no event that got a 2xx is lost and fewer than 1% of requests get a 5xx (the QS-17 bar).
+    level: e2e
+    planned: "manual: start prototype/e2e/kafka_auth_test.go:TestListenerSwitchKeepsAcknowledgedEvents with E2E_LISTENER_SWITCH=1, then push the step commit (S3, S4, S5) and let ArgoCD sync it; the test sends events until the Kafka cluster and the clients are rolled and Ready, then checks the bar. Run once per step: the switch happens once, so it cannot run in the regular suite."
+
+checklist:
+  T-01:
+    planned: "applies — no new tenant data path; after the switch the two-tenant usage e2e (gateway → UsageWriteAPI → Kafka → Usage Writer → usage store) still stores each tenant's events under its own tenant_id"
+  T-02:
+    planned: "applies — the usage-event and tenant-states record schemas do not change; the existing contract tests of usage and tenants run unchanged (kfake, no login)"
+  T-04:
+    planned: "applies (critical) — every Kafka identity × operation on the usage path, on kind with the real brokers through a client pod that carries the allowed pod label; no login, wrong password, no TLS; writeapi read and foreign topic; writer produce and foreign group. tenant-states users (tenants, api-gateway) are not tested, by the 2026-11-12 decision"
+  T-08:
+    planned: "does not apply — no database migration"
+  T-11:
+    planned: "does not apply (critical) — no new parser of untrusted input; the CA file is our own config from a Secret"
+  T-12:
+    planned: "applies (critical) — two controls. Login: TestKafkaRejectsClientWithoutValidLogin fails with authentication removed from the TLS listener. ACLs: TestWriteAPIUserOnlyProducesUsageEvents fails with authorization removed. Run once on kind with ArgoCD self-heal paused for the kafka app"
+
+quality_scenarios:
+  touched: [QS-17]
+  tests:
+    QS-17:
+      planned: prototype/e2e/usage_test.go:TestBrokerLossLosesNoAcknowledgedEvent, after the switch, over TLS with SCRAM
+
+gates:
+  G-07: {status: pass, by: owner, date: 2026-11-12, note: plan for alpha approved in chat}

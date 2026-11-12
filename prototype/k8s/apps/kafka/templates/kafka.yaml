@@ -47,10 +47,12 @@ spec:
         port: 9092
         type: internal
         tls: false
-        # Strimzi turns these into a NetworkPolicy: only these pods reach the
-        # client listener (HAMSP-26 AC-8). Anyone else could write usage
-        # events for any tenant or tenant states (HAMSP-52); topic ACLs are
-        # HAMSP-31.
+        # Every client is a KafkaUser with its own SCRAM password (HAMSP-31);
+        # the ACLs decide what it may do. Strimzi also turns the peers below
+        # into a NetworkPolicy (HAMSP-26 AC-8) as a second layer: a pod label
+        # is not an identity.
+        authentication:
+          type: scram-sha-512
         networkPolicyPeers:
           - namespaceSelector:
               matchLabels:
@@ -76,6 +78,10 @@ spec:
             podSelector:
               matchLabels:
                 app.kubernetes.io/name: usage-writer
+    # Simple ACLs: a user may do only what its KafkaUser lists. The
+    # operators use their own TLS listener and are superusers by default.
+    authorization:
+      type: simple
     config:
       default.replication.factor: 3
       min.insync.replicas: 2
@@ -86,6 +92,10 @@ spec:
       auto.create.topics.enable: false
   entityOperator:
     topicOperator:
+      resources:
+        requests: {cpu: 50m, memory: 192Mi}
+        limits: {memory: 256Mi}
+    userOperator:
       resources:
         requests: {cpu: 50m, memory: 192Mi}
         limits: {memory: 256Mi}
