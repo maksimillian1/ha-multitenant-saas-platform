@@ -1,0 +1,7 @@
+apiVersion: v2
+name: zitadel
+version: 1.0.0
+dependencies:
+  - name: zitadel
+    version: 10.4.0
+    repository: https://charts.zitadel.com

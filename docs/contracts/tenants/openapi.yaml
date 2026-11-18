@@ -1,0 +1,244 @@
+openapi: 3.1.0
+info:
+  title: Tenant Management API
+  version: 1.0.0
+  description: >
+    Creates, suspends, resumes and deletes tenants (ADR-0012). Every operation
+    is synchronous and records each step in the tenant's row; a failed step
+    answers with the tenant as the failure left it.
+servers:
+  - url: http://tenants.tenants.svc.cluster.local
+security:
+  - zitadel: []
+paths:
+  /tenants:
+    get:
+      summary: List tenants, newest first
+      parameters:
+        - name: include_deleted
+          in: query
+          schema: { type: boolean, default: false }
+      responses:
+        "200":
+          description: The tenants
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/TenantList" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+    post:
+      summary: Create a tenant and provision it
+      parameters:
+        - $ref: "#/components/parameters/AdminUserId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CreateTenant" }
+            examples:
+              create: { externalValue: examples/create-tenant.json }
+      responses:
+        "201":
+          description: The tenant, active
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Tenant" }
+              examples:
+                active: { externalValue: examples/tenant-active.json }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "502": { $ref: "#/components/responses/StepFailed" }
+        "504": { $ref: "#/components/responses/StepFailed" }
+  /tenants/{id}:
+    parameters:
+      - $ref: "#/components/parameters/TenantId"
+    get:
+      summary: One tenant
+      responses:
+        "200":
+          description: The tenant
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Tenant" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    delete:
+      summary: Delete a suspended tenant, or one in provisioning or deleting, and leave a tombstone
+      parameters:
+        - $ref: "#/components/parameters/AdminUserId"
+      responses:
+        "200":
+          description: The tombstone
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Tenant" }
+              examples:
+                deleted: { externalValue: examples/tenant-deleted.json }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "502": { $ref: "#/components/responses/StepFailed" }
+        "504": { $ref: "#/components/responses/StepFailed" }
+  /tenants/{id}/retry:
+    parameters:
+      - $ref: "#/components/parameters/TenantId"
+    post:
+      summary: Resume a tenant left in provisioning or deleting
+      parameters:
+        - $ref: "#/components/parameters/AdminUserId"
+      responses:
+        "200":
+          description: The tenant after the change
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Tenant" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "502": { $ref: "#/components/responses/StepFailed" }
+        "504": { $ref: "#/components/responses/StepFailed" }
+  /tenants/{id}/suspend:
+    parameters:
+      - $ref: "#/components/parameters/TenantId"
+    post:
+      summary: Suspend an active tenant (its organization is deactivated)
+      parameters:
+        - $ref: "#/components/parameters/AdminUserId"
+      responses:
+        "200":
+          description: The tenant after the change
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Tenant" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "502": { $ref: "#/components/responses/StepFailed" }
+        "504": { $ref: "#/components/responses/StepFailed" }
+  /tenants/{id}/resume:
+    parameters:
+      - $ref: "#/components/parameters/TenantId"
+    post:
+      summary: Make a suspended tenant active again
+      parameters:
+        - $ref: "#/components/parameters/AdminUserId"
+      responses:
+        "200":
+          description: The tenant after the change
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Tenant" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "502": { $ref: "#/components/responses/StepFailed" }
+        "504": { $ref: "#/components/responses/StepFailed" }
+components:
+  securitySchemes:
+    zitadel:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: A Zitadel access token for the project tenant-management with the role tenant-manager.
+  parameters:
+    TenantId:
+      name: id
+      in: path
+      required: true
+      schema: { $ref: "#/components/schemas/TenantId" }
+    AdminUserId:
+      name: X-Admin-User-Id
+      in: header
+      required: true
+      description: Zitadel user ID of the admin who asked for the change.
+      schema: { type: string, pattern: "^[A-Za-z0-9_-]{1,64}$" }
+  responses:
+    BadRequest:
+      description: Invalid body or missing X-Admin-User-Id
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+    Unauthorized:
+      description: No valid token
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+    Forbidden:
+      description: A valid token without the role tenant-manager
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+    NotFound:
+      description: No such tenant
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+    Conflict:
+      description: >
+        The name is taken, another request is changing the tenant, the tenant's
+        state does not allow the change, or Zitadel or Kubernetes holds a
+        foreign object with the tenant's name (then with the tenant).
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+    StepFailed:
+      description: A step failed (502) or timed out (504); the tenant is as the failure left it.
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+          examples:
+            failed: { externalValue: examples/error-step-failed.json }
+  schemas:
+    TenantId:
+      type: string
+      description: The tenant_id everywhere, and the ID of the tenant's Zitadel organization.
+      pattern: "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+    CreateTenant:
+      type: object
+      additionalProperties: false
+      required: [name, admin_email]
+      properties:
+        name: { type: string, minLength: 1, maxLength: 100 }
+        admin_email: { type: string, format: email, maxLength: 254 }
+    Tenant:
+      type: object
+      required: [id, state, parts, created_by, created_at, updated_at]
+      properties:
+        id: { $ref: "#/components/schemas/TenantId" }
+        name: { type: string, description: Empty on a tombstone. }
+        admin_email: { type: string, description: Empty on a tombstone. }
+        state: { type: string, enum: [provisioning, active, suspended, deleting, deleted] }
+        parts:
+          type: array
+          description: The parts created so far outside the registry.
+          items: { type: string, enum: [organization, admin, namespace] }
+        last_error: { type: string, description: The error of the last failed step, until a step succeeds. }
+        created_by: { type: string }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+        deleted_by: { type: string }
+        deleted_at: { type: string, format: date-time }
+    TenantList:
+      type: object
+      required: [tenants]
+      properties:
+        tenants:
+          type: array
+          items: { $ref: "#/components/schemas/Tenant" }
+    Error:
+      type: object
+      required: [error]
+      properties:
+        error: { type: string }
+        tenant: { $ref: "#/components/schemas/Tenant" }

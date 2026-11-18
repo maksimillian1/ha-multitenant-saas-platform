@@ -5,6 +5,8 @@ Date: 2026-07-01
 ## Status
 Proposed
 
+Amended by [ADR-0008](0008-usage-store-on-timescaledb.md) for the usage database: TimescaleDB does not allow RLS together with its columnstore and continuous aggregates, so that database enforces the same isolation through a `SECURITY DEFINER` write function and `security_barrier` views, and no application role has privileges on its tables.
+
 ## Context & Problem Statement
 The platform must support multi-tenancy for B2B clients under high throughput (target: 5000+ RPS). We need to determine the optimal database isolation strategy in PostgreSQL managed by CloudNativePG (CNPG) to balance data security, operational complexity, infrastructure cost, and performance under peak loads.
 

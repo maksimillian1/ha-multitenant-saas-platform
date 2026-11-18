@@ -1,0 +1,10 @@
+feature: gateway-routing
+title: API Gateway configuration, routing and health
+critical: false
+code:
+  - apps/gateway/core/**
+  - apps/gateway/health/**
+  - apps/gateway/main.go
+c4: [apiGateway]
+links:
+  issues: [HAMSP-23]

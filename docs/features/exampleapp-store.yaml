@@ -1,0 +1,8 @@
+feature: exampleapp-store
+title: ExampleApp tenant data in PostgreSQL with RLS
+critical: true
+code:
+  - apps/exampleapp/store/**
+c4: [exampleApp, postgres]
+links:
+  issues: [HAMSP-23]

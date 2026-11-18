@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "authdemo",
+      "runtimeExecutable": "go",
+      "runtimeArgs": ["run", "-C", "prototype/authdemo", "."],
+      "port": 8090
+    }
+  ]
+}

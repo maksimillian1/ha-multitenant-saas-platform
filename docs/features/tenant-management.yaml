@@ -1,0 +1,221 @@
+feature: tenant-management
+title: "Tenant Management: a platform admin creates, suspends and deletes tenants (ADR-0012)"
+critical: true
+stage: alpha
+code:
+  - apps/tenants/**
+  - apps/admin/tenants/**
+  - docs/contracts/tenants/**
+  - prototype/k8s/apps/tenants/**
+  - .github/workflows/tenants.yml
+c4: [tenantMgmt, adminPortal, authService]
+links:
+  issues: [HAMSP-51, HAMSP-6, HAMSP-52]
+requirements: [FR-01, QS-02, QS-18, C-03, C-04, C-06]
+
+acceptance:
+  AC-1:
+    text: "POST /tenants with a name and the first admin's email, called with a valid service token that holds the role tenant-manager, inserts the tenant in state provisioning, runs every step in the same request and answers 201 with the tenant in state active; GET /tenants and GET /tenants/{id} show its state, the steps done and the last error."
+    level: integration
+    planned: apps/tenants/api/api_test.go:TestCreateTenantRunsEveryStep
+    verified:
+      - apps/tenants/api/api_test.go:TestCreateTenantRunsEveryStep
+      - apps/tenants/api/contract_test.go:TestContractExamples
+  AC-2:
+    text: "The provisioning steps run in order: a Zitadel organization whose ID becomes the tenant_id; a human user with the given email in that organization, with the role ORG_OWNER, invited by email; a namespace tenant-<tenant_id> labelled with the tenant_id, with a ResourceQuota and a default-deny CiliumNetworkPolicy."
+    level: integration
+    planned: apps/tenants/lifecycle/lifecycle_test.go:TestProvisionStepsInOrder
+    verified:
+      - apps/tenants/lifecycle/lifecycle_test.go:TestProvisionStepsInOrder
+  AC-3:
+    text: "Every step is idempotent: after a failure or a crash after any step, POST /tenants/{id}/retry resumes at the first step not done and the tenant ends active with exactly one organization, one admin user and one namespace."
+    level: integration
+    planned: apps/tenants/lifecycle/lifecycle_test.go:TestRetryAfterFailureAtEveryStep
+    verified:
+      - apps/tenants/lifecycle/lifecycle_test.go:TestRetryAfterFailureAtEveryStep
+  AC-4:
+    text: "When Zitadel or the Kubernetes API fails or times out during a step, the request stops, the tenant stays in provisioning (or deleting) with the error in last_error and the steps done so far, the answer is 502 or 504 with the tenant, and no later step runs."
+    level: integration
+    planned: apps/tenants/lifecycle/lifecycle_test.go:TestDependencyFailureStopsAndRecords
+    verified:
+      - apps/tenants/lifecycle/lifecycle_test.go:TestDependencyFailureStopsAndRecords
+  AC-5:
+    text: "Two requests on the same tenant never run at once: the second one gets 409 while the first holds the tenant's lock (a PostgreSQL session advisory lock), and the lock is released when the first request ends or its process dies."
+    level: integration
+    planned: apps/tenants/store/store_test.go:TestConcurrentRequestOnSameTenantGets409
+    verified:
+      - apps/tenants/store/store_test.go:TestConcurrentRequestOnSameTenantGets409
+  AC-6:
+    text: "POST /tenants/{id}/suspend moves an active tenant to suspended and deactivates its Zitadel organization; POST /tenants/{id}/resume moves it back to active and reactivates the organization. Either call on a tenant in another state answers 409 and changes nothing."
+    level: integration
+    planned: apps/tenants/lifecycle/lifecycle_test.go:TestSuspendResume
+    verified:
+      - apps/tenants/lifecycle/lifecycle_test.go:TestSuspendResume
+  AC-7:
+    text: "DELETE /tenants/{id} on a suspended tenant, or one in provisioning, moves it to deleting and in the same request removes the namespace and then the Zitadel organization (with its users), and leaves a tombstone with the tenant_id, the timestamps and the deleting admin, state deleted; a failed step leaves it in deleting with last_error until a retry. DELETE in any other state answers 409. Deleting tenant A leaves tenant B's organization, users and namespace untouched."
+    level: integration
+    planned: apps/tenants/lifecycle/lifecycle_test.go:TestDeleteLeavesTombstoneAndOtherTenants
+    verified:
+      - apps/tenants/lifecycle/lifecycle_test.go:TestDeleteLeavesTombstoneAndOtherTenants
+  AC-8:
+    text: "A tenant name is unique among tenants that are not deleted: a second POST with the same name answers 409. An empty or over-long name, or a malformed email, answers 400 and creates nothing."
+    level: unit
+    planned: apps/tenants/api/validate_test.go:TestCreateInputValidation
+    verified:
+      - apps/tenants/api/validate_test.go:TestCreateInputValidation
+  AC-9:
+    text: "Every route answers 401 without a valid token (no token, bad signature, expired, wrong issuer or audience) and 403 for a valid token without the role tenant-manager; in neither case is Zitadel, Kubernetes or the tenants table written."
+    level: integration
+    planned: apps/tenants/api/api_test.go:TestEveryRouteRequiresTenantManager
+    verified:
+      - apps/tenants/api/api_test.go:TestEveryRouteRequiresTenantManager
+      - apps/tenants/auth/auth_test.go:TestTokenChecks
+      - apps/tenants/auth/auth_test.go:TestRequire
+  AC-10:
+    text: "Only pods of the admin namespace can open a connection to Tenant Management (CiliumNetworkPolicy)."
+    level: e2e
+    planned: prototype/e2e/tenants_test.go:TestOnlyAdminNamespaceReachesTenantManagement
+    verified:
+      - prototype/e2e/tenants_test.go:TestOnlyAdminNamespaceReachesTenantManagement
+  AC-11:
+    text: "Every state change is logged with the acting admin's user ID, the action and the tenant_id; the admin's user ID comes from the request of an authenticated caller and is required on every mutation."
+    level: unit
+    planned: apps/tenants/api/api_test.go:TestMutationsAreLogged
+    verified:
+      - apps/tenants/api/api_test.go:TestMutationsAreLogged
+  AC-12:
+    text: "The tenants table is a platform table: only Tenant Management's database role has privileges on it, and the RLS guardrail names it in an explicit list of platform tables while still failing on any other table without forced RLS."
+    level: integration
+    planned: apps/tenants/store/store_test.go:TestTenantsTableIsPlatformOnly
+    verified:
+      - apps/tenants/store/store_test.go:TestTenantsTableIsPlatformOnly
+      - apps/tenants/store/store_test.go:TestMigrationsLeaveNoUnprotectedTables
+  AC-13:
+    text: "The admin app has a Tenants page: a list of tenants with name, state and creation time; a create dialog (name, first admin's email); a tenant page with its state, steps and last error that shows a Retry button while the tenant is in provisioning or deleting; suspend, resume and delete, where delete is offered only for a suspended tenant and asks to type the tenant's name."
+    level: unit
+    planned: apps/admin/ui/app/src/routes/tenants.test.tsx
+    verified:
+      - "apps/admin/ui/app/src/routes/tenants.test.tsx:tenants list"
+      - "apps/admin/ui/app/src/routes/tenants.test.tsx:tenant page"
+  AC-14:
+    text: "The admin app's tenant routes require a session with the role super-admin (401 or 403 otherwise) and the CSRF checks of ADR-0009, call Tenant Management with the app's machine token and the admin's user ID, and map its 400, 404 and 409 answers through and an outage to 502 or 504."
+    level: unit
+    planned: apps/admin/api/tenants_test.go:TestTenantRoutes
+    verified:
+      - apps/admin/api/tenants_test.go:TestTenantRoutes
+      - apps/admin/api/tenants_test.go:TestTenantErrorsAreMapped
+      - apps/admin/tenants/client_test.go:TestClientSendsTokenAndAdmin
+  AC-15:
+    text: "The admin app no longer creates or deletes Zitadel organizations directly: the Organizations page has no create or delete action, and the BFF has no routes for them (a request to the former routes answers 404 or 405 and calls no Zitadel API). Organizations are created and deleted only as tenants, through the Tenants page."
+    level: unit
+    planned: apps/admin/api/orgs_test.go:TestOrgCreateAndDeleteAreGone
+    verified:
+      - apps/admin/api/orgs_test.go:TestOrgCreateAndDeleteAreGone
+  AC-16:
+    text: "Tenant Management calls Zitadel only with short-lived access tokens that it gets with the JWT profile key of its machine user (ZITADEL_KEY_FILE); it has no personal access token. A token is reused until shortly before it expires; a call Zitadel answers with 401 drops the token and is sent once more with a new one. The bootstrap gives the machine user a new 30-day key on every run and deletes its other keys and tokens."
+    level: unit
+    planned: apps/tenants/zitadel/token_test.go:TestUnauthenticatedRetriesOnceWithNewToken
+    verified:
+      - apps/tenants/zitadel/token_test.go:TestUnauthenticatedRetriesOnceWithNewToken
+      - apps/tenants/zitadel/token_test.go:TestTokenRenewedBeforeExpiry
+      - apps/tenants/zitadel/token_test.go:TestShortTokenRenewedBeforeExpiry
+      - apps/tenants/zitadel/key_test.go:TestLoadKeyRejectsMissingOrInvalid
+      - prototype/e2e/tenants_test.go:TestTenantManagementHasOnlyShortKey
+  AC-17:
+    text: "After POST /tenants/{id}/suspend, requests with a token issued before the suspension get 403 at the API Gateway within 10 s, and the tenant's users get no new tokens; after resume a new token is accepted again."
+    level: e2e
+    planned: prototype/e2e/tenants_test.go:TestSuspendedTenantLosesAPIAccess
+    verified:
+      - prototype/e2e/tenants_test.go:TestSuspendedTenantLosesAPIAccess
+  AC-18:
+    text: "Every operation and a resync once a minute publish {tenant_id, state, at} to the compacted Kafka topic tenant-states, keyed by tenant_id. A failed publish is logged, never fails the request and never blocks it longer than 5 s."
+    level: unit
+    planned: apps/tenants/events/events_test.go:TestStateChangesArePublished
+    verified:
+      - apps/tenants/events/events_test.go:TestStateChangesArePublished
+      - apps/tenants/lifecycle/lifecycle_test.go:TestEveryOperationPublishesTheState
+      - apps/tenants/events/contract_test.go:TestRecordsMatchContract
+
+checklist:
+  T-01:
+    planned: "applies — two tenants A and B provisioned against fake Zitadel and Kubernetes APIs; suspend, resume, retry and delete of A never call Zitadel or Kubernetes for B's organization, users or namespace, and A's ID in the path acts only on A's row. Tenant Management → PostgreSQL, Zitadel, Kubernetes API."
+    verified:
+      - "apps/tenants/lifecycle/lifecycle_test.go:TestDeleteLeavesTombstoneAndOtherTenants"
+      - "apps/tenants/kube/client_test.go:TestNamespaceOfAnotherTenantIsNeverTouched"
+  T-02:
+    planned: "applies — new API in docs/contracts/tenants/openapi.yaml; Tenant Management's handlers and the admin BFF's client are tested against its examples; a broken body gets 400."
+    verified:
+      - "apps/tenants/api/contract_test.go:TestContractExamples"
+      - "apps/admin/tenants/client_test.go:TestClientSendsTokenAndAdmin"
+      - "apps/tenants/zitadel/client_test.go:TestRequestsMatchTheProtos"
+      - "apps/tenants/kube/client_test.go:TestEnsureNamespaceCreatesNamespaceQuotaAndPolicy"
+      - "apps/tenants/zitadel/token_test.go:TestBrokenTokenAnswerIsAnError"
+      - "apps/tenants/events/contract_test.go:TestRecordsMatchContract"
+      - "apps/gateway/tenantstate/contract_test.go:TestContractExamples"
+  T-04:
+    planned: "applies — every Tenant Management route with no token, a forged or expired token, a valid token without tenant-manager, and one with it; every admin BFF tenant route with no session, the viewer role and super-admin."
+    verified:
+      - "apps/tenants/api/api_test.go:TestEveryRouteRequiresTenantManager"
+      - "apps/tenants/auth/auth_test.go:TestTokenChecks"
+      - "apps/tenants/auth/auth_test.go:TestRequire"
+      - "apps/admin/api/tenants_test.go:TestTenantRoutes"
+  T-08:
+    planned: "applies — the tenants migration on an empty database and on one with rows; tenants is a platform table, privileges only for the service role, and the RLS guardrail lists it explicitly."
+    verified:
+      - "apps/tenants/store/store_test.go:TestMigrationsLeaveNoUnprotectedTables"
+      - "apps/tenants/store/store_test.go:TestMigrationsRunAgainOnADatabaseWithData"
+      - "apps/tenants/store/store_test.go:TestTenantsTableIsPlatformOnly"
+  T-11:
+    planned: "applies — a fuzz target for the request body decoder and validation of POST /tenants."
+    verified:
+      - "apps/tenants/api/validate_test.go:FuzzDecodeCreate"
+  T-12:
+    planned: "applies — canaries: the route test fails with the tenant-manager role check removed; the e2e network test fails without the ingress CiliumNetworkPolicy. The default-deny policy in each tenant namespace is created here; its cross-tenant test is HAMSP-58."
+    verified:
+      - "apps/tenants/auth/auth_test.go:TestTokenChecks"
+      - "apps/tenants/auth/auth_test.go:TestRequire"
+      - "prototype/e2e/tenants_test.go:TestOnlyAdminNamespaceReachesTenantManagement"
+      - "apps/tenants/lifecycle/lifecycle_test.go:TestEveryOperationPublishesTheState"
+
+quality_scenarios:
+  touched: [QS-02, QS-18]
+  recommended_runs: []
+
+gates:
+  G-01: {status: n/a, by: verify, date: 2026-11-10, note: no release flag}
+  G-02: {status: pass, by: verify, date: 2026-11-11, commit: a5d82a6}
+  G-03: {status: pass, by: verify, date: 2026-11-11, commit: a5d82a6, note: "docs/contracts/tenants/openapi.yaml and docs/contracts/tenant-states/record.v1.json with their examples; tenant-states added by verify, approved by the owner 2026-11-11"}
+  G-04: {status: pass, by: verify, date: 2026-11-11, commit: a5d82a6, level: basic}
+  G-05: {status: pass, by: verify, date: 2026-11-11, note: "QS-02 and QS-18 listed; no cheap QS test planned; QS-02's cross-tenant network test is HAMSP-58; QS-18's every-store deletion test not run; no load or chaos run recommended"}
+  G-07: {status: pass, by: owner, date: 2026-11-09}
+
+deviations:
+  - item: AC-16
+    change: added after the plan was approved (Tenant Management moves from a personal access token to a JWT profile key, as admin-app in HAMSP-36), on the owner's request in chat
+    approved: "2026-11-10"
+  - item: AC-17, AC-18
+    change: added after the plan was approved (HAMSP-52, suspended tenants rejected through the Kafka topic tenant-states), on the owner's request in chat
+    approved: "2026-11-11"
+  - item: T-02
+    change: "added by verify: the tenant-states record crosses from Tenant Management to the API Gateway and is a new contract (docs/contracts/tenant-states); approved by the owner in chat"
+    approved: "2026-11-11"
+
+runs:
+  - date: 2026-11-10
+    commit: cc7413b
+    stage_checked: alpha
+    verdict: ready
+    failed: []
+    not_checked: []
+  - date: 2026-11-11
+    commit: 58fc1cd
+    stage_checked: alpha
+    verdict: not-ready
+    failed: [T-02, G-03]
+    not_checked: []
+  - date: 2026-11-11
+    commit: a5d82a6
+    stage_checked: alpha
+    verdict: ready
+    failed: []
+    not_checked: []

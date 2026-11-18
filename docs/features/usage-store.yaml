@@ -1,0 +1,10 @@
+feature: usage-store
+title: "The usage store: schema, RLS views and roles, writes through the store interface"
+critical: true
+code:
+  - apps/usage/internal/store/**
+  - apps/usage/internal/migrations/**
+  - apps/usage/cmd/migrate/**
+c4: [usageStore]
+links:
+  issues: [HAMSP-23]

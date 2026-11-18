@@ -1,0 +1,21 @@
+# Only the admin app may reach Tenant Management (HAMSP-51 AC-10). The token
+# check stays: this policy is the second layer, not the only one. Kubelet
+# probes come from the host and are allowed by Cilium's default.
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: tenants-from-admin-only
+  namespace: tenants
+spec:
+  endpointSelector:
+    matchLabels:
+      app.kubernetes.io/name: tenants
+  ingress:
+    - fromEndpoints:
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: admin
+            app.kubernetes.io/name: admin
+      toPorts:
+        - ports:
+            - port: "8080"
+              protocol: TCP

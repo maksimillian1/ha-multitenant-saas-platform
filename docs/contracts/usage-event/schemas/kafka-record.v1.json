@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "usage-events record value v1",
+  "description": "The value of one record in topic usage-events, written by UsageWriteAPI. Key: tenant_id as UTF-8 bytes. The examples are what UsageWriteAPI's and Usage Writer's tests run against (README.md).",
+  "allOf": [{"$ref": "event.v1.json"}],
+  "required": ["schema_version"],
+  "properties": {
+    "schema_version": {"const": 1}
+  },
+  "examples": [
+    {
+      "schema_version": 1,
+      "event_id": "0192f6a8-7c1e-7b3a-9c4d-2f1e8a6b5c3d",
+      "event_time": "2026-10-24T20:15:03.123Z",
+      "tenant_id": "396438053259838069",
+      "metric": "api_calls",
+      "quantity": 1,
+      "attributes": {"method": "GET", "path": "/items/42", "status": 200,
+                     "duration_ms": 12, "request_bytes": 0, "response_bytes": 9007199254740993}
+    }
+  ]
+}
