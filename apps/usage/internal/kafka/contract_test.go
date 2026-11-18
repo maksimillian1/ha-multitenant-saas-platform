@@ -27,6 +27,7 @@ func jsonValue(t *testing.T, b []byte) any {
 // UsageWriteAPI writes exactly the Kafka version it declares, and the record
 // of the HTTP example's first event is the Kafka example. A new SchemaVersion
 // without a declaration and a schema with examples fails here.
+// Verifies: kafka-client-auth T-02
 func TestEncodeWritesTheProducedVersion(t *testing.T) {
 	want := fmt.Sprintf("v%d", core.SchemaVersion)
 	produces := contracttest.Produces(t, "kafka", "writeapi")
