@@ -14,24 +14,70 @@ acceptance:
   AC-1:
     text: "A record that does not decode (bad JSON, missing event_id, tenant_id or event_time, schema_version newer than the writer) goes to the DLQ topic with its key and value byte for byte and the headers dlq-reason, dlq-source (topic/partition/offset) and dlq-time. The next records of the partition are written."
     level: integration
+    planned: apps/usage/internal/writer/dlq_test.go:TestUndecodableRecordGoesToDLQ
   AC-2:
     text: "A record that fails core.Validate without the time window (for example quantity <= 0) goes to the DLQ before the database. The other records of the same fetch are written."
     level: integration
+    planned: apps/usage/internal/writer/dlq_test.go:TestInvalidEventGoesToDLQBeforeStore
   AC-3:
     text: "When the database returns an error of SQLSTATE class 22 or 23, the batch is split in halves until the bad record is found. That record goes to the DLQ; every other event of the batch is stored exactly once."
     level: integration
+    planned: apps/usage/internal/writer/dlq_test.go:TestDatabasePoisonIsIsolatedByBisection
   AC-4:
     text: "A transient database error (connection lost) sends nothing to the DLQ: the partition stops and retries. After the database is back every event is stored exactly once (QS-09)."
     level: integration
+    planned: apps/usage/internal/writer/writer_test.go:TestDatabaseOutageLosesNothing
   AC-5:
     text: "When writing to the DLQ fails, the offset is not committed and the event is not lost."
     level: integration
+    planned: apps/usage/internal/writer/dlq_test.go:TestFailedDLQWriteCommitsNoOffset
   AC-6:
     text: "Usage Writer exports a counter of records sent to the DLQ, and an alert rule fires when it is above 0."
     level: unit
+    planned: apps/usage/internal/writer/metrics_test.go:TestDLQCounterAndAlertRule
   AC-7:
     text: "writer replay sends the chosen DLQ records to the main topic with the value unchanged and the header replayed-from=dlq. The event is stored once; replaying it again adds no second row."
     level: integration
+    planned: apps/usage/internal/writer/replay_test.go:TestReplayStoresOnceAndTwiceIsNoop
   AC-8:
     text: "The DLQ topic has a retention of 7 days, set in its GitOps KafkaTopic manifest."
     level: manual
+    planned: "manual: after ArgoCD sync run kubectl -n kafka get kafkatopic usage-events-dlq -o jsonpath='{.spec.config.retention\\.ms}' and expect 604800000; read the manifest in prototype/k8s/apps/kafka/templates/kafka.yaml. Manual because the value is Strimzi config, not code."
+
+checklist:
+  T-01:
+    planned: >-
+      applies — a DLQ'd and then replayed event of tenant A is stored under tenant A only, in a
+      mixed batch with tenant B; bisection never moves an event to another tenant's write;
+      Kafka → Usage Writer → usage store (RLS on)
+  T-02:
+    planned: >-
+      applies — the DLQ record (original value + headers dlq-reason, dlq-source, dlq-time) and the
+      replayed-from header go into docs/contracts/usage-event/README.md; writer and replay pass
+      the existing usage-event examples; Usage Writer → Kafka
+  T-04:
+    planned: >-
+      applies (critical) — writer replay is a new action: it runs only as the writer's service
+      account inside the usage namespace; no HTTP endpoint is added; Kafka has no auth yet
+      (separate issue), so the test checks the network policy, not an ACL
+  T-08:
+    planned: does not apply — no migration
+  T-11:
+    planned: >-
+      applies (critical) — kafka.Decode parses records any pod can produce; a fuzz target checks
+      that every input either decodes or goes to the DLQ, never panics
+  T-12:
+    planned: >-
+      applies (critical) — the DLQ is a control against usage loss: the AC-1 and AC-3 tests are
+      shown to fail when the DLQ write is replaced by the old skip and by the old whole-batch retry
+
+quality_scenarios:
+  touched: [QS-06, QS-09]
+  tests:
+    QS-06:
+      planned: apps/usage/internal/writer/replay_test.go:TestReplayStoresOnceAndTwiceIsNoop
+    QS-09:
+      planned: apps/usage/internal/writer/writer_test.go:TestDatabaseOutageLosesNothing
+
+gates:
+  G-07: {status: not-checked, by: owner, date: 2026-11-18, note: plan for alpha waits for approval}
