@@ -6,7 +6,7 @@
 #
 # The private key never goes to Git: it is generated here, kept in
 # prototype/.kafka-ca/ (git-ignored) and loaded into the cluster as Secrets.
-# EKS gets its CA from External Secrets instead.
+# EKS is to get its CA from External Secrets (not done in HAMSP-31).
 #
 #   ./prototype/kafka-ca.sh           create the CA if needed and load the Secrets
 #   ./prototype/kafka-ca.sh --finish  drop the old CA once a replacement has rolled
