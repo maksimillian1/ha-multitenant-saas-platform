@@ -66,7 +66,7 @@ generation() { # SECRET ANNOTATION
 
 ensure_ca
 for ns in kafka "${CLIENT_NAMESPACES[@]}"; do
-  kubectl create namespace "${ns}" --dry-run=client -o yaml | kubectl apply -f - >/dev/null
+  kubectl get namespace "${ns}" &>/dev/null || kubectl create namespace "${ns}" >/dev/null
 done
 
 current=$(kubectl -n kafka get secret "${CERT_SECRET}" -o jsonpath='{.data.ca\.crt}' 2>/dev/null | base64 -d || true)
