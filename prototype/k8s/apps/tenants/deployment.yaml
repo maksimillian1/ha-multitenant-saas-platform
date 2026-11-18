@@ -20,6 +20,8 @@ spec:
         app.kubernetes.io/name: tenants
     spec:
       serviceAccountName: tenants
+      # The 5 s preStop pause plus up to 30 s of graceful shutdown (core/http.go).
+      terminationGracePeriodSeconds: 40
       # The image runs as nonroot (65532); runAsUser gives runAsNonRoot the
       # number to check, and fsGroup lets the process read the key file,
       # which is not readable by others.
@@ -84,6 +86,11 @@ spec:
             - name: zitadel-key
               mountPath: /var/run/secrets/zitadel
               readOnly: true
+          # On delete the endpoints are removed while SIGTERM is already on its way:
+          # keep serving for 5 s until every node stops sending new connections here.
+          lifecycle:
+            preStop:
+              sleep: {seconds: 5}
           readinessProbe:
             httpGet: {path: /readyz, port: http}
             periodSeconds: 5
