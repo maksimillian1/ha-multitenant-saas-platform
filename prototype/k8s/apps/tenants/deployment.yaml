@@ -40,7 +40,15 @@ spec:
           env:
             # Every tenant's state goes to the topic tenant-states (HAMSP-52).
             - name: KAFKA_BROKERS
-              value: usage-kafka-kafka-bootstrap.kafka.svc:9092
+              value: usage-kafka-kafka-bootstrap.kafka.svc:9093
+            # Switch step 2 of 3 (HAMSP-31): TLS with the cluster CA and a
+            # SCRAM login as KafkaUser tenants.
+            - name: KAFKA_CA_FILE
+              value: /etc/kafka-ca/ca.crt
+            - name: KAFKA_USERNAME
+              valueFrom: {secretKeyRef: {name: tenants-kafka, key: KAFKA_USERNAME}}
+            - name: KAFKA_PASSWORD
+              valueFrom: {secretKeyRef: {name: tenants-kafka, key: KAFKA_PASSWORD}}
             - name: DATABASE_URL
               valueFrom:
                 secretKeyRef:
@@ -70,6 +78,9 @@ spec:
             - name: TENANT_QUOTA_PODS
               value: "10"
           volumeMounts:
+            - name: kafka-ca
+              mountPath: /etc/kafka-ca
+              readOnly: true
             - name: zitadel-key
               mountPath: /var/run/secrets/zitadel
               readOnly: true
@@ -87,6 +98,11 @@ spec:
             readOnlyRootFilesystem: true
             capabilities: {drop: ["ALL"]}
       volumes:
+        # The usage-kafka cluster CA, loaded by prototype/kafka-ca.sh.
+        - name: kafka-ca
+          secret:
+            secretName: usage-kafka-ca
+            defaultMode: 0444
         - name: zitadel-key
           secret:
             secretName: tenants-zitadel

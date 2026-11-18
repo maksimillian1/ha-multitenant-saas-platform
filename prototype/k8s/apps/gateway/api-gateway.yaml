@@ -47,10 +47,22 @@ spec:
               value: /items=http://exampleapp.exampleapp.svc:8080
             # Suspended tenants are read from the topic tenant-states (HAMSP-52).
             - name: KAFKA_BROKERS
-              value: usage-kafka-kafka-bootstrap.kafka.svc:9092
+              value: usage-kafka-kafka-bootstrap.kafka.svc:9093
+            # Switch step 2 of 3 (HAMSP-31): TLS with the cluster CA and a
+            # SCRAM login as KafkaUser api-gateway.
+            - name: KAFKA_CA_FILE
+              value: /etc/kafka-ca/ca.crt
+            - name: KAFKA_USERNAME
+              valueFrom: {secretKeyRef: {name: api-gateway-kafka, key: KAFKA_USERNAME}}
+            - name: KAFKA_PASSWORD
+              valueFrom: {secretKeyRef: {name: api-gateway-kafka, key: KAFKA_PASSWORD}}
             # Every API call becomes a usage event (HAMSP-26).
             - name: USAGE_URL
               value: http://usage-writeapi.usage.svc:8080/v1/events
+          volumeMounts:
+            - name: kafka-ca
+              mountPath: /etc/kafka-ca
+              readOnly: true
           readinessProbe:
             httpGet: {path: /healthz, port: http}
             periodSeconds: 5
@@ -64,6 +76,12 @@ spec:
             allowPrivilegeEscalation: false
             readOnlyRootFilesystem: true
             capabilities: {drop: ["ALL"]}
+      volumes:
+        # The usage-kafka cluster CA, loaded by prototype/kafka-ca.sh.
+        - name: kafka-ca
+          secret:
+            secretName: usage-kafka-ca
+            defaultMode: 0444
 ---
 apiVersion: v1
 kind: Service
