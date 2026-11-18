@@ -37,23 +37,26 @@ metadata:
   annotations:
     argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
 spec:
+  # Our own cluster CA (cluster-ca.yaml, HAMSP-31): the clients trust it.
+  clusterCa:
+    generateCertificateAuthority: false
   kafka:
     version: 4.3.1
     metadataVersion: 4.3-IV0
     # No rack awareness here: kind nodes have no zone label. In EKS each broker
     # sits in its own AZ (ADR-0005, rack.topologyKey: topology.kubernetes.io/zone).
     listeners:
+      # Switch step 1 of 3 (HAMSP-31): the plain listener stays, without a
+      # login, until every client has moved to the TLS listener below.
       - name: plain
         port: 9092
         type: internal
         tls: false
-        # Every client is a KafkaUser with its own SCRAM password (HAMSP-31);
-        # the ACLs decide what it may do. Strimzi also turns the peers below
-        # into a NetworkPolicy (HAMSP-26 AC-8) as a second layer: a pod label
-        # is not an identity.
-        authentication:
-          type: scram-sha-512
-        networkPolicyPeers:
+        # Strimzi turns these into a NetworkPolicy: only these pods reach the
+        # client listeners (HAMSP-26 AC-8). The network policy is the second
+        # layer; the login and the ACLs are the first (a pod label is not an
+        # identity).
+        networkPolicyPeers: &clientPeers
           - namespaceSelector:
               matchLabels:
                 kubernetes.io/metadata.name: tenants
@@ -78,10 +81,23 @@ spec:
             podSelector:
               matchLabels:
                 app.kubernetes.io/name: usage-writer
-    # Simple ACLs: a user may do only what its KafkaUser lists. The
-    # operators use their own TLS listener and are superusers by default.
+      # Every client logs in as its own KafkaUser over TLS with the cluster CA
+      # (users.yaml, prototype/kafka-ca.sh).
+      - name: tls
+        port: 9093
+        type: internal
+        tls: true
+        authentication:
+          type: scram-sha-512
+        networkPolicyPeers: *clientPeers
+    # Simple ACLs: a user may do only what its KafkaUser lists. The operators
+    # use their own TLS listener and are superusers. ANONYMOUS, the principal
+    # of the plain listener, is a superuser only until step 3 of the switch
+    # removes that listener.
     authorization:
       type: simple
+      superUsers:
+        - ANONYMOUS
     config:
       default.replication.factor: 3
       min.insync.replicas: 2

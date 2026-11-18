@@ -128,6 +128,12 @@ for app in "${APPS[@]}"; do
   done
 done
 
+# ── 5b. Kafka cluster CA ──────────────────────────────────────────────────────
+# Our own CA for usage-kafka (HAMSP-31). Its key stays out of Git: the script
+# keeps it in prototype/.kafka-ca/ and loads it as Secrets before ArgoCD
+# creates the Kafka cluster.
+"${SCRIPT_DIR}/kafka-ca.sh"
+
 # ── 6. apply GitOps ApplicationSet ────────────────────────────────────────────
 # CNPG, MinIO, the Postgres cluster, Zitadel, ExampleApp, the API Gateway,
 # Strimzi with the usage Kafka cluster and the usage services.
