@@ -257,6 +257,8 @@ func deletePods(t *testing.T, ns, selector, deployment string) {
 
 // AC-1: an API call through the Gateway is stored as exactly one api_calls
 // event of the caller's tenant, with request data but no query string.
+//
+// Verifies: kafka-client-auth AC-2; T-01
 func TestAPICallIsStoredAsUsageEvent(t *testing.T) {
 	for _, ten := range []tenant{tenA, tenB} {
 		t.Run(ten.Name, func(t *testing.T) {
@@ -549,6 +551,8 @@ spec:
 
 // AC-14 / QS-17: one Kafka broker pod is deleted while events flow; every
 // event UsageWriteAPI acknowledged is stored.
+//
+// Verifies: kafka-client-auth QS-17
 func TestBrokerLossLosesNoAcknowledgedEvent(t *testing.T) {
 	if testing.Short() {
 		t.Skip("takes over a minute")
