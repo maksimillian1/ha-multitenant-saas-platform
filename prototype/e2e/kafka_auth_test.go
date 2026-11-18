@@ -407,7 +407,12 @@ func TestListenerSwitchKeepsAcknowledgedEvents(t *testing.T) {
 	if rate >= 1 {
 		t.Errorf("%.2f%% of requests failed, want below 1%%", rate)
 	}
-	waitForStoredIDs(t, acked, 5*time.Minute)
+	// In chunks: a step yields thousands of IDs, more than one psql argument holds.
+	for len(acked) > 0 {
+		n := min(500, len(acked))
+		waitForStoredIDs(t, acked[:n], 5*time.Minute)
+		acked = acked[n:]
+	}
 }
 
 // startSender starts the pod that sends one usage event of tenant A every
@@ -448,7 +453,8 @@ func retryKubectl(ctx context.Context, args ...string) (string, error) {
 }
 
 // rolloutState is the generation of the Kafka cluster and of every Kafka
-// client Deployment; it changes when a step of the switch is synced.
+// client Deployment, and the broker pods; it changes when a step of the
+// switch is synced.
 func rolloutState(ctx context.Context) (string, error) {
 	var parts []string
 	for _, r := range []string{"kafka/kafka/usage-kafka", "usage/deploy/usage-writeapi", "usage/deploy/usage-writer",
@@ -460,6 +466,13 @@ func rolloutState(ctx context.Context) (string, error) {
 		}
 		parts = append(parts, f[2]+"="+g)
 	}
+	// A new cluster CA rolls the brokers without changing a generation.
+	pods, err := retryKubectl(ctx, "-n", "kafka", "get", "pods", "-l", "strimzi.io/cluster=usage-kafka",
+		"-o", "jsonpath={.items[*].metadata.uid}")
+	if err != nil {
+		return "", err
+	}
+	parts = append(parts, "pods="+pods)
 	return strings.Join(parts, " "), nil
 }
 
