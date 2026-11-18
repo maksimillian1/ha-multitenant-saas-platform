@@ -19,6 +19,7 @@ func records(values ...[]byte) []*kgo.Record {
 
 // Usage Writer reads the examples of every Kafka version it declares in
 // participants.json.
+// Verifies: kafka-client-auth T-02
 func TestReadsEveryConsumedVersion(t *testing.T) {
 	for _, v := range contracttest.Consumes(t, "kafka", "writer") {
 		t.Run(v, func(t *testing.T) {
