@@ -322,50 +322,45 @@ func TestKafkaHasOnlyTheTLSListener(t *testing.T) {
 }
 
 // AC-6 runs once per deploy of the listener switch, not in the regular suite:
-// start it with E2E_LISTENER_SWITCH=1, then let ArgoCD sync the step. A pod
-// next to the API Gateway sends usage events to UsageWriteAPI until Kafka
-// and the clients have rolled and settled; then no acknowledged event may be
-// missing and fewer than 1% of requests may have failed (QS-17).
+// start it with E2E_LISTENER_SWITCH=1, then let ArgoCD sync the step (or run
+// prototype/kafka-ca.sh). A pod next to the API Gateway sends usage events to
+// UsageWriteAPI until Kafka and the clients have rolled and settled; then no
+// acknowledged event may be missing and fewer than 1% of requests may have
+// failed (QS-17). E2E_SWITCH_POD=<pod> adopts a sender pod that is already
+// running, for a run whose watcher stopped early: the pod's log covers the
+// whole step.
 //
 // Verifies: kafka-client-auth AC-6; QS-17
 func TestListenerSwitchKeepsAcknowledgedEvents(t *testing.T) {
 	if os.Getenv("E2E_LISTENER_SWITCH") == "" {
 		t.Skip("set E2E_LISTENER_SWITCH=1 and sync a step of the listener switch while it runs")
 	}
-	start := rolloutState(t)
-	prefix := randomID()[:8]
-	name := "e2e-switch-" + randomID()
-	// Event IDs are UUID-shaped: prefix-0000-4000-8000-<counter>.
-	script := fmt.Sprintf(`i=0
-while [ ! -f /tmp/stop ]; do
-  i=$((i+1))
-  id=$(printf '%s-0000-4000-8000-%%012d' $i)
-  now=$(date -u +%%Y-%%m-%%dT%%H:%%M:%%SZ)
-  code=$(curl -s -m 15 -o /dev/null -w '%%{http_code}' -H 'Content-Type: application/json' \
-    --data "{\"events\":[{\"event_id\":\"$id\",\"event_time\":\"$now\",\"tenant_id\":\"%s\",\"metric\":\"api_calls\",\"quantity\":1,\"attributes\":{\"path\":\"/e2e/listener-switch\"}}]}" \
-    http://usage-writeapi.usage.svc:8080/v1/events)
-  echo "$id $code"
-  sleep 0.2
-done
-echo done`, prefix, tenA.OrgID)
 	ctx, cancel := context.WithTimeout(context.Background(), 40*time.Minute)
 	defer cancel()
-	if _, err := kubectl(ctx, "-n", "gateway", "run", name, "--restart=Never", "--image=curlimages/curl:8.11.1",
-		"--labels=app.kubernetes.io/name=api-gateway", "--command", "--", "sh", "-c", script); err != nil {
-		t.Fatal(err)
+	name := os.Getenv("E2E_SWITCH_POD")
+	adopted := name != ""
+	if !adopted {
+		name = "e2e-switch-" + randomID()
+		startSender(ctx, t, name)
 	}
-	defer func() { _, _ = kubectl(context.Background(), "-n", "gateway", "delete", "pod", name, "--wait=false") }()
+	defer func() {
+		dctx, dcancel := context.WithTimeout(context.Background(), 2*time.Minute)
+		defer dcancel()
+		_, _ = retryKubectl(dctx, "-n", "gateway", "delete", "pod", name, "--wait=false")
+	}()
 
-	t.Logf("sending events; sync the step now (start: %s)", start)
-	changed := false
+	// A step counts as changed when a generation moves, or when the test
+	// starts while something is still rolling.
+	start, _ := rolloutState(ctx)
+	changed := adopted || !settled(ctx)
+	t.Logf("sending events from %s; sync the step now (start: %s)", name, start)
 	settledFor := 0
 	for ctx.Err() == nil {
 		time.Sleep(10 * time.Second)
-		now := rolloutState(t)
-		if now != start {
+		if now, err := rolloutState(ctx); err == nil && now != start {
 			changed = true
 		}
-		if changed && settled(t) {
+		if changed && settled(ctx) {
 			settledFor++
 		} else {
 			settledFor = 0
@@ -378,7 +373,7 @@ echo done`, prefix, tenA.OrgID)
 	if !changed {
 		t.Fatal("nothing rolled within the time limit; was the step synced?")
 	}
-	if _, err := kubectl(ctx, "-n", "gateway", "exec", name, "--", "touch", "/tmp/stop"); err != nil {
+	if _, err := retryKubectl(ctx, "-n", "gateway", "exec", name, "--", "touch", "/tmp/stop"); err != nil {
 		t.Fatal(err)
 	}
 	var log string
@@ -405,7 +400,7 @@ echo done`, prefix, tenA.OrgID)
 	}
 	total := len(acked) + failed
 	rate := 100 * float64(failed) / float64(max(1, total))
-	t.Logf("%d acknowledged, %d failed (%.2f%%) during the switch", len(acked), failed, rate)
+	t.Logf("%d acknowledged, %d failed (%.2f%%) during the step", len(acked), failed, rate)
 	if len(acked) == 0 {
 		t.Fatal("no event was acknowledged")
 	}
@@ -415,31 +410,62 @@ echo done`, prefix, tenA.OrgID)
 	waitForStoredIDs(t, acked, 5*time.Minute)
 }
 
+// startSender starts the pod that sends one usage event of tenant A every
+// 200 ms and logs "<event_id> <status>" per request until /tmp/stop exists.
+// Event IDs are UUID-shaped: <prefix>-0000-4000-8000-<counter>.
+func startSender(ctx context.Context, t *testing.T, name string) {
+	t.Helper()
+	script := fmt.Sprintf(`i=0
+while [ ! -f /tmp/stop ]; do
+  i=$((i+1))
+  id=$(printf '%s-0000-4000-8000-%%012d' $i)
+  now=$(date -u +%%Y-%%m-%%dT%%H:%%M:%%SZ)
+  code=$(curl -s -m 15 -o /dev/null -w '%%{http_code}' -H 'Content-Type: application/json' \
+    --data "{\"events\":[{\"event_id\":\"$id\",\"event_time\":\"$now\",\"tenant_id\":\"%s\",\"metric\":\"api_calls\",\"quantity\":1,\"attributes\":{\"path\":\"/e2e/listener-switch\"}}]}" \
+    http://usage-writeapi.usage.svc:8080/v1/events)
+  echo "$id $code"
+  sleep 0.2
+done
+echo done`, randomID()[:8], tenA.OrgID)
+	if _, err := retryKubectl(ctx, "-n", "gateway", "run", name, "--restart=Never", "--image=curlimages/curl:8.11.1",
+		"--labels=app.kubernetes.io/name=api-gateway", "--command", "--", "sh", "-c", script); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// retryKubectl retries kubectl while the API server is briefly unreachable,
+// which happens on kind while every broker and client rolls.
+func retryKubectl(ctx context.Context, args ...string) (string, error) {
+	var out string
+	var err error
+	for range 5 {
+		if out, err = kubectl(ctx, args...); err == nil || ctx.Err() != nil {
+			return out, err
+		}
+		time.Sleep(3 * time.Second)
+	}
+	return out, err
+}
+
 // rolloutState is the generation of the Kafka cluster and of every Kafka
 // client Deployment; it changes when a step of the switch is synced.
-func rolloutState(t *testing.T) string {
-	t.Helper()
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-	defer cancel()
+func rolloutState(ctx context.Context) (string, error) {
 	var parts []string
 	for _, r := range []string{"kafka/kafka/usage-kafka", "usage/deploy/usage-writeapi", "usage/deploy/usage-writer",
 		"gateway/deploy/api-gateway", "tenants/deploy/tenants"} {
 		f := strings.SplitN(r, "/", 3)
-		g, err := kubectl(ctx, "-n", f[0], "get", f[1], f[2], "-o", "jsonpath={.metadata.generation}")
+		g, err := retryKubectl(ctx, "-n", f[0], "get", f[1], f[2], "-o", "jsonpath={.metadata.generation}")
 		if err != nil {
-			t.Fatal(err)
+			return "", err
 		}
 		parts = append(parts, f[2]+"="+g)
 	}
-	return strings.Join(parts, " ")
+	return strings.Join(parts, " "), nil
 }
 
 // settled reports whether the Kafka cluster is Ready for its latest
 // generation, every broker pod is Ready and every client Deployment is rolled.
-func settled(t *testing.T) bool {
-	t.Helper()
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-	defer cancel()
+func settled(ctx context.Context) bool {
 	k, err := kubectl(ctx, "-n", "kafka", "get", "kafka", "usage-kafka", "-o",
 		`jsonpath={.metadata.generation} {.status.observedGeneration} {.status.conditions[?(@.type=="Ready")].status}`)
 	if err != nil {
