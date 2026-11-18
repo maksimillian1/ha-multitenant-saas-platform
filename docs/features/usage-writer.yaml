@@ -36,13 +36,17 @@ acceptance:
     level: unit
     planned: apps/usage/internal/writer/metrics_test.go:TestDLQCounterAndAlertRule
   AC-7:
-    text: "writer replay sends the chosen DLQ records to the main topic with the value unchanged and the header replayed-from=dlq. The event is stored once; replaying it again adds no second row."
+    text: "writer replay runs as its own Job and logs in as the KafkaUser usage-replay. It sends the chosen DLQ records to the main topic with the value unchanged and the header replayed-from=dlq. The event is stored once; replaying it again adds no second row."
     level: integration
     planned: apps/usage/internal/writer/replay_test.go:TestReplayStoresOnceAndTwiceIsNoop
   AC-8:
     text: "The DLQ topic has a retention of 7 days, set in its GitOps KafkaTopic manifest."
     level: manual
     planned: "manual: after ArgoCD sync run kubectl -n kafka get kafkatopic usage-events-dlq -o jsonpath='{.spec.config.retention\\.ms}' and expect 604800000; read the manifest in prototype/k8s/apps/kafka/templates/kafka.yaml. Manual because the value is Strimzi config, not code."
+  AC-9:
+    text: "Kafka ACLs: usage-writer can write to usage-events-dlq and still cannot write to usage-events; usage-replay can read usage-events-dlq and write to usage-events, and cannot read usage-events or write to usage-events-dlq; usage-writeapi cannot read or write usage-events-dlq."
+    level: e2e
+    planned: prototype/e2e/kafka_auth_test.go:TestDLQAndReplayUsersACLs
 
 checklist:
   T-01:
@@ -57,9 +61,9 @@ checklist:
       the existing usage-event examples; Usage Writer → Kafka
   T-04:
     planned: >-
-      applies (critical) — writer replay is a new action: it runs only as the writer's service
-      account inside the usage namespace; no HTTP endpoint is added; Kafka has no auth yet
-      (separate issue), so the test checks the network policy, not an ACL
+      applies (critical) — writer replay is a new action with its own KafkaUser usage-replay;
+      the ACLs of usage-writer, usage-replay and usage-writeapi are checked in both directions on
+      kind (AC-9); the kafka-client-auth ACL tests stay green; Usage Writer, replay Job → Kafka
   T-08:
     planned: does not apply — no migration
   T-11:
@@ -80,4 +84,4 @@ quality_scenarios:
       planned: apps/usage/internal/writer/writer_test.go:TestDatabaseOutageLosesNothing
 
 gates:
-  G-07: {status: pass, by: owner, date: 2026-11-18, note: plan for alpha approved in chat}
+  G-07: {status: not-checked, by: owner, date: 2026-11-18, note: "alpha plan changed for Kafka auth (AC-7, AC-9, T-04); waits for approval"}
