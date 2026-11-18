@@ -10,6 +10,7 @@ code:
   - apps/gateway/tenantstate/auth.go
   - apps/tenants/events/auth.go
   - prototype/e2e/kafka_auth_test.go
+  - prototype/kafka-ca.sh
 c4: [kafka]
 links:
   issues: [HAMSP-31]
