@@ -543,7 +543,7 @@ func TestDLQAndReplayUsersACLs(t *testing.T) {
 	out := runKafkaSteps(t,
 		kafkaStep{name: "writer-dlq", login: writer, cmd: produceCmd("usage-events-dlq"), stdin: dlqRecord},
 		kafkaStep{name: "writer-main", login: writer, cmd: produceCmd("usage-events") + noIdem, stdin: dlqRecord},
-		kafkaStep{name: "replay-read-dlq", login: replay, cmd: readCmd("usage-events-dlq")},
+		kafkaStep{name: "replay-read-dlq", login: replay, cmd: readAnyPartitionCmd("usage-events-dlq", 6)},
 		kafkaStep{name: "replay-main", login: replay, cmd: produceCmd("usage-events"), stdin: replayed},
 		kafkaStep{name: "replay-read-main", login: replay, cmd: readCmd("usage-events")},
 		kafkaStep{name: "replay-write-dlq", login: replay, cmd: produceCmd("usage-events-dlq") + noIdem, stdin: dlqRecord},
@@ -553,10 +553,23 @@ func TestDLQAndReplayUsersACLs(t *testing.T) {
 	mustNotContain(t, out["writer-dlq"], "ERROR", "usage-writer produces to usage-events-dlq")
 	mustContain(t, out["writer-main"], "TopicAuthorizationException", "usage-writer produces to usage-events")
 	mustContain(t, out["replay-read-dlq"], "Processed a total of 1 messages", "usage-replay reads usage-events-dlq")
+	mustNotContain(t, out["replay-read-dlq"], "AuthorizationException", "usage-replay reads usage-events-dlq")
 	mustNotContain(t, out["replay-main"], "ERROR", "usage-replay produces to usage-events")
 	mustContain(t, out["replay-read-main"], "TopicAuthorizationException", "usage-replay reads usage-events")
 	mustContain(t, out["replay-write-dlq"], "TopicAuthorizationException", "usage-replay produces to usage-events-dlq")
 	mustContain(t, out["writeapi-read-dlq"], "TopicAuthorizationException", "usage-writeapi reads usage-events-dlq")
 	mustContain(t, out["writeapi-write-dlq"], "TopicAuthorizationException", "usage-writeapi produces to usage-events-dlq")
 	waitForStoredIDs(t, []string{id}, 2*time.Minute)
+}
+
+// readAnyPartitionCmd reads one record from each of the topic's partitions
+// without a consumer group, so a record keyed by tenant is found wherever it
+// landed.
+func readAnyPartitionCmd(topic string, partitions int) string {
+	cmd := ""
+	for p := range partitions {
+		cmd += kafkaBin + "/kafka-console-consumer.sh --bootstrap-server " + kafkaTLS + " --topic " + topic +
+			" --partition " + strconv.Itoa(p) + " --offset earliest --max-messages 1 --timeout-ms 5000 --consumer.config $C; "
+	}
+	return cmd
 }
