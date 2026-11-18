@@ -380,10 +380,11 @@ if curl -s -m 5 -o /dev/null http://usage-writeapi.usage.svc:8080/healthz; then 
 }
 
 // AC-8: only UsageWriteAPI, Usage Writer, the API Gateway and Tenant
-// Management can connect to the Kafka client listener. The control pod carries Usage Writer's label and gets through.
+// Management can connect to the Kafka client listener (9093 since HAMSP-31
+// removed the plain one). The control pod carries Usage Writer's label and gets through.
 func TestDirectAccessToKafkaIsBlocked(t *testing.T) {
 	// time_connect is 0 when the TCP connection was never established.
-	script := `curl -s -m 8 --connect-timeout 4 -o /dev/null -w 'connect=%{time_connect}' telnet://usage-kafka-kafka-bootstrap.kafka.svc:9092 </dev/null; true`
+	script := `curl -s -m 8 --connect-timeout 4 -o /dev/null -w 'connect=%{time_connect}' telnet://usage-kafka-kafka-bootstrap.kafka.svc:9093 </dev/null; true`
 	connected := func(out string) bool {
 		v, ok := strings.CutPrefix(strings.TrimSpace(out), "connect=")
 		f, err := strconv.ParseFloat(v, 64)
