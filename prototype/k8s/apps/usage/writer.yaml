@@ -29,7 +29,7 @@ spec:
           env:
             - name: KAFKA_BROKERS
               value: usage-kafka-kafka-bootstrap.kafka.svc:9093
-            # Switch step 2 of 3 (HAMSP-31): TLS with the cluster CA and a
+            # HAMSP-31: TLS with the cluster CA and a
             # SCRAM login as KafkaUser usage-writer.
             - name: KAFKA_CA_FILE
               value: /etc/kafka-ca/ca.crt
