@@ -1,5 +1,5 @@
 # One KafkaUser per Kafka client (HAMSP-31): UsageWriteAPI, Usage Writer,
-# Tenant Management and the API Gateway. usage migrate has none: it needs no
+# writer replay (HAMSP-30), Tenant Management and the API Gateway. usage migrate has none: it needs no
 # Kafka. Local kind prototype passwords only; the same values are in
 # the Secrets of each client's namespace, because a Strimzi user lives in the
 # Kafka namespace and the pods read their password in the usage namespace.
@@ -43,7 +43,8 @@ spec:
       - resource: {type: cluster}
         operations: [IdempotentWrite]
 ---
-# Usage Writer: read usage-events with its own consumer group only.
+# Usage Writer: read usage-events with its own consumer group only, and write
+# poison records to usage-events-dlq (HAMSP-30).
 apiVersion: kafka.strimzi.io/v1
 kind: KafkaUser
 metadata:
@@ -65,6 +66,45 @@ spec:
         operations: [Read, Describe]
       - resource: {type: group, name: usage-writer, patternType: literal}
         operations: [Read]
+      - resource: {type: topic, name: usage-events-dlq, patternType: literal}
+        operations: [Write, Describe]
+      - resource: {type: cluster}
+        operations: [IdempotentWrite]
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: usage-replay-kafka-password
+type: Opaque
+stringData:
+  password: dev-usage-replay-kafka # gitleaks:allow
+---
+# writer replay (HAMSP-30): read usage-events-dlq without a consumer group and
+# write the chosen records back to usage-events. It cannot read usage-events
+# or write usage-events-dlq.
+apiVersion: kafka.strimzi.io/v1
+kind: KafkaUser
+metadata:
+  name: usage-replay
+  labels:
+    strimzi.io/cluster: usage-kafka
+  annotations:
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
+spec:
+  authentication:
+    type: scram-sha-512
+    password:
+      valueFrom:
+        secretKeyRef: {name: usage-replay-kafka-password, key: password}
+  authorization:
+    type: simple
+    acls:
+      - resource: {type: topic, name: usage-events-dlq, patternType: literal}
+        operations: [Read, Describe]
+      - resource: {type: topic, name: usage-events, patternType: literal}
+        operations: [Write, Describe]
+      - resource: {type: cluster}
+        operations: [IdempotentWrite]
 ---
 apiVersion: v1
 kind: Secret

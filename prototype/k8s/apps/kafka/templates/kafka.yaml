@@ -119,6 +119,24 @@ spec:
     min.insync.replicas: 2
     retention.ms: 604800000
 ---
+# Usage Writer's dead-letter topic (HAMSP-30, feature usage-writer): poison
+# records, key and value unchanged, the reason in headers. Retention counts
+# from the DLQ write and is the time to replay them (writer replay).
+apiVersion: kafka.strimzi.io/v1
+kind: KafkaTopic
+metadata:
+  name: usage-events-dlq
+  labels:
+    strimzi.io/cluster: usage-kafka
+  annotations:
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
+spec:
+  partitions: 6
+  replicas: 3
+  config:
+    min.insync.replicas: 2
+    retention.ms: 604800000
+---
 # Every tenant's latest state, key tenant_id, written by Tenant Management and
 # read in full by every API Gateway replica (ADR-0012, item 5, HAMSP-52).
 # Compacted: the latest state per tenant is kept forever.
