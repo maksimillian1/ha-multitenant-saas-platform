@@ -29,7 +29,24 @@ spec:
               containerPort: 8080
           env:
             - name: KAFKA_BROKERS
-              value: usage-kafka-kafka-bootstrap.kafka.svc:9092
+              value: usage-kafka-kafka-bootstrap.kafka.svc:9093
+            # HAMSP-31: TLS with the cluster CA and a
+            # SCRAM login as KafkaUser usage-writeapi.
+            - name: KAFKA_CA_FILE
+              value: /etc/kafka-ca/ca.crt
+            - name: KAFKA_USERNAME
+              valueFrom: {secretKeyRef: {name: usage-writeapi-kafka, key: KAFKA_USERNAME}}
+            - name: KAFKA_PASSWORD
+              valueFrom: {secretKeyRef: {name: usage-writeapi-kafka, key: KAFKA_PASSWORD}}
+          volumeMounts:
+            - name: kafka-ca
+              mountPath: /etc/kafka-ca
+              readOnly: true
+          # On delete the endpoints are removed while SIGTERM is already on its way:
+          # keep serving for 5 s until every node stops sending new connections here.
+          lifecycle:
+            preStop:
+              sleep: {seconds: 5}
           readinessProbe:
             httpGet: {path: /readyz, port: http}
             periodSeconds: 5
@@ -43,6 +60,12 @@ spec:
             allowPrivilegeEscalation: false
             readOnlyRootFilesystem: true
             capabilities: {drop: ["ALL"]}
+      volumes:
+        # The usage-kafka cluster CA, loaded by prototype/kafka-ca.sh.
+        - name: kafka-ca
+          secret:
+            secretName: usage-kafka-ca
+            defaultMode: 0444
 ---
 apiVersion: v1
 kind: Service

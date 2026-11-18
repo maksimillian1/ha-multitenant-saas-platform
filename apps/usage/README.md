@@ -10,6 +10,12 @@ One Go module, three binaries, one image each. Built from one `Dockerfile` by ta
 
 Independent releases are a non-goal: the three images share the git SHA and roll out together. The split isolates code, image and credentials. Revisit when the writer's rebalance on every rollout shows as consumer lag; then use reproducible builds and pin digests, so unchanged images do not roll.
 
+## Kafka access
+
+Each binary that uses Kafka is its own KafkaUser (HAMSP-31, [kafka-client-auth](../../docs/features/kafka-client-auth.yaml)): it connects to the TLS listener `usage-kafka-kafka-bootstrap.kafka.svc:9093`, trusts only the cluster CA and logs in with SCRAM-SHA-512. ACLs give `usage-writeapi` produce on `usage-events` and `usage-writer` read on `usage-events` with its group `usage-writer`; migrate has no Kafka login. The network policy on the brokers stays as a second layer.
+
+The clients read `KAFKA_BROKERS`, `KAFKA_CA_FILE`, `KAFKA_USERNAME` and `KAFKA_PASSWORD` (`internal/kafka/auth.go`). A login without a CA file is refused at start: SCRAM runs only over TLS. With none of them set, the client connects without TLS and login, which the tests against kfake use. The CA on kind comes from `prototype/kafka-ca.sh` (`prototype/README.md`, "Kafka cluster CA").
+
 ## Import boundaries
 
 | Package | Must never link |

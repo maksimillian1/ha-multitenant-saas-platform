@@ -38,6 +38,11 @@ type Config struct {
 	// for the API Gateway (ADR-0012, item 5).
 	KafkaBrokers []string
 	TenantStates string
+	// KafkaUsername and KafkaPassword: the SCRAM login of the tenants KafkaUser (HAMSP-31).
+	KafkaUsername string
+	KafkaPassword string
+	// KafkaCAFile: the usage-kafka cluster CA the client trusts (HAMSP-31).
+	KafkaCAFile string
 }
 
 func GetEnv(key, defaultVal string) string {
@@ -67,6 +72,9 @@ func LoadConfig() Config {
 		StepTimeout:        timeout,
 		KafkaBrokers:       splitList(GetEnv("KAFKA_BROKERS", "")),
 		TenantStates:       GetEnv("TENANT_STATES_TOPIC", "tenant-states"),
+		KafkaUsername:      GetEnv("KAFKA_USERNAME", ""),
+		KafkaPassword:      GetEnv("KAFKA_PASSWORD", ""),
+		KafkaCAFile:        GetEnv("KAFKA_CA_FILE", ""),
 	}
 }
 

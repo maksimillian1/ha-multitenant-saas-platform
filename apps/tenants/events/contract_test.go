@@ -48,6 +48,7 @@ func loadSchema(t *testing.T) recordSchema {
 // an RFC 3339 time.
 //
 // Verifies: tenant-management T-02; AC-18
+// Verifies: kafka-client-auth T-02
 func TestRecordsMatchContract(t *testing.T) {
 	schema := loadSchema(t)
 	states := []core.State{core.StateProvisioning, core.StateActive, core.StateSuspended, core.StateDeleting, core.StateDeleted}

@@ -30,6 +30,7 @@ func contractExamples(t *testing.T) []json.RawMessage {
 // it does not know keeps the tenant's earlier one.
 //
 // Verifies: gateway-auth AC-2; tenant-management T-02
+// Verifies: kafka-client-auth T-02
 func TestContractExamples(t *testing.T) {
 	s := New()
 	for _, raw := range contractExamples(t) {

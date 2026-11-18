@@ -257,6 +257,8 @@ func deletePods(t *testing.T, ns, selector, deployment string) {
 
 // AC-1: an API call through the Gateway is stored as exactly one api_calls
 // event of the caller's tenant, with request data but no query string.
+//
+// Verifies: kafka-client-auth AC-2; T-01
 func TestAPICallIsStoredAsUsageEvent(t *testing.T) {
 	for _, ten := range []tenant{tenA, tenB} {
 		t.Run(ten.Name, func(t *testing.T) {
@@ -380,10 +382,11 @@ if curl -s -m 5 -o /dev/null http://usage-writeapi.usage.svc:8080/healthz; then 
 }
 
 // AC-8: only UsageWriteAPI, Usage Writer, the API Gateway and Tenant
-// Management can connect to the Kafka client listener. The control pod carries Usage Writer's label and gets through.
+// Management can connect to the Kafka client listener (9093 since HAMSP-31
+// removed the plain one). The control pod carries Usage Writer's label and gets through.
 func TestDirectAccessToKafkaIsBlocked(t *testing.T) {
 	// time_connect is 0 when the TCP connection was never established.
-	script := `curl -s -m 8 --connect-timeout 4 -o /dev/null -w 'connect=%{time_connect}' telnet://usage-kafka-kafka-bootstrap.kafka.svc:9092 </dev/null; true`
+	script := `curl -s -m 8 --connect-timeout 4 -o /dev/null -w 'connect=%{time_connect}' telnet://usage-kafka-kafka-bootstrap.kafka.svc:9093 </dev/null; true`
 	connected := func(out string) bool {
 		v, ok := strings.CutPrefix(strings.TrimSpace(out), "connect=")
 		f, err := strconv.ParseFloat(v, 64)
@@ -548,6 +551,8 @@ spec:
 
 // AC-14 / QS-17: one Kafka broker pod is deleted while events flow; every
 // event UsageWriteAPI acknowledged is stored.
+//
+// Verifies: kafka-client-auth QS-17
 func TestBrokerLossLosesNoAcknowledgedEvent(t *testing.T) {
 	if testing.Short() {
 		t.Skip("takes over a minute")

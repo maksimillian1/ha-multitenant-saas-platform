@@ -57,12 +57,12 @@ func (s *States) apply(e Event) {
 
 // Follow reads the whole topic from the start, without a consumer group, so
 // every replica holds every tenant, and keeps reading until ctx ends.
-func (s *States) Follow(ctx context.Context, brokers []string, topic string, log *slog.Logger) error {
-	client, err := kgo.NewClient(
+func (s *States) Follow(ctx context.Context, brokers []string, topic string, log *slog.Logger, extra ...kgo.Opt) error {
+	client, err := kgo.NewClient(append([]kgo.Opt{
 		kgo.SeedBrokers(brokers...),
 		kgo.ConsumeTopics(topic),
 		kgo.ConsumeResetOffset(kgo.NewOffset().AtStart()),
-	)
+	}, extra...)...)
 	if err != nil {
 		return err
 	}

@@ -21,6 +21,9 @@ type Config struct {
 	UsageMaxPending int
 	KafkaBrokers    []string
 	TenantStates    string
+	KafkaUsername   string
+	KafkaPassword   string
+	KafkaCAFile     string
 }
 
 func GetEnv(key, defaultVal string) string {
@@ -46,6 +49,9 @@ func LoadConfig() Config {
 		UsageMaxPending: maxPending,
 		KafkaBrokers:    splitList(GetEnv("KAFKA_BROKERS", "")),
 		TenantStates:    GetEnv("TENANT_STATES_TOPIC", "tenant-states"),
+		KafkaUsername:   GetEnv("KAFKA_USERNAME", ""),
+		KafkaPassword:   GetEnv("KAFKA_PASSWORD", ""),
+		KafkaCAFile:     GetEnv("KAFKA_CA_FILE", ""),
 	}
 }
 
