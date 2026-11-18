@@ -104,11 +104,13 @@ func runKafkaSteps(t *testing.T, steps ...kafkaStep) map[string]string {
 	res := map[string]string{}
 	for _, s := range steps {
 		_, rest, ok := strings.Cut(out, ">>> "+s.name+"\n")
-		body, _, ok2 := strings.Cut(rest, "<<< "+s.name)
+		body, trailer, ok2 := strings.Cut(rest, "<<< "+s.name)
 		if !ok || !ok2 {
 			t.Fatalf("step %s has no output:\n%s", s.name, out)
 		}
-		res[s.name] = body
+		// The trailer line holds the exit code: "<<< name rc=N".
+		rc, _, _ := strings.Cut(trailer, "\n")
+		res[s.name] = body + strings.TrimSpace(rc)
 	}
 	return res
 }
@@ -131,7 +133,7 @@ func runPod(t *testing.T, ns, image, labels, script string, within time.Duration
 		_, _ = kubectl(dctx, "-n", ns, "delete", "pod", name, "--wait=false")
 	}()
 	for {
-		phase, err := kubectl(ctx, "-n", ns, "get", "pod", name, "-o", "jsonpath={.status.phase}")
+		phase, err := retryKubectl(ctx, "-n", ns, "get", "pod", name, "-o", "jsonpath={.status.phase}")
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -144,7 +146,7 @@ func runPod(t *testing.T, ns, image, labels, script string, within time.Duration
 		case <-time.After(2 * time.Second):
 		}
 	}
-	out, err := kubectl(ctx, "-n", ns, "logs", name)
+	out, err := retryKubectl(ctx, "-n", ns, "logs", name)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -211,15 +213,22 @@ func TestKafkaRejectsClientWithoutValidLogin(t *testing.T) {
 		kafkaStep{name: "control", login: writeapi, cmd: produceCmd("usage-events"), stdin: controlRecord},
 		kafkaStep{name: "wrong-password", login: wrong, cmd: produceCmd("usage-events"), stdin: record},
 		kafkaStep{name: "tls-without-login", login: kafkaLogin{protocol: "SSL"}, cmd: produceCmd("usage-events"), stdin: record},
-		kafkaStep{name: "no-tls", login: kafkaLogin{protocol: "PLAINTEXT"}, cmd: produceCmd("usage-events"), stdin: record},
+		// A plaintext Kafka request (ApiVersions v0). The Kafka CLI cannot be
+		// used here: a plaintext client reads the TLS answer as a huge
+		// response size and runs out of memory.
+		kafkaStep{name: "no-tls", login: kafkaLogin{protocol: "PLAINTEXT"}, cmd: `bash -c 'exec 3<>/dev/tcp/` +
+			strings.Replace(kafkaTLS, ":", "/", 1) + `; printf "\\x00\\x00\\x00\\x0b\\x00\\x12\\x00\\x00\\x00\\x00\\x00\\x01\\x00\\x01x" >&3; head -c 8 <&3 | od -An -tx1'`},
 	)
 	mustNotContain(t, out["control"], "ERROR", "control produce with the usage-writeapi login")
 	mustContain(t, out["control"], "rc=0", "control produce with the usage-writeapi login")
 	mustContain(t, out["wrong-password"], "SaslAuthenticationException", "wrong password")
 	// The listener expects a SASL handshake; a TLS client without SASL is cut off.
 	mustContain(t, out["tls-without-login"], "ERROR", "TLS without a login")
-	// A plaintext client cannot talk to a TLS listener at all.
-	mustContain(t, out["no-tls"], "ERROR", "plaintext client")
+	// A plaintext request gets a TLS alert (record type 0x15), not a Kafka
+	// response: the listener speaks only TLS.
+	if f := strings.Fields(out["no-tls"]); len(f) == 0 || f[0] != "15" {
+		t.Errorf("plaintext request: want a TLS alert (first byte 15), got %q", out["no-tls"])
+	}
 	waitForStoredIDs(t, []string{controlID}, 2*time.Minute)
 }
 
@@ -251,7 +260,9 @@ func TestWriterUserOnlyConsumesWithItsGroup(t *testing.T) {
 		kafkaStep{name: "own-group", login: writer, cmd: kafkaBin + "/kafka-consumer-groups.sh --bootstrap-server " + kafkaTLS +
 			" --command-config $C --describe --group usage-writer"},
 		kafkaStep{name: "other-group", login: writer, cmd: groupReadCmd("usage-events", "e2e-other-"+randomID())},
-		kafkaStep{name: "produce", login: writer, cmd: produceCmd("usage-events"), stdin: record},
+		// Not idempotent: an idempotent producer is refused by the missing
+		// IdempotentWrite cluster ACL before the topic ACL is checked.
+		kafkaStep{name: "produce", login: writer, cmd: produceCmd("usage-events") + " --producer-property enable.idempotence=false", stdin: record},
 	)
 	mustContain(t, out["read"], "Processed a total of 1 messages", "usage-writer reads usage-events")
 	mustNotContain(t, out["own-group"], "Exception", "usage-writer describes its group")
