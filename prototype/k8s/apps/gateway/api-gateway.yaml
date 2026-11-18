@@ -63,6 +63,11 @@ spec:
             - name: kafka-ca
               mountPath: /etc/kafka-ca
               readOnly: true
+          # On delete the endpoints are removed while SIGTERM is already on its way:
+          # keep serving for 5 s until every node stops sending new connections here.
+          lifecycle:
+            preStop:
+              sleep: {seconds: 5}
           readinessProbe:
             httpGet: {path: /healthz, port: http}
             periodSeconds: 5
