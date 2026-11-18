@@ -28,9 +28,21 @@ spec:
               containerPort: 8080
           env:
             - name: KAFKA_BROKERS
-              value: usage-kafka-kafka-bootstrap.kafka.svc:9092
+              value: usage-kafka-kafka-bootstrap.kafka.svc:9093
+            # HAMSP-31: TLS with the cluster CA and a
+            # SCRAM login as KafkaUser usage-writer.
+            - name: KAFKA_CA_FILE
+              value: /etc/kafka-ca/ca.crt
+            - name: KAFKA_USERNAME
+              valueFrom: {secretKeyRef: {name: usage-writer-kafka, key: KAFKA_USERNAME}}
+            - name: KAFKA_PASSWORD
+              valueFrom: {secretKeyRef: {name: usage-writer-kafka, key: KAFKA_PASSWORD}}
             - name: DATABASE_URL
               valueFrom: {secretKeyRef: {name: usage-writer-db, key: DATABASE_URL}}
+          volumeMounts:
+            - name: kafka-ca
+              mountPath: /etc/kafka-ca
+              readOnly: true
           livenessProbe:
             httpGet: {path: /healthz, port: http}
             periodSeconds: 10
@@ -41,3 +53,9 @@ spec:
             allowPrivilegeEscalation: false
             readOnlyRootFilesystem: true
             capabilities: {drop: ["ALL"]}
+      volumes:
+        # The usage-kafka cluster CA, loaded by prototype/kafka-ca.sh.
+        - name: kafka-ca
+          secret:
+            secretName: usage-kafka-ca
+            defaultMode: 0444

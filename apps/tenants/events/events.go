@@ -33,13 +33,14 @@ type Publisher struct {
 	client *kgo.Client
 }
 
-func NewPublisher(brokers []string, topic string, log *slog.Logger) (*Publisher, error) {
+func NewPublisher(brokers []string, topic string, log *slog.Logger, extra ...kgo.Opt) (*Publisher, error) {
 	opts := []kgo.Opt{
 		kgo.SeedBrokers(brokers...),
 		kgo.DefaultProduceTopic(topic),
 		kgo.RequiredAcks(kgo.AllISRAcks()),
 		kgo.RecordDeliveryTimeout(publishTimeout),
 	}
+	opts = append(opts, extra...)
 	client, err := kgo.NewClient(opts...)
 	if err != nil {
 		return nil, err

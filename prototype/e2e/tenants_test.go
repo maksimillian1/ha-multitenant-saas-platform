@@ -87,6 +87,7 @@ func tmCall(t *testing.T, method, path, body string) string {
 // tenant-states topic, not only when its tokens expire; resume gives it back.
 //
 // Verifies: tenant-management AC-17
+// Verifies: kafka-client-auth AC-2
 func TestSuspendedTenantLosesAPIAccess(t *testing.T) {
 	out := tmCall(t, "POST", "/tenants", `{"name":"e2e-suspend-`+randomID()+`","admin_email":"e2e-suspend@example.com"}`)
 	if !strings.Contains(out, "status=201") {

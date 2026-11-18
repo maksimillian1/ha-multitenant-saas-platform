@@ -50,6 +50,41 @@ go test -C prototype/e2e -count=1 -v ./...
 
 `create-cluster.sh` recreates the kind cluster `cngp-demo`, installs the Gateway API CRDs, Cilium (with Gateway API) and ArgoCD, builds the `apps/exampleapp`, `apps/gateway`, `apps/usage` and `apps/admin` images and loads them into kind (the usage cluster pulls the TimescaleDB extension image from GHCR, `images/timescaledb`), and points ArgoCD at the current branch (`GITOPS_REVISION` overrides it).
 
+### Kafka cluster CA
+
+Every Kafka client connects to `usage-kafka` over TLS and trusts only its cluster CA (HAMSP-31). The CA is ours, not one Strimzi generates (`generateCertificateAuthority: false`), so it exists before the cluster does. Its private key never goes to Git: each developer creates one for their own kind cluster.
+
+`create-cluster.sh` runs `prototype/kafka-ca.sh`, which does it all. It keeps the CA in `prototype/.kafka-ca/` (git-ignored) and loads it as Secrets: `usage-kafka-cluster-ca-cert` and `usage-kafka-cluster-ca` in namespace `kafka`, and `usage-kafka-ca` (the certificate only) in `usage`, `gateway` and `tenants`. Run it again at any time; it changes nothing when the Secrets are up to date.
+
+The same by hand:
+
+```bash
+mkdir -p prototype/.kafka-ca && cd prototype/.kafka-ca
+openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:4096 -out ca.key
+openssl req -x509 -new -key ca.key -days 3650 -subj "/O=hamsp/CN=usage-kafka cluster CA (kind)" \
+  -addext "basicConstraints=critical,CA:TRUE" -addext "keyUsage=critical,keyCertSign,cRLSign" -out ca.crt
+```
+
+```bash
+kubectl -n kafka create secret generic usage-kafka-cluster-ca-cert --from-file=ca.crt=prototype/.kafka-ca/ca.crt
+kubectl -n kafka create secret generic usage-kafka-cluster-ca --from-file=ca.key=prototype/.kafka-ca/ca.key
+kubectl -n kafka label secret usage-kafka-cluster-ca-cert usage-kafka-cluster-ca strimzi.io/kind=Kafka strimzi.io/cluster=usage-kafka
+kubectl -n kafka annotate secret usage-kafka-cluster-ca-cert strimzi.io/ca-cert-generation=0
+kubectl -n kafka annotate secret usage-kafka-cluster-ca strimzi.io/ca-key-generation=0
+```
+
+```bash
+for ns in usage gateway tenants; do kubectl -n $ns create secret generic usage-kafka-ca --from-file=ca.crt=prototype/.kafka-ca/ca.crt; done
+```
+
+The Secrets must exist before ArgoCD creates the Kafka cluster; without them the brokers do not start.
+
+**A cluster that runs on a CA Strimzi generated** (created before HAMSP-31): `kafka-ca.sh` replaces it without downtime. It keeps the old certificate trusted under `ca-<expiry>.crt` and raises both generations, so Strimzi rolls the brokers onto the new CA. When `kubectl -n kafka get kafka usage-kafka` is Ready again, drop the old certificate:
+
+```bash
+./prototype/kafka-ca.sh --finish
+```
+
 `bootstrap-tenants.sh` waits for Zitadel, creates the organizations `tenant-a` and `tenant-b` with one machine user each, and writes their client credentials to `prototype/.tenants.json` (git-ignored). It also sets the access token lifetime to 60 s for the expiry test.
 
 It also creates the Zitadel project `platform-api`. Its ID is the audience every token must carry (HAMSP-22). Zitadel generates the ID, so the script writes it to the ConfigMap `gateway/api-gateway-audience` and restarts the API Gateway. Until the script has run, the API Gateway pods wait in `CreateContainerConfigError` and ArgoCD shows the `gateway` app as Degraded.
