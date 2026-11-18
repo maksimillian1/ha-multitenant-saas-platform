@@ -84,4 +84,4 @@ quality_scenarios:
       planned: apps/usage/internal/writer/writer_test.go:TestDatabaseOutageLosesNothing
 
 gates:
-  G-07: {status: not-checked, by: owner, date: 2026-11-18, note: "alpha plan changed for Kafka auth (AC-7, AC-9, T-04); waits for approval"}
+  G-07: {status: pass, by: owner, date: 2026-11-18, note: "alpha plan approved in chat, including the Kafka auth changes (AC-7, AC-9, T-04)"}
