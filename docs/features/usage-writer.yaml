@@ -14,7 +14,7 @@ acceptance:
   AC-1:
     text: "A record that does not decode (bad JSON, missing event_id, tenant_id or event_time, schema_version newer than the writer) goes to the DLQ topic with its key and value byte for byte and the headers dlq-reason, dlq-source (topic/partition/offset), dlq-time and dlq-original-timestamp (the Kafka timestamp of the original record). The DLQ record's own Kafka timestamp is the time of the DLQ write, so the 7-day retention counts from there. The next records of the partition are written."
     level: integration
-    planned: apps/usage/internal/writer/dlq_test.go:TestUndecodableRecordGoesToDLQ, apps/usage/internal/kafka/dlq_test.go:TestDLQRecordKeepsBytesAndAddsHeaders, apps/usage/internal/kafka/dlq_test.go:TestDLQSendWritesToDLQTopic
+    planned: apps/usage/internal/writer/dlq_test.go:TestUndecodableRecordGoesToDLQ, apps/usage/internal/writer/contract_test.go:TestSendsNewerVersionToDLQ, apps/usage/internal/kafka/dlq_test.go:TestDLQRecordKeepsBytesAndAddsHeaders, apps/usage/internal/kafka/dlq_test.go:TestDLQSendWritesToDLQTopic
   AC-2:
     text: "A record that fails core.Validate without the time window (for example quantity <= 0) goes to the DLQ before the database. The other records of the same fetch are written."
     level: integration

@@ -11,6 +11,7 @@ type Config struct {
 	KafkaBrokers       string
 	KafkaTopic         string
 	KafkaGroup         string
+	KafkaDLQTopic      string
 	KafkaUsername      string
 	KafkaPassword      string
 	KafkaCAFile        string
@@ -31,6 +32,7 @@ func LoadConfig() Config {
 		KafkaBrokers:       GetEnv("KAFKA_BROKERS", ""),
 		KafkaTopic:         GetEnv("KAFKA_TOPIC", "usage-events"),
 		KafkaGroup:         GetEnv("KAFKA_GROUP", "usage-writer"),
+		KafkaDLQTopic:      GetEnv("KAFKA_DLQ_TOPIC", "usage-events-dlq"),
 		KafkaUsername:      GetEnv("KAFKA_USERNAME", ""),
 		KafkaPassword:      GetEnv("KAFKA_PASSWORD", ""),
 		KafkaCAFile:        GetEnv("KAFKA_CA_FILE", ""),

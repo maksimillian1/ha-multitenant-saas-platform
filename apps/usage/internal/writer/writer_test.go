@@ -82,13 +82,17 @@ func (p *pipeline) send(events ...core.Event) int {
 
 // startWriter runs a Usage Writer on st until the returned stop is called or
 // the writer returns on its own.
-func (p *pipeline) startWriter(st core.EventWriter, afterStore func() error) (w *Service, stop func(), done <-chan error) {
+// A nil dlq is a working in-memory DLQ.
+func (p *pipeline) startWriter(st core.EventWriter, dlq DeadLetters, afterStore func() error) (w *Service, stop func(), done <-chan error) {
 	p.t.Helper()
 	client, err := kafka.NewConsumer(p.brokers, topic, p.group)
 	if err != nil {
 		p.t.Fatal(err)
 	}
-	w = NewService(client, st, quiet)
+	if dlq == nil {
+		dlq = &fakeDLQ{}
+	}
+	w = NewService(client, st, dlq, quiet)
 	w.afterStore = afterStore
 	ctx, cancel := context.WithCancel(context.Background())
 	ch := make(chan error, 1)
@@ -136,7 +140,7 @@ func (p *pipeline) waitForCount(events []core.Event, want int, within time.Durat
 // AC-9 / QS-06: the same event sent 3 times is stored once.
 func TestSameEventThreeTimesIsStoredOnce(t *testing.T) {
 	p := newPipeline(t)
-	w, _, _ := p.startWriter(p.st, nil)
+	w, _, _ := p.startWriter(p.st, nil, nil)
 	e := newEvent("tenant-a")
 	for i := 0; i < 3; i++ {
 		if code := p.send(e); code != http.StatusAccepted {
@@ -168,7 +172,7 @@ func TestCrashBeforeOffsetCommitStoresOnce(t *testing.T) {
 	}
 
 	crash := errors.New("simulated crash before the offset commit")
-	_, _, done := p.startWriter(p.st, func() error { return crash })
+	_, _, done := p.startWriter(p.st, nil, func() error { return crash })
 	select {
 	case err := <-done:
 		if !errors.Is(err, crash) {
@@ -181,7 +185,7 @@ func TestCrashBeforeOffsetCommitStoresOnce(t *testing.T) {
 		t.Fatal("the first writer stored nothing before its crash; the test proves nothing")
 	}
 
-	w, _, _ := p.startWriter(p.st, nil)
+	w, _, _ := p.startWriter(p.st, nil, nil)
 	p.waitForCount(events, len(events), 15*time.Second)
 	deadline := time.Now().Add(10 * time.Second)
 	for w.Skipped.Load() == 0 && time.Now().Before(deadline) {
@@ -214,7 +218,7 @@ func TestDatabaseOutageLosesNothing(t *testing.T) {
 	p := newPipeline(t)
 	fs := &failingStore{next: p.st}
 	fs.down.Store(true)
-	p.startWriter(fs, nil)
+	p.startWriter(fs, nil, nil)
 
 	var accepted []core.Event
 	for i := 0; i < 40; i++ {
