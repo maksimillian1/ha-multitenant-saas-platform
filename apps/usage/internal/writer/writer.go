@@ -12,6 +12,7 @@ package writer
 
 import (
 	"context"
+	"errors"
 	"log/slog"
 	"sync/atomic"
 	"time"
@@ -76,9 +77,11 @@ func (w *Service) Run(ctx context.Context) error {
 			continue
 		}
 		events, poison := w.decode(ctx, records)
-		if !w.storeWithRetry(ctx, eventsOf(events)) {
+		bad, ok := w.storeWithRetry(ctx, events)
+		if !ok {
 			return nil // shutting down; nothing committed, the batch is delivered again
 		}
+		poison = append(poison, bad...)
 		if !w.deadLetterWithRetry(ctx, poison) {
 			return nil // as above: the batch, poison included, is delivered again
 		}
@@ -153,27 +156,46 @@ func (w *Service) deadLetterWithRetry(ctx context.Context, poison []kafka.Poison
 	}
 }
 
-// storeWithRetry retries until the batch is stored or ctx is done. While the
+// storeWithRetry stores events and returns the ones the database rejects as
+// bad data (core.ErrBadData). A batch with such an event is split in halves
+// until the event is alone, so the others are stored and only it goes to the
+// DLQ. Any other error is retried until it passes or ctx is done: while the
 // database is down nothing is committed, so the events wait in Kafka.
-func (w *Service) storeWithRetry(ctx context.Context, events []core.Event) bool {
+func (w *Service) storeWithRetry(ctx context.Context, events []pending) ([]kafka.Poison, bool) {
 	if len(events) == 0 {
-		return true
+		return nil, true
 	}
 	backoff := minBackoff
 	for {
-		fresh, err := w.Store.Write(ctx, events)
+		batch := eventsOf(events)
+		fresh, err := w.Store.Write(ctx, batch)
 		if err == nil {
 			w.Stored.Add(int64(len(fresh)))
-			w.Skipped.Add(int64(len(events) - len(fresh)))
-			return true
+			w.Skipped.Add(int64(len(batch) - len(fresh)))
+			return nil, true
 		}
 		if ctx.Err() != nil {
-			return false
+			return nil, false
+		}
+		if errors.Is(err, core.ErrBadData) {
+			if len(events) == 1 {
+				r := events[0].record
+				w.Log.ErrorContext(ctx, "the database rejected a usage record, sending to the DLQ",
+					"partition", r.Partition, "offset", r.Offset, "err", err)
+				return []kafka.Poison{{Record: r, Reason: err.Error()}}, true
+			}
+			half := len(events) / 2
+			left, ok := w.storeWithRetry(ctx, events[:half])
+			if !ok {
+				return nil, false
+			}
+			right, ok := w.storeWithRetry(ctx, events[half:])
+			return append(left, right...), ok
 		}
 		w.Log.WarnContext(ctx, "storing batch failed, retrying", "events", len(events), "retry_in", backoff, "err", err)
 		select {
 		case <-ctx.Done():
-			return false
+			return nil, false
 		case <-time.After(backoff):
 		}
 		backoff = min(backoff*2, maxBackoff)

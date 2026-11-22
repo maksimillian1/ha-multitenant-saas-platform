@@ -214,11 +214,14 @@ func (f *failingStore) Write(ctx context.Context, events []core.Event) ([]core.E
 
 // AC-13 / QS-09 (in-process): while the database is down, UsageWriteAPI keeps
 // accepting events; once it is back, every accepted event is stored once.
+//
+// Verifies: usage-writer AC-4
 func TestDatabaseOutageLosesNothing(t *testing.T) {
 	p := newPipeline(t)
 	fs := &failingStore{next: p.st}
 	fs.down.Store(true)
-	p.startWriter(fs, nil, nil)
+	dlq := &fakeDLQ{}
+	p.startWriter(fs, dlq, nil)
 
 	var accepted []core.Event
 	for i := 0; i < 40; i++ {
@@ -238,4 +241,8 @@ func TestDatabaseOutageLosesNothing(t *testing.T) {
 
 	fs.down.Store(false)
 	p.waitForCount(accepted, len(accepted), 20*time.Second)
+	// A transient error is not poison: nothing of it goes to the DLQ (HAMSP-30).
+	if got := dlq.values(); len(got) != 0 {
+		t.Fatalf("%d records went to the DLQ during a database outage", len(got))
+	}
 }

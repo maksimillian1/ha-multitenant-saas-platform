@@ -5,9 +5,13 @@ package store
 
 import (
 	"context"
+	"errors"
+	"fmt"
+	"strings"
 	"time"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/maksimillian1/ha-multitenant-saas-platform/apps/usage/internal/core"
@@ -111,7 +115,19 @@ func (s *Postgres) Write(ctx context.Context, events []core.Event) ([]core.Event
 		return nil
 	})
 	if err != nil {
-		return nil, err
+		return nil, classify(err)
 	}
 	return fresh, nil
+}
+
+// classify marks errors of SQLSTATE class 22 (data exception) and 23
+// (integrity constraint violation) as core.ErrBadData: they come from the
+// events and fail again on every retry. Everything else, such as a lost
+// connection, may pass on a retry.
+func classify(err error) error {
+	var pgErr *pgconn.PgError
+	if errors.As(err, &pgErr) && (strings.HasPrefix(pgErr.Code, "22") || strings.HasPrefix(pgErr.Code, "23")) {
+		return fmt.Errorf("%w: %w", core.ErrBadData, err)
+	}
+	return err
 }
