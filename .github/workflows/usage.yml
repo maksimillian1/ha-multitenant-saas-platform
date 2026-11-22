@@ -44,6 +44,8 @@ jobs:
           go-version-file: apps/usage/go.mod
           cache-dependency-path: apps/usage/go.sum
       - run: go vet ./...
+      - name: Fuzz the Usage Writer record decoder (T-11)
+        run: go test -run '^$' -fuzz FuzzDecode -fuzztime 30s ./internal/writer/
       - name: Build for arm64 (C-06)
         run: CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -o /dev/null ./cmd/...
       # -count=1 disables the test cache; a skipped DB test must not pass silently.
