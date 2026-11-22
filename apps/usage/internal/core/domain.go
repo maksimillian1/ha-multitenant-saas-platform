@@ -57,6 +57,20 @@ type Record struct {
 
 // Validate checks one event against the contract at time now.
 func (e Event) Validate(now time.Time) error {
+	if err := e.ValidateContent(); err != nil {
+		return err
+	}
+	if e.Time.Before(now.Add(-MaxAge)) || e.Time.After(now.Add(MaxClockSkew)) {
+		return fmt.Errorf("event_time %s is outside [now - %s, now + %s]", e.Time.Format(time.RFC3339), MaxAge, MaxClockSkew)
+	}
+	return nil
+}
+
+// ValidateContent checks one event against the contract without the event_time
+// window. Usage Writer uses it: an event that UsageWriteAPI accepted, or that
+// is replayed from the DLQ, may be older than the window by the time it is
+// stored, and is still stored.
+func (e Event) ValidateContent() error {
 	switch {
 	case e.ID == "":
 		return errors.New("event_id is required")
@@ -64,8 +78,6 @@ func (e Event) Validate(now time.Time) error {
 		return errors.New("event_id must be a UUID")
 	case e.Time.IsZero():
 		return errors.New("event_time is required")
-	case e.Time.Before(now.Add(-MaxAge)) || e.Time.After(now.Add(MaxClockSkew)):
-		return fmt.Errorf("event_time %s is outside [now - %s, now + %s]", e.Time.Format(time.RFC3339), MaxAge, MaxClockSkew)
 	case e.TenantID == "":
 		return errors.New("tenant_id is required")
 	case !tenantRe.MatchString(e.TenantID):

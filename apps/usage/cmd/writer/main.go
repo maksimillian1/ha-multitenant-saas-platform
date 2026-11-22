@@ -52,8 +52,13 @@ func run(ctx context.Context, cfg core.Config, log *slog.Logger) error {
 		return err
 	}
 	defer consumer.Close()
+	dlq, err := kafka.NewDLQ(brokers, cfg.KafkaDLQTopic, auth...)
+	if err != nil {
+		return err
+	}
+	defer dlq.Close()
 
-	writerService := writer.NewService(consumer, st, log)
+	writerService := writer.NewService(consumer, st, dlq, log)
 	healthService := health.NewService(nil)
 
 	mux := http.NewServeMux()

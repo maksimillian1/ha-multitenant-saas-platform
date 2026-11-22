@@ -1,6 +1,7 @@
 package writer
 
 import (
+	"bytes"
 	"context"
 	"testing"
 
@@ -29,8 +30,8 @@ func TestReadsEveryConsumedVersion(t *testing.T) {
 			for i, e := range examples {
 				values[i] = e
 			}
-			if got := w.decode(context.Background(), records(values...)); len(got) != len(values) {
-				t.Fatalf("decoded %d of %d examples (malformed %d)", len(got), len(values), w.Malformed.Load())
+			if got, poison := w.decode(context.Background(), records(values...)); len(got) != len(values) {
+				t.Fatalf("decoded %d of %d examples; poison: %+v", len(got), len(values), poison)
 			}
 		})
 	}
@@ -44,19 +45,21 @@ func TestReadsRecordWithoutSchemaVersion(t *testing.T) {
 	legacy := []byte(`{"event_id": "0192f6a8-7c1e-7b3a-9c4d-2f1e8a6b5c3d", "event_time": "2026-10-24T20:15:03.123Z",
 		"tenant_id": "396438053259838069", "metric": "api_calls", "quantity": 1,
 		"attributes": {"method": "GET", "path": "/items/42", "status": 200}}`)
-	got := w.decode(context.Background(), records(legacy))
-	if len(got) != 1 || got[0].ID != "0192f6a8-7c1e-7b3a-9c4d-2f1e8a6b5c3d" {
-		t.Fatalf("decode = %+v, malformed %d", got, w.Malformed.Load())
+	got, poison := w.decode(context.Background(), records(legacy))
+	if len(got) != 1 || got[0].event.ID != "0192f6a8-7c1e-7b3a-9c4d-2f1e8a6b5c3d" {
+		t.Fatalf("decode = %+v, poison %+v", got, poison)
 	}
 }
 
-// A schema version newer than this writer is counted as malformed and skipped,
-// not stored half-understood (HAMSP-30 turns the skip into a DLQ).
-func TestSkipsNewerVersion(t *testing.T) {
+// A schema version newer than this writer goes to the DLQ, not stored
+// half-understood and not skipped (HAMSP-30).
+// Verifies: usage-writer AC-1
+func TestSendsNewerVersionToDLQ(t *testing.T) {
 	w := &Service{Log: quiet}
 	newer := []byte(`{"schema_version": 99, "event_id": "0192f6a8-7c1e-7b3a-9c4d-2f1e8a6b5c3d",
 		"event_time": "2026-10-24T20:15:03.123Z", "tenant_id": "396438053259838069", "metric": "api_calls", "quantity": 1}`)
-	if got := w.decode(context.Background(), records(newer)); len(got) != 0 || w.Malformed.Load() != 1 {
-		t.Fatalf("decode = %+v, malformed %d; want skipped", got, w.Malformed.Load())
+	got, poison := w.decode(context.Background(), records(newer))
+	if len(got) != 0 || len(poison) != 1 || !bytes.Equal(poison[0].Record.Value, newer) {
+		t.Fatalf("decode = %+v, poison %+v; want the record as poison, unchanged", got, poison)
 	}
 }

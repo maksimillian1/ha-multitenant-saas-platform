@@ -60,7 +60,7 @@ Each schema carries `examples`. CI checks them against the schema; the services'
 | `apps/gateway` | `usage/contract_test.go` | The body it sends has the fields of the example of each version it produces, of the same JSON kinds. |
 | `apps/usage` writeapi | `internal/writeapi/contract_test.go` | Serves `/vN/events` for each version it consumes, accepts its examples, keeps attributes exact. |
 | `apps/usage` writeapi | `internal/kafka/contract_test.go` | Writes exactly the Kafka version it declares, equal to that version's example. |
-| `apps/usage` writer | `internal/writer/contract_test.go` | Reads the examples of each version it consumes; reads records without `schema_version` as v1; skips newer versions. |
+| `apps/usage` writer | `internal/writer/contract_test.go` | Reads the examples of each version it consumes; reads records without `schema_version` as v1; sends newer versions to the DLQ. |
 | `apps/usage` writer | `internal/kafka/dlq_test.go` | A DLQ record keeps the original key, value and headers byte for byte and adds the DLQ headers. |
 
 `response_bytes: 9007199254740993` (2^53 + 1) is there on purpose: a decoder that goes through `float64` changes it, and the tests compare it exactly.
