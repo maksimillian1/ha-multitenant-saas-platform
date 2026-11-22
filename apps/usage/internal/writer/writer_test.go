@@ -43,7 +43,7 @@ type pipeline struct {
 func newPipeline(t *testing.T) *pipeline {
 	t.Helper()
 	db := testpg.New(t)
-	cluster, err := kfake.NewCluster(kfake.NumBrokers(3), kfake.SeedTopics(3, topic))
+	cluster, err := kfake.NewCluster(kfake.NumBrokers(3), kfake.SeedTopics(3, topic, dlqTopic))
 	if err != nil {
 		t.Fatal(err)
 	}
