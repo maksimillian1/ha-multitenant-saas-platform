@@ -68,8 +68,9 @@ checklist:
     planned: does not apply — no migration
   T-11:
     planned: >-
-      applies (critical) — kafka.Decode parses records any pod can produce; a fuzz target checks
-      that every input either decodes or goes to the DLQ, never panics
+      applies (critical) — kafka.Decode parses records a buggy producer can write; the fuzz target
+      apps/usage/internal/writer/decode_fuzz_test.go:FuzzDecode checks that every input either
+      decodes into a valid event or goes to the DLQ unchanged, never panics; CI runs it for 30s
   T-12:
     planned: >-
       applies (critical) — the DLQ is a control against usage loss: the AC-1 and AC-3 tests are
