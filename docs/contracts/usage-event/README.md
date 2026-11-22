@@ -34,9 +34,22 @@ UsageWriteAPI checks these in `core.Validate`; every sender must keep them:
 
 ## Kafka
 
-Topic `usage-events`. Key: `tenant_id`, so one tenant's events stay in order on one partition. Value: `kafka-record.vN.json`, written by UsageWriteAPI. Only UsageWriteAPI produces and only Usage Writer consumes; other pods cannot reach the brokers (`CiliumNetworkPolicy`; authentication is HAMSP-31).
+Topic `usage-events`. Key: `tenant_id`, so one tenant's events stay in order on one partition. Value: `kafka-record.vN.json`, written by UsageWriteAPI. Only UsageWriteAPI and writer replay produce, only Usage Writer consumes: each logs in as its own KafkaUser and its ACLs allow nothing else (HAMSP-31).
 
-Usage Writer reads every version it declares in `participants.json`. A record without `schema_version` was written before the field existed and is read as v1. A newer version is logged, counted as malformed and skipped (HAMSP-30 replaces the skip with a DLQ), which is why a new version is added to the writer before UsageWriteAPI writes it.
+Usage Writer reads every version it declares in `participants.json`. A record without `schema_version` was written before the field existed and is read as v1. A newer version goes to the DLQ like any record the writer cannot store, which is why a new version is added to the writer before UsageWriteAPI writes it.
+
+### Dead-letter topic
+
+Topic `usage-events-dlq` (HAMSP-30, feature `usage-writer`). Usage Writer writes to it every record it cannot store: one that does not decode, one that fails validation, or one the database rejects as bad data (SQLSTATE class 22 or 23). The key, the value and the original headers are the original bytes, unchanged. The writer adds these headers:
+
+| Header | Value |
+|---|---|
+| `dlq-reason` | Why the record could not be stored, for people; not parsed. |
+| `dlq-source` | `<topic>/<partition>/<offset>` it was read from. |
+| `dlq-time` | When it was written to the DLQ, RFC 3339 UTC. |
+| `dlq-original-timestamp` | The original record's Kafka timestamp, RFC 3339 UTC. |
+
+The DLQ record's own Kafka timestamp is the time of the DLQ write, so the 7-day retention counts from there. `writer replay` puts chosen DLQ records back on `usage-events` with the value unchanged and the header `replayed-from: dlq`; the dedup key (`tenant_id`, `event_id`, `event_time`) makes a second replay a no-op. Only Usage Writer writes the DLQ and only writer replay reads it.
 
 ## Examples and tests
 
@@ -48,6 +61,7 @@ Each schema carries `examples`. CI checks them against the schema; the services'
 | `apps/usage` writeapi | `internal/writeapi/contract_test.go` | Serves `/vN/events` for each version it consumes, accepts its examples, keeps attributes exact. |
 | `apps/usage` writeapi | `internal/kafka/contract_test.go` | Writes exactly the Kafka version it declares, equal to that version's example. |
 | `apps/usage` writer | `internal/writer/contract_test.go` | Reads the examples of each version it consumes; reads records without `schema_version` as v1; skips newer versions. |
+| `apps/usage` writer | `internal/kafka/dlq_test.go` | A DLQ record keeps the original key, value and headers byte for byte and adds the DLQ headers. |
 
 `response_bytes: 9007199254740993` (2^53 + 1) is there on purpose: a decoder that goes through `float64` changes it, and the tests compare it exactly.
 
