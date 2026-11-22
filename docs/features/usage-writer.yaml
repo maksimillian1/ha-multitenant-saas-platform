@@ -5,6 +5,7 @@ code:
   - apps/usage/internal/writer/**
   - apps/usage/cmd/writer/**
   - apps/usage/internal/core/**
+  - prototype/monitoring/usage-writer.*
 c4: [usageWriter]
 links:
   issues: [HAMSP-23, HAMSP-30]
@@ -34,7 +35,7 @@ acceptance:
   AC-6:
     text: "Usage Writer exports a counter of records sent to the DLQ, and an alert rule fires when it is above 0."
     level: unit
-    planned: apps/usage/internal/writer/metrics_test.go:TestDLQCounterAndAlertRule
+    planned: "apps/usage/internal/writer/metrics_test.go:TestDLQCounterAndAlertRule; the rule itself: promtool test rules prototype/monitoring/usage-writer.rules.test.yaml (CI step in usage.yml)"
   AC-7:
     text: "writer replay runs as its own Job and logs in as the KafkaUser usage-replay. It sends the chosen DLQ records to the main topic with the value unchanged and the header replayed-from=dlq. The event is stored once; replaying it again adds no second row."
     level: integration
