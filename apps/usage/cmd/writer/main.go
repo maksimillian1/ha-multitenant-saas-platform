@@ -63,6 +63,7 @@ func run(ctx context.Context, cfg core.Config, log *slog.Logger) error {
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /healthz", healthService.LiveHandler)
+	mux.HandleFunc("GET /metrics", writerService.MetricsHandler)
 	go func() {
 		if err := httpx.Serve(ctx, log, cfg.ListenAddr, mux); err != nil {
 			log.Error("health endpoint", "err", err)

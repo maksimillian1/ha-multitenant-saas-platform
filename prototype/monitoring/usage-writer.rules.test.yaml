@@ -1,0 +1,32 @@
+# promtool test rules usage-writer.rules.test.yaml (HAMSP-30, AC-6).
+rule_files:
+  - usage-writer.rules.yaml
+evaluation_interval: 1m
+tests:
+  # No record in the DLQ: no alert.
+  - interval: 1m
+    input_series:
+      - series: usage_writer_records_dead_lettered_total{pod="usage-writer-0"}
+        values: 0x30
+    alert_rule_test:
+      - eval_time: 30m
+        alertname: UsageWriterDeadLetters
+        exp_alerts: []
+  # One record goes to the DLQ at minute 10: the alert fires at once.
+  - interval: 1m
+    input_series:
+      - series: usage_writer_records_dead_lettered_total{pod="usage-writer-0"}
+        values: 0x9 1x50
+    alert_rule_test:
+      - eval_time: 9m
+        alertname: UsageWriterDeadLetters
+        exp_alerts: []
+      - eval_time: 11m
+        alertname: UsageWriterDeadLetters
+        exp_alerts:
+          - exp_labels: {severity: page, pod: usage-writer-0}
+            exp_annotations:
+              summary: Usage Writer sent 1 records to usage-events-dlq in the last hour.
+              description: >-
+                Read the dlq-reason header of the records in usage-events-dlq, fix the cause, then put them
+                back with writer replay within 7 days (docs/contracts/usage-event, "Dead-letter topic").

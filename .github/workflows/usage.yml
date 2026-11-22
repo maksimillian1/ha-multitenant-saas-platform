@@ -5,12 +5,14 @@ on:
     paths:
       - "apps/usage/**"
       - "docs/contracts/usage-event/**"
+      - "prototype/monitoring/usage-writer.*"
       - ".github/workflows/usage.yml"
   push:
     branches: [master]
     paths:
       - "apps/usage/**"
       - "docs/contracts/usage-event/**"
+      - "prototype/monitoring/usage-writer.*"
       - ".github/workflows/usage.yml"
 
 jobs:
@@ -46,6 +48,9 @@ jobs:
       - run: go vet ./...
       - name: Fuzz the Usage Writer record decoder (T-11)
         run: go test -run '^$' -fuzz FuzzDecode -fuzztime 30s ./internal/writer/
+      - name: Test the Usage Writer alert rules (AC-6)
+        working-directory: prototype/monitoring
+        run: docker run --rm -v "$PWD:/rules" -w /rules --entrypoint promtool prom/prometheus:v3.7.3 test rules usage-writer.rules.test.yaml
       - name: Build for arm64 (C-06)
         run: CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -o /dev/null ./cmd/...
       # -count=1 disables the test cache; a skipped DB test must not pass silently.
