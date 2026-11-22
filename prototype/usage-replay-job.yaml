@@ -3,7 +3,7 @@
 # the DLQ records is fixed. Pick the records by partition and offset, from the
 # dlq-source and dlq-reason headers (docs/contracts/usage-event):
 #
-#   sed -e 's/PARTITION/0/' -e 's/FROM/12/' -e 's/TO/15/' -e 's/NAME/0-12-15/' \
+#   sed -e 's/__PARTITION__/0/' -e 's/__FROM__/12/' -e 's/__TO__/15/' -e 's/__NAME__/0-12-15/' \
 #     prototype/usage-replay-job.yaml | kubectl create -f -
 #   kubectl -n usage logs -f job/usage-replay-0-12-15
 #
@@ -13,7 +13,7 @@
 apiVersion: batch/v1
 kind: Job
 metadata:
-  name: usage-replay-NAME
+  name: usage-replay-__NAME__
   namespace: usage
 spec:
   backoffLimit: 0
@@ -30,7 +30,7 @@ spec:
         - name: replay
           image: hamsp/usage-writer:dev
           imagePullPolicy: IfNotPresent
-          args: [replay, -partition, "PARTITION", -from, "FROM", -to, "TO"]
+          args: [replay, -partition, "__PARTITION__", -from, "__FROM__", -to, "__TO__"]
           env:
             - name: KAFKA_BROKERS
               value: usage-kafka-kafka-bootstrap.kafka.svc:9093
