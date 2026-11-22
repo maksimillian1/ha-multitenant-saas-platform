@@ -1,0 +1,58 @@
+# writer replay (HAMSP-30, feature usage-writer, AC-7): puts DLQ records back
+# on usage-events. Not synced by ArgoCD; start it by hand after the cause of
+# the DLQ records is fixed. Pick the records by partition and offset, from the
+# dlq-source and dlq-reason headers (docs/contracts/usage-event):
+#
+#   sed -e 's/PARTITION/0/' -e 's/FROM/12/' -e 's/TO/15/' -e 's/NAME/0-12-15/' \
+#     prototype/usage-replay-job.yaml | kubectl create -f -
+#   kubectl -n usage logs -f job/usage-replay-0-12-15
+#
+# It logs in as the KafkaUser usage-replay: read usage-events-dlq, write
+# usage-events, nothing else. A second run of the same offsets stores nothing
+# new (dedup key, ADR-0007).
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: usage-replay-NAME
+  namespace: usage
+spec:
+  backoffLimit: 0
+  ttlSecondsAfterFinished: 86400
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: usage-replay
+    spec:
+      restartPolicy: Never
+      serviceAccountName: usage-replay
+      automountServiceAccountToken: false
+      containers:
+        - name: replay
+          image: hamsp/usage-writer:dev
+          imagePullPolicy: IfNotPresent
+          args: [replay, -partition, "PARTITION", -from, "FROM", -to, "TO"]
+          env:
+            - name: KAFKA_BROKERS
+              value: usage-kafka-kafka-bootstrap.kafka.svc:9093
+            - name: KAFKA_CA_FILE
+              value: /etc/kafka-ca/ca.crt
+            - name: KAFKA_USERNAME
+              valueFrom: {secretKeyRef: {name: usage-replay-kafka, key: KAFKA_USERNAME}}
+            - name: KAFKA_PASSWORD
+              valueFrom: {secretKeyRef: {name: usage-replay-kafka, key: KAFKA_PASSWORD}}
+          volumeMounts:
+            - name: kafka-ca
+              mountPath: /etc/kafka-ca
+              readOnly: true
+          resources:
+            requests: {cpu: 50m, memory: 32Mi}
+            limits: {memory: 128Mi}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: {drop: ["ALL"]}
+      volumes:
+        - name: kafka-ca
+          secret:
+            secretName: usage-kafka-ca
+            defaultMode: 0444

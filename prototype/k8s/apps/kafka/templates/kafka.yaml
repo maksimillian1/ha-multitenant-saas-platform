@@ -80,6 +80,13 @@ spec:
             podSelector:
               matchLabels:
                 app.kubernetes.io/name: usage-writer
+          # writer replay (HAMSP-30), a Job started by hand: prototype/usage-replay-job.yaml.
+          - namespaceSelector:
+              matchLabels:
+                kubernetes.io/metadata.name: usage
+            podSelector:
+              matchLabels:
+                app.kubernetes.io/name: usage-replay
     # Simple ACLs: a user may do only what its KafkaUser lists. The operators
     # use their own TLS listener and are superusers.
     authorization:

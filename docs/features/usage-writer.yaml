@@ -6,6 +6,7 @@ code:
   - apps/usage/cmd/writer/**
   - apps/usage/internal/core/**
   - prototype/monitoring/usage-writer.*
+  - prototype/usage-replay-job.yaml
 c4: [usageWriter]
 links:
   issues: [HAMSP-23, HAMSP-30]
