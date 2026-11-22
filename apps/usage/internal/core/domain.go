@@ -123,9 +123,15 @@ type Producer interface {
 	Ping(ctx context.Context) error
 }
 
+// ErrBadData marks a Write error caused by the events, not by the database:
+// the same batch will fail again however often it is retried (HAMSP-30).
+var ErrBadData = errors.New("the database rejected the events as bad data")
+
 // EventWriter stores usage events once (ADR-0007).
 type EventWriter interface {
 	// Write stores a batch in one transaction and returns the events that were
 	// new. Events stored before, in this batch or an earlier one, are skipped.
+	// An error that wraps ErrBadData means an event of the batch can never be
+	// stored; any other error may pass.
 	Write(ctx context.Context, events []Event) ([]Event, error)
 }

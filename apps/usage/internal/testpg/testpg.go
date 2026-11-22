@@ -135,6 +135,18 @@ func (db DB) Count(t testing.TB, ids []string) int {
 	return n
 }
 
+// CountTenant returns the stored rows with the given event IDs whose
+// tenant_id is tenant, as the superuser.
+func (db DB) CountTenant(t testing.TB, tenant string, ids []string) int {
+	t.Helper()
+	var n int
+	if err := db.Super.QueryRow(context.Background(),
+		"SELECT count(*) FROM usage_events WHERE tenant_id = $1 AND event_id::text = ANY($2)", tenant, ids).Scan(&n); err != nil {
+		t.Fatal(err)
+	}
+	return n
+}
+
 // pauseJobs unschedules the policies the migrations created, so only the tests
 // run them (CALL run_job runs an unscheduled job too). Otherwise the background
 // scheduler may start a policy while a test runs the same one, and a second

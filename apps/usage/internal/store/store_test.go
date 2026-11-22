@@ -517,3 +517,23 @@ func TestWriteKeepsAttributes(t *testing.T) {
 		t.Fatalf("attributes path=%q status=%d", path, status)
 	}
 }
+
+// A write the database rejects as bad data (SQLSTATE class 22 or 23) wraps
+// core.ErrBadData, so the writer sends the event to the DLQ; a lost
+// connection does not, so the writer retries it (HAMSP-30).
+//
+// Verifies: usage-writer AC-3; AC-4
+func TestBadDataIsMarkedAndOutageIsNot(t *testing.T) {
+	db := testpg.New(t)
+	st := openStore(t, db)
+	bad := newEvent("tenant-a", time.Now())
+	bad.Attributes = []byte(`{"path":"/a\u0000b"}`)
+	if _, err := st.Write(context.Background(), []core.Event{bad}); !errors.Is(err, core.ErrBadData) {
+		t.Fatalf("NUL in jsonb: err = %v, want core.ErrBadData", err)
+	}
+
+	st.Close()
+	if _, err := st.Write(context.Background(), []core.Event{newEvent("tenant-a", time.Now())}); err == nil || errors.Is(err, core.ErrBadData) {
+		t.Fatalf("closed pool: err = %v, want an error that is not core.ErrBadData", err)
+	}
+}

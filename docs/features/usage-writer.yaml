@@ -22,11 +22,11 @@ acceptance:
   AC-3:
     text: "When the database returns an error of SQLSTATE class 22 or 23, the batch is split in halves until the bad record is found. That record goes to the DLQ; every other event of the batch is stored exactly once."
     level: integration
-    planned: apps/usage/internal/writer/dlq_test.go:TestDatabasePoisonIsIsolatedByBisection
+    planned: apps/usage/internal/writer/dlq_test.go:TestDatabasePoisonIsIsolatedByBisection, apps/usage/internal/store/store_test.go:TestBadDataIsMarkedAndOutageIsNot
   AC-4:
     text: "A transient database error (connection lost) sends nothing to the DLQ: the partition stops and retries. After the database is back every event is stored exactly once (QS-09)."
     level: integration
-    planned: apps/usage/internal/writer/writer_test.go:TestDatabaseOutageLosesNothing
+    planned: apps/usage/internal/writer/writer_test.go:TestDatabaseOutageLosesNothing, apps/usage/internal/store/store_test.go:TestBadDataIsMarkedAndOutageIsNot
   AC-5:
     text: "When writing to the DLQ fails, the offset is not committed and the event is not lost."
     level: integration

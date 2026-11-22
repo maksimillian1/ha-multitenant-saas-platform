@@ -215,3 +215,48 @@ func (s *recordingStore) saw(id string) bool {
 	defer s.mu.Unlock()
 	return s.ids[id]
 }
+
+// A record that passes the contract but that the database rejects as bad data
+// (here a NUL in attributes: valid JSON, invalid jsonb, SQLSTATE 22P05) is
+// found by splitting the batch; it goes to the DLQ and every other event of
+// the batch, of both tenants, is stored once. Without the split the whole
+// batch is retried forever and this test fails (T-12 canary).
+//
+// Verifies: usage-writer AC-3; T-01; T-12
+func TestDatabasePoisonIsIsolatedByBisection(t *testing.T) {
+	p := newPipeline(t)
+	dlq := &fakeDLQ{}
+
+	bad := newEvent("tenant-a")
+	bad.Attributes = []byte(`{"path":"/a\u0000b"}`)
+	var good []core.Event
+	values := [][]byte{}
+	for i := range 7 {
+		e := newEvent([]string{"tenant-a", "tenant-b"}[i%2])
+		good = append(good, e)
+		values = append(values, rawEvent(t, e, core.SchemaVersion))
+		if i == 3 {
+			values = append(values, rawEvent(t, bad, core.SchemaVersion))
+		}
+	}
+	// One key, so all records are on one partition and arrive in one fetch.
+	p.produceRaw("mixed", values...)
+	p.startWriter(p.st, dlq, nil)
+
+	p.waitForCount(good, len(good), 20*time.Second)
+	containsAll(t, waitForDLQ(t, dlq, 1, 10*time.Second), rawEvent(t, bad, core.SchemaVersion))
+	if n := p.db.Count(t, []string{bad.ID}); n != 0 {
+		t.Fatalf("the bad event was stored %d times", n)
+	}
+	for _, tenant := range []string{"tenant-a", "tenant-b"} {
+		var own []core.Event
+		for _, e := range good {
+			if e.TenantID == tenant {
+				own = append(own, e)
+			}
+		}
+		if n := p.db.CountTenant(t, tenant, ids(own)); n != len(own) {
+			t.Fatalf("%s: %d of its %d events are stored under it", tenant, n, len(own))
+		}
+	}
+}
