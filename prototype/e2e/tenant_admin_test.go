@@ -11,6 +11,7 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
+	"slices"
 	"testing"
 	"time"
 )
@@ -242,5 +243,131 @@ func TestOrgOwnerCreatesUserWithRole(t *testing.T) {
 	tok := humanToken(t, iamAdmin, consoleClient(t), scope, loginName, password)
 	if org := userinfoOrg(t, tok); org != tenA.OrgID {
 		t.Errorf("new user's token organization = %q, want tenant A %s", org, tenA.OrgID)
+	}
+}
+
+// activeIDPs lists the identity providers the login offers in organization orgID.
+func activeIDPs(t testing.TB, bearer, orgID string) []string {
+	t.Helper()
+	r := zitadelCall(t, bearer, http.MethodGet, "/v2/settings/login/idps?ctx.orgId="+orgID, nil)
+	mustStatus(t, r, http.StatusOK, "active identity providers of "+orgID)
+	var out struct {
+		IdentityProviders []struct {
+			ID string `json:"id"`
+		} `json:"identityProviders"`
+	}
+	r.decode(t, &out)
+	ids := make([]string, 0, len(out.IdentityProviders))
+	for _, p := range out.IdentityProviders {
+		ids = append(ids, p.ID)
+	}
+	return ids
+}
+
+// Verifies: tenant-self-admin AC-5
+func TestOrgIdentityProviderOnlyInItsOrg(t *testing.T) {
+	iamAdmin := keyToken(t, loadServiceKey(t, iamAdminKeySecret, iamAdminKeyField))
+	owner := humanOrgOwner(t, iamAdmin, tenA.OrgID)
+
+	r := zitadelCall(t, owner, http.MethodPost, "/management/v1/idps/generic_oidc", map[string]any{
+		"name": "e2e-customer-idp-" + randomID(), "issuer": "https://idp.example.invalid", "clientId": "e2e", "clientSecret": "e2e", // gitleaks:allow
+		"scopes": []string{"openid"}, "providerOptions": map[string]bool{"isLinkingAllowed": true, "isCreationAllowed": true, "isAutoCreation": true},
+	})
+	mustStatus(t, r, http.StatusOK, "add an OIDC identity provider as tenant A's ORG_OWNER")
+	var idp struct {
+		ID string `json:"id"`
+	}
+	r.decode(t, &idp)
+	t.Cleanup(func() {
+		zitadelOrgCall(t, iamAdmin, tenA.OrgID, http.MethodDelete, "/management/v1/idps/"+idp.ID, nil)
+	})
+
+	// Organization A gets its own login policy with external login allowed, as
+	// the Console's "Identity providers" page does.
+	r = zitadelCall(t, owner, http.MethodGet, "/management/v1/policies/login", nil)
+	mustStatus(t, r, http.StatusOK, "read tenant A's login policy")
+	var lp struct {
+		IsDefault bool `json:"isDefault"`
+	}
+	r.decode(t, &lp)
+	if lp.IsDefault {
+		mustStatus(t, zitadelCall(t, owner, http.MethodPost, "/management/v1/policies/login",
+			map[string]any{"allowUsernamePassword": true, "allowExternalIdp": true}), http.StatusOK, "add tenant A's login policy")
+		t.Cleanup(func() {
+			zitadelOrgCall(t, iamAdmin, tenA.OrgID, http.MethodDelete, "/management/v1/policies/login", nil)
+		})
+	}
+	mustStatus(t, zitadelCall(t, owner, http.MethodPost, "/management/v1/policies/login/idps",
+		map[string]any{"idpId": idp.ID, "ownerType": "IDP_OWNER_TYPE_ORG"}), http.StatusOK, "offer the identity provider on tenant A's login")
+
+	login := loginClientToken(t)
+	if ids := activeIDPs(t, login, tenA.OrgID); !slices.Contains(ids, idp.ID) {
+		t.Errorf("tenant A's login does not offer its identity provider %s; offers %v", idp.ID, ids)
+	}
+	if ids := activeIDPs(t, login, tenB.OrgID); slices.Contains(ids, idp.ID) {
+		t.Errorf("tenant B's login offers tenant A's identity provider %s", idp.ID)
+	}
+}
+
+// brandingColor reads the primary color the login and the Console use for organization orgID.
+func brandingColor(t testing.TB, bearer, orgID string) string {
+	t.Helper()
+	r := zitadelCall(t, bearer, http.MethodGet, "/v2/settings/branding?ctx.orgId="+orgID, nil)
+	mustStatus(t, r, http.StatusOK, "branding of "+orgID)
+	var out struct {
+		Settings struct {
+			LightTheme struct {
+				PrimaryColor string `json:"primaryColor"`
+			} `json:"lightTheme"`
+		} `json:"settings"`
+	}
+	r.decode(t, &out)
+	return out.Settings.LightTheme.PrimaryColor
+}
+
+// Verifies: tenant-self-admin AC-6
+func TestOrgBrandingSeenByOrgUsers(t *testing.T) {
+	iamAdmin := keyToken(t, loadServiceKey(t, iamAdminKeySecret, iamAdminKeyField))
+	app := keyToken(t, loadServiceKey(t, adminAppKeySecret, adminAppKeyField))
+	owner := humanOrgOwner(t, iamAdmin, tenA.OrgID)
+
+	color := "#1" + randomID()[:5]
+	r := zitadelOrgCall(t, app, tenA.OrgID, http.MethodGet, "/management/v1/policies/label", nil)
+	mustStatus(t, r, http.StatusOK, "read tenant A's branding as admin-app")
+	var current struct {
+		Policy struct {
+			IsDefault bool `json:"isDefault"`
+		} `json:"policy"`
+	}
+	r.decode(t, &current)
+	if current.Policy.IsDefault {
+		mustStatus(t, zitadelOrgCall(t, app, tenA.OrgID, http.MethodPost, "/management/v1/policies/label",
+			map[string]any{"primaryColor": color}), http.StatusOK, "add tenant A's branding as admin-app")
+		t.Cleanup(func() {
+			zitadelOrgCall(t, iamAdmin, tenA.OrgID, http.MethodDelete, "/management/v1/policies/label", nil)
+		})
+	} else {
+		t.Skip("tenant A already has its own branding; the test needs the default to restore it")
+	}
+	mustStatus(t, zitadelOrgCall(t, app, tenA.OrgID, http.MethodPost, "/management/v1/policies/label/_activate", map[string]any{}),
+		http.StatusOK, "activate tenant A's branding as admin-app")
+
+	login := loginClientToken(t)
+	if got := brandingColor(t, login, tenA.OrgID); got != color {
+		t.Errorf("tenant A's login primary color = %q, want %q", got, color)
+	}
+	if got := brandingColor(t, login, tenB.OrgID); got == color {
+		t.Errorf("tenant B's login shows tenant A's color %q", color)
+	}
+	r = zitadelCall(t, owner, http.MethodGet, "/management/v1/policies/label", nil)
+	mustStatus(t, r, http.StatusOK, "read the branding with the Console token of tenant A's ORG_OWNER")
+	var seen struct {
+		Policy struct {
+			PrimaryColor string `json:"primaryColor"`
+		} `json:"policy"`
+	}
+	r.decode(t, &seen)
+	if seen.Policy.PrimaryColor != color {
+		t.Errorf("Console of tenant A's ORG_OWNER sees primary color %q, want %q", seen.Policy.PrimaryColor, color)
 	}
 }
