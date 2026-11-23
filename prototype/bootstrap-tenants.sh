@@ -220,11 +220,11 @@ ORG=""
 
 # ── 5. the super admin app (apps/admin): browser sign-in, project role ─────────
 
-# The instance requires Login V2, which this cluster does not deploy (the
-# chart's login is disabled). Zitadel's built-in login serves browser sign-in
-# once the requirement is off.
-echo "Using Zitadel's built-in login for browser sign-in..."
-zitadel PUT /v2/features/instance '{"loginV2": {"required": false}}' >/dev/null
+# Browser sign-in goes through Login V2, which the Zitadel chart deploys at
+# /ui/v2/login; the Console and every OIDC app redirect there.
+echo "Using Login V2 for browser sign-in..."
+zitadel PUT /v2/features/instance "$(jq -nc --arg u "${ISSUER}/ui/v2/login" \
+  '{loginV2: {required: true, baseUri: $u}}')" >/dev/null
 
 # The admin API requires the project role ${ADMIN_ROLE}. With role assertion on
 # the project and on the app, Zitadel puts the user's roles into the ID token.
