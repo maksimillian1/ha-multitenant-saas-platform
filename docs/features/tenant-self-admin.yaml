@@ -1,7 +1,7 @@
 feature: tenant-self-admin
 title: Tenant admins manage their users, roles and SSO in the Zitadel Console; tenant web login for ExampleApp
 critical: true
-c4: [authService, exampleApp]
+c4: [authService, tenantWeb, exampleApp]
 links:
   issues: [HAMSP-57]
 code:
@@ -10,6 +10,7 @@ code:
   - prototype/e2e/tenant_admin_test.go
   - prototype/e2e/exampleweb_test.go
   - .github/workflows/exampleweb.yml
+  - prototype/e2e/human_login_test.go
 requirements: [FR-02, FR-03, QS-11, C-04, C-06]
 
 acceptance:
@@ -82,7 +83,7 @@ acceptance:
       When the API Gateway answers 401 for an expired token, exampleapp-web refreshes the token
       once and repeats the call; when the refresh fails, it sends the user to the login.
     level: unit
-    planned: apps/exampleweb/items/items_test.go:TestRefreshOnceOn401
+    planned: apps/exampleweb/page/page_test.go:TestRefreshOnceOn401
 
 checklist:                          # planned for alpha: basic + critical items
   T-01:
