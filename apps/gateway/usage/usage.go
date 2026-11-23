@@ -1,9 +1,5 @@
-// Package usage reports every API call as a usage event to UsageWriteAPI
-// (docs/contracts/usage-event). Each event is one asynchronous
-// request with retries, so the client's response never waits for usage. At
-// most Limit events may be unsent at a time; beyond that new events are
-// dropped and counted, so an outage of UsageWriteAPI cannot exhaust the
-// Gateway's memory.
+// Package usage drops and counts events beyond Limit, so a UsageWriteAPI outage cannot exhaust
+// the Gateway's memory; the client's response never waits for usage.
 package usage
 
 import (
@@ -24,14 +20,13 @@ import (
 const defaultRetryFor = 15 * time.Minute
 
 type Service struct {
-	URL string // UsageWriteAPI, e.g. http://usage-writeapi.usage.svc:8080/v1/events
-	// RetryFor is how long one event is retried before it is given up.
+	URL      string // UsageWriteAPI, e.g. http://usage-writeapi.usage.svc:8080/v1/events
 	RetryFor time.Duration
 	Client   *http.Client
 	Backoff  func(attempt int) time.Duration
 	Log      *slog.Logger
 
-	slots   chan struct{} // unsent events (in flight or retrying) at most
+	slots   chan struct{}
 	stop    chan struct{}
 	stopped sync.Once
 	wg      sync.WaitGroup
@@ -112,7 +107,6 @@ func (r *Service) post(body []byte) (int, error) {
 	return resp.StatusCode, nil
 }
 
-// Close stops retrying and waits until the events in flight are done or ctx ends.
 func (r *Service) Close(ctx context.Context) {
 	r.stopped.Do(func() { close(r.stop) })
 	done := make(chan struct{})

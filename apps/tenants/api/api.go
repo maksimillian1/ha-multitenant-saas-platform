@@ -1,6 +1,3 @@
-// Package api is Tenant Management's HTTP API (docs/contracts/tenants).
-// Every route needs a caller with the role tenant-manager (package auth);
-// every change also names the acting admin in X-Admin-User-Id.
 package api
 
 import (
@@ -14,12 +11,9 @@ import (
 	"github.com/maksimillian1/ha-multitenant-saas-platform/apps/tenants/lifecycle"
 )
 
-// AdminHeader carries the Zitadel user ID of the admin who asked for a
-// change, for the audit log. The caller (the admin app) is trusted to set
-// it, because only a caller with the role tenant-manager gets this far.
+// Trusted for the audit log: only a caller with the role tenant-manager gets this far.
 const AdminHeader = "X-Admin-User-Id"
 
-// Lifecycle is what the API needs from lifecycle.Service.
 type Lifecycle interface {
 	Get(ctx context.Context, id string) (core.Tenant, error)
 	List(ctx context.Context, includeDeleted bool) ([]core.Tenant, error)
@@ -39,7 +33,6 @@ func NewServer(tenants Lifecycle, log *slog.Logger) *Server {
 	return &Server{tenants: tenants, log: log}
 }
 
-// Routes returns the API, every route behind the role check.
 func (s *Server) Routes(checker auth.Checker) http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /tenants", s.list)
@@ -52,7 +45,6 @@ func (s *Server) Routes(checker auth.Checker) http.Handler {
 	return auth.Require(checker, mux)
 }
 
-// TenantList is the answer of GET /tenants.
 type TenantList struct {
 	Tenants []core.Tenant `json:"tenants"`
 }
@@ -92,7 +84,6 @@ func (s *Server) create(w http.ResponseWriter, r *http.Request, admin string) {
 
 type changeHandler func(w http.ResponseWriter, r *http.Request, admin string)
 
-// change requires the acting admin's user ID.
 func (s *Server) change(next changeHandler) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		admin := r.Header.Get(AdminHeader)
@@ -104,7 +95,7 @@ func (s *Server) change(next changeHandler) http.HandlerFunc {
 	}
 }
 
-// withID answers 404 for a path ID that cannot be a tenant ID.
+// 404 for a path ID that cannot be a tenant ID.
 func (s *Server) withID(next func(w http.ResponseWriter, r *http.Request, id string)) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		id := r.PathValue("id")
@@ -129,9 +120,7 @@ func (s *Server) withIDChange(op func(ctx context.Context, id, admin string) (co
 	}
 }
 
-// fail maps an error to its answer. A failed step answers 502, or 504 for a
-// timeout, 409 when Zitadel or Kubernetes holds a foreign object, always
-// with the tenant as the failure left it.
+// Every failure answer carries the tenant as the failure left it.
 func (s *Server) fail(w http.ResponseWriter, r *http.Request, err error) {
 	var input *InputError
 	var step *lifecycle.StepError

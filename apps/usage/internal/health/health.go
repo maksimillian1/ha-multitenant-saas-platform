@@ -7,7 +7,6 @@ import (
 )
 
 type Service struct {
-	// Ping reports whether Kafka is reachable.
 	Ping func(context.Context) error
 }
 

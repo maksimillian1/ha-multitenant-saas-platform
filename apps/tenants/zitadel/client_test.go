@@ -17,7 +17,6 @@ type call struct {
 	Body  map[string]any
 }
 
-// fakeZitadel records every call and answers from answers[path], 200 {} by default.
 type fakeZitadel struct {
 	t       *testing.T
 	calls   []call
@@ -136,7 +135,6 @@ func TestCreateOrganizationIsIdempotent(t *testing.T) {
 		t.Fatalf("list body = %v", got)
 	}
 
-	// The name belongs to another organization: not ours to adopt.
 	f, c = newFake(t)
 	f.answers[pathAddOrg] = answer(http.StatusConflict, `{"code":"already_exists","message":"exists"}`)
 	f.answers[pathListOrgs] = answer(http.StatusOK, `{"result":[]}`)
@@ -150,7 +148,7 @@ func TestCreateAdminIsIdempotent(t *testing.T) {
 	ctx := context.Background()
 	f, c := newFake(t)
 	f.answers[pathAddHuman] = answer(http.StatusConflict, `{"code":"already_exists","message":"user exists"}`)
-	// The v1 gateway answers with a numeric gRPC code (6 = already exists).
+	// 6 = already exists.
 	f.answers[pathMembers] = answer(http.StatusConflict, `{"code":6,"message":"member exists"}`)
 	f.answers[pathInvite] = answer(http.StatusBadRequest, `{"code":"failed_precondition","message":"already initialised"}`)
 	if err := c.CreateAdmin(ctx, tenantID, tenantID+"-admin", "boss@acme.test"); err != nil {
@@ -160,7 +158,6 @@ func TestCreateAdminIsIdempotent(t *testing.T) {
 		t.Fatalf("calls = %v", got)
 	}
 
-	// A user created just now that cannot be invited is an error.
 	f, c = newFake(t)
 	f.answers[pathInvite] = answer(http.StatusBadRequest, `{"code":"failed_precondition","message":"no email"}`)
 	if err := c.CreateAdmin(ctx, tenantID, tenantID+"-admin", "boss@acme.test"); !HasCode(err, CodeFailedPrecondition) {

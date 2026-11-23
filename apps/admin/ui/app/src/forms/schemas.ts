@@ -1,7 +1,6 @@
 import { z } from 'zod'
 
-// The rules mirror the API's (openapi.yaml); Zitadel checks the rest, such
-// as password complexity and unique names, and the dialog shows its answer.
+// Mirrors openapi.yaml; Zitadel checks the rest (password complexity, unique names).
 
 export const requiredText = (max = 200) =>
   z.string().trim().min(1, 'Required').max(max, `At most ${max} characters`)

@@ -6,8 +6,6 @@ import { Input } from '@/components/ui/input'
 import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select'
 import { Textarea } from '@/components/ui/textarea'
 
-// The fields bind shadcn/ui field components to react-hook-form; the zod
-// schema of the form decides what is valid.
 
 type FieldProps<T extends FieldValues> = {
   control: Control<T>
@@ -128,8 +126,6 @@ export function CheckboxField<T extends FieldValues>({ control, name, label, des
   )
 }
 
-// ChoiceList is a group of checkboxes for picking several values, such as
-// the roles of a role assignment.
 export function ChoiceList<T extends FieldValues>({
   control,
   name,

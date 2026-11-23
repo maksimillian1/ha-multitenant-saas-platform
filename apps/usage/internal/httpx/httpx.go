@@ -1,4 +1,3 @@
-// Package httpx serves the HTTP endpoints of writeapi and writer.
 package httpx
 
 import (
@@ -20,8 +19,7 @@ func WriteError(w http.ResponseWriter, status int, msg string) {
 	WriteJSON(w, status, map[string]string{"error": msg})
 }
 
-// Serve runs h on addr until ctx is done, then returns once the requests in
-// flight are finished or 10 seconds have passed.
+// Serve waits up to 10 seconds for requests in flight after ctx is done.
 func Serve(ctx context.Context, log *slog.Logger, addr string, h http.Handler) error {
 	srv := &http.Server{Addr: addr, Handler: h, ReadHeaderTimeout: 5 * time.Second}
 	drained := make(chan struct{})

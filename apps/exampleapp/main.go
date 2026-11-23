@@ -1,8 +1,4 @@
-// Command exampleapp is the minimal per-tenant service from ADR-0001. It exists
-// to test tenant isolation, failover and load; it is not part of the product.
-//
-//	exampleapp serve     serve the HTTP API as the application role (DATABASE_URL)
-//	exampleapp migrate   apply migrations as the owner role (MIGRATE_DATABASE_URL)
+// Command exampleapp exists only to test tenant isolation, failover and load (ADR-0001).
 package main
 
 import (
@@ -80,8 +76,6 @@ func bootstrapServices(ctx context.Context, cfg core.Config, log *slog.Logger) (
 	return itemsService, healthService, st.Close, nil
 }
 
-// migrate waits up to 5 minutes for the database, then applies the migrations
-// and fails if any multi-tenant table is left without RLS.
 func migrate(ctx context.Context, cfg core.Config, log *slog.Logger) error {
 	if err := core.Required("MIGRATE_DATABASE_URL", cfg.MigrateDatabaseURL); err != nil {
 		return err

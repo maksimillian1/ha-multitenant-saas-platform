@@ -20,9 +20,8 @@ import (
 	"github.com/twmb/franz-go/pkg/kgo"
 )
 
-// testCA is a CA and a broker certificate for 127.0.0.1 signed by it.
 type testCA struct {
-	file   string // the CA certificate as PEM
+	file   string
 	server tls.Certificate
 }
 
@@ -64,8 +63,6 @@ func newTestCA(t *testing.T) testCA {
 	return testCA{file: file, server: tls.Certificate{Certificate: [][]byte{srvDER}, PrivateKey: srvKey}}
 }
 
-// tlsSCRAMCluster is a kfake broker that, like usage-kafka, accepts only TLS
-// with a SCRAM-SHA-512 login.
 func tlsSCRAMCluster(t *testing.T, ca testCA) *kfake.Cluster {
 	t.Helper()
 	c, err := kfake.NewCluster(

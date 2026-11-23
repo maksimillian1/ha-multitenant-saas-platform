@@ -22,8 +22,6 @@ const themeOptions: Record<Theme, { label: string; icon: typeof Sun }> = {
   system: { label: 'System', icon: Monitor },
 }
 
-// UserMenu sits at the foot of the sidebar and of the mobile menu; a
-// collapsed sidebar shows only the avatar. It holds the theme and sign-out.
 export function UserMenu({
   me,
   collapsed = false,
@@ -33,8 +31,7 @@ export function UserMenu({
   collapsed?: boolean
   side?: 'right' | 'top'
 }) {
-  // Sign-out is a POST form: the Go server drops the session cookie and sends
-  // the browser on to Zitadel's end_session endpoint.
+  // A POST form: the Go server drops the cookie and redirects to Zitadel's end_session.
   const logoutForm = useRef<HTMLFormElement>(null)
   const theme = useTheme()
 

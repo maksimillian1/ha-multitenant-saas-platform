@@ -1,6 +1,4 @@
-// Command gateway is the API Gateway (ADR-0004). It sits behind the
-// infrastructure entry point (Cilium Gateway API), validates the Zitadel JWT,
-// sets x-tenant-id and routes by path prefix to the platform services.
+// Command gateway is the API Gateway (ADR-0004).
 package main
 
 import (
@@ -61,7 +59,6 @@ func main() {
 	}
 }
 
-// bootstrapServices returns a nil usage service when USAGE_URL is not set.
 func bootstrapServices(ctx context.Context, cfg core.Config, log *slog.Logger) (*proxy.Service, *usage.Service, *health.Service, error) {
 	if err := cfg.Validate(); err != nil {
 		return nil, nil, nil, err

@@ -1,10 +1,5 @@
-// Package lifecycle creates, suspends, resumes and deletes tenants
-// (ADR-0012). Every operation runs synchronously in the caller's request:
-// it takes the tenant's lock, runs its steps in order and records each step
-// in the tenants row before the next one starts. A failed step stops the
-// operation, leaves the tenant in its state with the error, and nothing is
-// rolled back; Retry resumes at the first step not done, and Delete removes
-// whatever exists.
+// Package lifecycle records each step before the next; a failed step rolls nothing back.
+// Retry resumes at the first step not done, Delete removes whatever exists (ADR-0012).
 package lifecycle
 
 import (
@@ -18,7 +13,6 @@ import (
 	"github.com/maksimillian1/ha-multitenant-saas-platform/apps/tenants/core"
 )
 
-// Store is the tenant registry.
 type Store interface {
 	Create(ctx context.Context, t core.Tenant) (core.Tenant, error)
 	Get(ctx context.Context, id string) (core.Tenant, error)
@@ -27,8 +21,7 @@ type Store interface {
 	Lock(ctx context.Context, id string) (unlock func(), err error)
 }
 
-// Zitadel holds the tenant's organization and its users. Every method is
-// idempotent.
+// Every method is idempotent.
 type Zitadel interface {
 	CreateOrganization(ctx context.Context, id, name string) error
 	CreateAdmin(ctx context.Context, orgID, userID, email string) error
@@ -37,13 +30,12 @@ type Zitadel interface {
 	DeleteOrganization(ctx context.Context, id string) error
 }
 
-// Kube holds the tenant's namespace. Both methods are idempotent.
+// Both methods are idempotent.
 type Kube interface {
 	EnsureNamespace(ctx context.Context, tenantID string) error
 	DeleteNamespace(ctx context.Context, tenantID string) error
 }
 
-// StepError is a failed step. The tenant is as the failure left it.
 type StepError struct {
 	Tenant core.Tenant
 	Step   string
@@ -53,7 +45,6 @@ type StepError struct {
 func (e *StepError) Error() string { return fmt.Sprintf("step %s: %v", e.Step, e.Err) }
 func (e *StepError) Unwrap() error { return e.Err }
 
-// Timeout reports whether the dependency ran out of time.
 func (e *StepError) Timeout() bool {
 	var t interface{ Timeout() bool }
 	return errors.Is(e.Err, context.DeadlineExceeded) || (errors.As(e.Err, &t) && t.Timeout())
@@ -65,14 +56,12 @@ type Service struct {
 	kube    Kube
 	log     *slog.Logger
 
-	// StepTimeout bounds one call to Zitadel or Kubernetes; DeleteTimeout
-	// bounds the namespace deletion, which waits until the namespace is gone.
+	// DeleteTimeout covers waiting until the namespace is gone.
 	StepTimeout   time.Duration
 	DeleteTimeout time.Duration
 	NewID         func() string
 	Now           func() time.Time
-	// Published gets the tenant after every operation, so its state reaches
-	// the API Gateway (ADR-0012, item 5); nil publishes nothing.
+	// nil publishes nothing.
 	Published func(ctx context.Context, t core.Tenant)
 }
 
@@ -92,7 +81,6 @@ func (s *Service) List(ctx context.Context, includeDeleted bool) ([]core.Tenant,
 	return s.store.List(ctx, includeDeleted)
 }
 
-// Create registers a tenant and provisions it.
 func (s *Service) Create(ctx context.Context, name, adminEmail, admin string) (core.Tenant, error) {
 	ctx = context.WithoutCancel(ctx) // a started provisioning finishes even if the caller leaves
 	t, err := s.store.Create(ctx, core.Tenant{ID: s.NewID(), Name: name, AdminEmail: adminEmail, CreatedBy: admin})
@@ -110,7 +98,6 @@ func (s *Service) Create(ctx context.Context, name, adminEmail, admin string) (c
 	return t, err
 }
 
-// Retry resumes a tenant left in provisioning or deleting.
 func (s *Service) Retry(ctx context.Context, id, admin string) (core.Tenant, error) {
 	ctx = context.WithoutCancel(ctx)
 	return s.locked(ctx, id, "retry", admin, func(t core.Tenant) (core.Tenant, error) {
@@ -125,8 +112,7 @@ func (s *Service) Retry(ctx context.Context, id, admin string) (core.Tenant, err
 	})
 }
 
-// Suspend blocks an active tenant: its organization is deactivated, so its
-// users cannot sign in. Its data stays.
+// Its data stays.
 func (s *Service) Suspend(ctx context.Context, id, admin string) (core.Tenant, error) {
 	ctx = context.WithoutCancel(ctx)
 	return s.locked(ctx, id, "suspend", admin, func(t core.Tenant) (core.Tenant, error) {
@@ -137,7 +123,6 @@ func (s *Service) Suspend(ctx context.Context, id, admin string) (core.Tenant, e
 	})
 }
 
-// Resume makes a suspended tenant active again.
 func (s *Service) Resume(ctx context.Context, id, admin string) (core.Tenant, error) {
 	ctx = context.WithoutCancel(ctx)
 	return s.locked(ctx, id, "resume", admin, func(t core.Tenant) (core.Tenant, error) {
@@ -148,8 +133,6 @@ func (s *Service) Resume(ctx context.Context, id, admin string) (core.Tenant, er
 	})
 }
 
-// Delete removes a suspended tenant, or one stuck in provisioning, from
-// every store this service provisions and leaves a tombstone.
 func (s *Service) Delete(ctx context.Context, id, admin string) (core.Tenant, error) {
 	ctx = context.WithoutCancel(ctx)
 	return s.locked(ctx, id, "delete", admin, func(t core.Tenant) (core.Tenant, error) {
@@ -191,7 +174,6 @@ func (s *Service) publish(ctx context.Context, t core.Tenant) {
 	}
 }
 
-// provision runs the steps not done yet, in order, recording each.
 func (s *Service) provision(ctx context.Context, t core.Tenant) (core.Tenant, error) {
 	for _, part := range core.ProvisionOrder {
 		if slices.Contains(t.Parts, part) {
@@ -225,9 +207,7 @@ func (s *Service) provision(ctx context.Context, t core.Tenant) (core.Tenant, er
 	return s.store.Save(ctx, t)
 }
 
-// deprovision removes every part, in reverse order, whether or not the row
-// records it: an attempt that died after creating a part but before
-// recording it must not leave an orphan.
+// Every part, recorded or not: an attempt that died before recording must not leave an orphan.
 func (s *Service) deprovision(ctx context.Context, t core.Tenant) (core.Tenant, error) {
 	if err := s.step(ctx, s.DeleteTimeout, func(ctx context.Context) error {
 		return s.kube.DeleteNamespace(ctx, t.ID)
@@ -265,7 +245,6 @@ func (s *Service) step(ctx context.Context, timeout time.Duration, fn func(conte
 	return fn(ctx)
 }
 
-// failed records the error of a step and returns it with the tenant.
 func (s *Service) failed(ctx context.Context, t core.Tenant, step string, err error) (core.Tenant, error) {
 	t.LastError = fmt.Sprintf("%s: %v", step, err)
 	if saved, saveErr := s.store.Save(ctx, t); saveErr == nil {
@@ -276,7 +255,6 @@ func (s *Service) failed(ctx context.Context, t core.Tenant, step string, err er
 	return t, &StepError{Tenant: t, Step: step, Err: err}
 }
 
-// audit logs every state change with the acting admin (AC-11).
 func (s *Service) audit(ctx context.Context, action, admin string, t core.Tenant, err error) {
 	attrs := []any{"action", action, "admin", admin, "tenant_id", t.ID, "state", t.State}
 	if err != nil {

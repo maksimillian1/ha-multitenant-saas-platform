@@ -24,8 +24,7 @@ import (
 	"github.com/maksimillian1/ha-multitenant-saas-platform/apps/usage/internal/writeapi"
 )
 
-// These tests run the pipeline in one process: UsageWriteAPI → Kafka (kfake,
-// 3 brokers) → Usage Writer → PostgreSQL (TEST_DATABASE_URL).
+// Pipeline in one process: UsageWriteAPI → kfake (3 brokers) → Usage Writer → TEST_DATABASE_URL.
 
 const topic = "usage-events"
 
@@ -43,7 +42,7 @@ type pipeline struct {
 func newPipeline(t *testing.T) *pipeline {
 	t.Helper()
 	db := testpg.New(t)
-	cluster, err := kfake.NewCluster(kfake.NumBrokers(3), kfake.SeedTopics(3, topic))
+	cluster, err := kfake.NewCluster(kfake.NumBrokers(3), kfake.SeedTopics(3, topic, dlqTopic))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -68,7 +67,6 @@ func newEvent(tenant string) core.Event {
 	}
 }
 
-// send posts events to UsageWriteAPI and returns the status code.
 func (p *pipeline) send(events ...core.Event) int {
 	p.t.Helper()
 	raw, err := json.Marshal(map[string]any{"events": events})
@@ -80,15 +78,17 @@ func (p *pipeline) send(events ...core.Event) int {
 	return w.Code
 }
 
-// startWriter runs a Usage Writer on st until the returned stop is called or
-// the writer returns on its own.
-func (p *pipeline) startWriter(st core.EventWriter, afterStore func() error) (w *Service, stop func(), done <-chan error) {
+// A nil dlq is a working in-memory DLQ.
+func (p *pipeline) startWriter(st core.EventWriter, dlq DeadLetters, afterStore func() error) (w *Service, stop func(), done <-chan error) {
 	p.t.Helper()
 	client, err := kafka.NewConsumer(p.brokers, topic, p.group)
 	if err != nil {
 		p.t.Fatal(err)
 	}
-	w = NewService(client, st, quiet)
+	if dlq == nil {
+		dlq = &fakeDLQ{}
+	}
+	w = NewService(client, st, dlq, quiet)
 	w.afterStore = afterStore
 	ctx, cancel := context.WithCancel(context.Background())
 	ch := make(chan error, 1)
@@ -112,8 +112,6 @@ func ids(events []core.Event) []string {
 	return out
 }
 
-// waitForCount waits until exactly want rows of these events are stored, then
-// checks that the count stays there.
 func (p *pipeline) waitForCount(events []core.Event, want int, within time.Duration) {
 	p.t.Helper()
 	deadline := time.Now().Add(within)
@@ -133,10 +131,9 @@ func (p *pipeline) waitForCount(events []core.Event, want int, within time.Durat
 	}
 }
 
-// AC-9 / QS-06: the same event sent 3 times is stored once.
 func TestSameEventThreeTimesIsStoredOnce(t *testing.T) {
 	p := newPipeline(t)
-	w, _, _ := p.startWriter(p.st, nil)
+	w, _, _ := p.startWriter(p.st, nil, nil)
 	e := newEvent("tenant-a")
 	for i := 0; i < 3; i++ {
 		if code := p.send(e); code != http.StatusAccepted {
@@ -153,9 +150,6 @@ func TestSameEventThreeTimesIsStoredOnce(t *testing.T) {
 	}
 }
 
-// AC-10 / QS-06: a writer that dies after the database commit and before the
-// offset commit leaves the batch uncommitted; the next writer stores it again,
-// and the dedup key keeps one row per event.
 func TestCrashBeforeOffsetCommitStoresOnce(t *testing.T) {
 	p := newPipeline(t)
 	var events []core.Event
@@ -168,7 +162,7 @@ func TestCrashBeforeOffsetCommitStoresOnce(t *testing.T) {
 	}
 
 	crash := errors.New("simulated crash before the offset commit")
-	_, _, done := p.startWriter(p.st, func() error { return crash })
+	_, _, done := p.startWriter(p.st, nil, func() error { return crash })
 	select {
 	case err := <-done:
 		if !errors.Is(err, crash) {
@@ -181,7 +175,7 @@ func TestCrashBeforeOffsetCommitStoresOnce(t *testing.T) {
 		t.Fatal("the first writer stored nothing before its crash; the test proves nothing")
 	}
 
-	w, _, _ := p.startWriter(p.st, nil)
+	w, _, _ := p.startWriter(p.st, nil, nil)
 	p.waitForCount(events, len(events), 15*time.Second)
 	deadline := time.Now().Add(10 * time.Second)
 	for w.Skipped.Load() == 0 && time.Now().Before(deadline) {
@@ -192,8 +186,6 @@ func TestCrashBeforeOffsetCommitStoresOnce(t *testing.T) {
 	}
 }
 
-// failingStore fails every write until the outage ends, like a database that
-// cannot be reached.
 type failingStore struct {
 	next     core.EventWriter
 	down     atomic.Bool
@@ -208,13 +200,13 @@ func (f *failingStore) Write(ctx context.Context, events []core.Event) ([]core.E
 	return f.next.Write(ctx, events)
 }
 
-// AC-13 / QS-09 (in-process): while the database is down, UsageWriteAPI keeps
-// accepting events; once it is back, every accepted event is stored once.
+// Verifies: usage-writer AC-4; QS-09
 func TestDatabaseOutageLosesNothing(t *testing.T) {
 	p := newPipeline(t)
 	fs := &failingStore{next: p.st}
 	fs.down.Store(true)
-	p.startWriter(fs, nil)
+	dlq := &fakeDLQ{}
+	p.startWriter(fs, dlq, nil)
 
 	var accepted []core.Event
 	for i := 0; i < 40; i++ {
@@ -234,4 +226,7 @@ func TestDatabaseOutageLosesNothing(t *testing.T) {
 
 	fs.down.Store(false)
 	p.waitForCount(accepted, len(accepted), 20*time.Second)
+	if got := dlq.values(); len(got) != 0 {
+		t.Fatalf("%d records went to the DLQ during a database outage", len(got))
+	}
 }

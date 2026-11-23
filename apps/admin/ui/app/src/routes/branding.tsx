@@ -1,8 +1,6 @@
 import { BrandingEditor } from '@/components/branding-editor'
 import { PageHeader } from '@/components/page'
 
-// PlatformBrandingPage edits the instance's login branding: the default of
-// every organization without its own, and the admin app's own look.
 export function PlatformBrandingPage() {
   return (
     <div className="flex flex-col gap-6">

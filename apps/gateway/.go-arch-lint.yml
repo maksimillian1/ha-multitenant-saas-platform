@@ -1,5 +1,5 @@
 # Components of the gateway and the imports allowed between them.
-# c4sync draws these components; the allowed edges are refined in HAMSP-70.
+# c4sync draws these components.
 version: 3
 workdir: .
 allow:

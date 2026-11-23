@@ -1,5 +1,4 @@
-// Command tenants is Tenant Management (ADR-0012): it creates, suspends,
-// resumes and deletes tenants for platform admins.
+// Command tenants is Tenant Management (ADR-0012).
 //
 //	tenants serve     serve the HTTP API as the application role (DATABASE_URL)
 //	tenants migrate   apply migrations as the owner role (MIGRATE_DATABASE_URL)
@@ -109,9 +108,6 @@ func serve(ctx context.Context, cfg core.Config, log *slog.Logger) error {
 	return core.Serve(ctx, log, cfg.ListenAddr, mux)
 }
 
-// migrate waits up to 5 minutes for the database, then applies the migrations
-// and fails if a table with tenant_id, other than the platform tables, is
-// left without RLS.
 func migrate(ctx context.Context, cfg core.Config, log *slog.Logger) error {
 	if err := core.Required("MIGRATE_DATABASE_URL", cfg.MigrateDatabaseURL); err != nil {
 		return err

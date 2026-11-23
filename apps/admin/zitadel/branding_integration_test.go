@@ -14,14 +14,7 @@ import (
 	"time"
 )
 
-// TestBrandingIntegration publishes branding for tenant-a on the kind
-// cluster and checks Zitadel's login CSS (HAMSP-37 AC-5, AC-13): tenant-a
-// shows the new primary color, while tenant-b's login and the platform
-// branding stay as they were. It also uploads, downloads and removes a draft
-// logo. Everything it changes is restored. With one account (HAMSP-36) the
-// admin app's key also reads and changes the instance branding: a draft is
-// saved and put back. It needs the variables of integrationClient.
-//
+// Everything it changes is restored. Needs the variables of integrationClient.
 // Verifies: admin-zitadel AC-6
 func TestBrandingIntegration(t *testing.T) {
 	c, base := integrationClient(t)
@@ -60,7 +53,7 @@ func TestBrandingIntegration(t *testing.T) {
 		t.Fatalf("saving the draft changed the active branding: %+v, %v", active.BrandingSettings, err)
 	}
 
-	// A draft logo goes up and comes back, unless tenant-a has one already.
+	// Unless tenant-a has a logo already.
 	if !before.HasAsset(AssetLogo) {
 		logo := tinyPNG(t)
 		must(t, c.UploadBrandingAsset(ctx, a, AssetLogo, "logo.png", "image/png", logo))
@@ -80,7 +73,6 @@ func TestBrandingIntegration(t *testing.T) {
 		return strings.Contains(loginCSS(ctx, t, base, tenantA, false), "--zitadel-color-primary-500: rgb(124, 58, 237)")
 	})
 
-	// tenant-b and the platform are untouched.
 	if got := loginCSS(ctx, t, base, tenantB, false); got != tenantBCSSBefore {
 		t.Errorf("tenant-b's login CSS changed:\n%s\nwas\n%s", got, tenantBCSSBefore)
 	}
@@ -92,8 +84,7 @@ func TestBrandingIntegration(t *testing.T) {
 	}
 }
 
-// changeInstanceDraft saves a changed draft of the instance branding with the
-// admin app's account and puts the old draft back. The active branding stays.
+// The active branding stays.
 func changeInstanceDraft(ctx context.Context, t *testing.T, c *Client) {
 	t.Helper()
 	draft, err := c.GetBranding(ctx, InstanceScope(), true)
@@ -117,8 +108,6 @@ func changeInstanceDraft(ctx context.Context, t *testing.T, c *Client) {
 	})
 }
 
-// restoreBranding puts tenant-a's branding back: removed if it had none,
-// otherwise the old active version published and the old draft saved.
 func restoreBranding(t *testing.T, c *Client, orgID string, draft, active Branding) {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
@@ -152,8 +141,6 @@ func orgByName(ctx context.Context, t *testing.T, c *Client, name string) string
 	return ""
 }
 
-// loginCSS is the variables.css of the login for an organization: its own
-// branding, or the instance's with defaultPolicy.
 func loginCSS(ctx context.Context, t *testing.T, base, orgID string, defaultPolicy bool) string {
 	t.Helper()
 	query := url.Values{
@@ -174,7 +161,7 @@ func loginCSS(ctx context.Context, t *testing.T, base, orgID string, defaultPoli
 	return string(body)
 }
 
-// tinyPNG is a valid 2x2 PNG; Zitadel decodes the images it stores.
+// Zitadel decodes the images it stores.
 func tinyPNG(t *testing.T) []byte {
 	t.Helper()
 	img := image.NewRGBA(image.Rect(0, 0, 2, 2))

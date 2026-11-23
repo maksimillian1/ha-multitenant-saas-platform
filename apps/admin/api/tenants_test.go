@@ -14,11 +14,7 @@ import (
 	"github.com/maksimillian1/ha-multitenant-saas-platform/apps/admin/tenants"
 )
 
-// TestTenantRoutes: the tenant routes call Tenant Management with the
-// admin's user ID and map its answers. The session and CSRF checks of every
-// tenant route are in TestEveryRouteRequiresAdmin and
-// TestMutationsNeedCSRFHeader (apiRoutes lists them).
-//
+// Session and CSRF checks of these routes are in TestEveryRouteRequiresAdmin and TestMutationsNeedCSRFHeader.
 // Verifies: tenant-management AC-14; T-04
 func TestTenantRoutes(t *testing.T) {
 	e := newEnv(t)

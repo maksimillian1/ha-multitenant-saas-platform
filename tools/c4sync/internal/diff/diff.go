@@ -87,7 +87,6 @@ func Compare(base, head *model.Model, important []string) *Report {
 		r.Changes = append(r.Changes, c)
 	}
 
-	// Components and their packages.
 	bc, hc := componentsByID(base), componentsByID(head)
 	for _, id := range keys(hc) {
 		if _, ok := bc[id]; !ok {
@@ -119,7 +118,6 @@ func Compare(base, head *model.Model, important []string) *Report {
 		}
 	}
 
-	// Relations between components.
 	type rel struct{ from, to string }
 	brs, hrs := map[rel]model.Relation{}, map[rel]model.Relation{}
 	for _, x := range base.Relations {
@@ -141,7 +139,6 @@ func Compare(base, head *model.Model, important []string) *Report {
 		}
 	}
 
-	// Relations to external elements.
 	ext := func(x model.ExternalRelation) string {
 		return fmt.Sprintf("%s → %s: %s (%s)", x.From, x.To, x.Description, x.Technology)
 	}
@@ -149,7 +146,6 @@ func Compare(base, head *model.Model, important []string) *Report {
 		add(Change{Kind: KindExternal, Op: op, Component: x.From, Text: ext(x), Where: whereIf(op, firstEvidence(x.Evidence))})
 	})
 
-	// External interfaces.
 	iface := func(x model.ExternalInterface) string {
 		name := x.Name
 		if x.Unresolved {
@@ -161,7 +157,6 @@ func Compare(base, head *model.Model, important []string) *Report {
 		add(Change{Kind: KindInterface, Op: op, Component: x.Component, Text: iface(x), Where: whereIf(op, x.Pos.String())})
 	})
 
-	// Code elements.
 	be, he := elementsByID(base), elementsByID(head)
 	for _, id := range keys(he) {
 		e := he[id]
@@ -183,7 +178,6 @@ func Compare(base, head *model.Model, important []string) *Report {
 		}
 	}
 
-	// Code relations.
 	cr := func(x model.CodeRelation) string { return fmt.Sprintf("%s %s %s", x.From, x.Kind, x.To) }
 	diffSets(base.CodeRelations, head.CodeRelations, cr, func(x model.CodeRelation, op string) {
 		elems := he
@@ -198,7 +192,6 @@ func Compare(base, head *model.Model, important []string) *Report {
 		add(Change{Kind: KindCodeRelation, Op: op, Component: from, Components: comps, Text: cr(x), Where: whereIf(op, firstEvidence(x.Evidence))})
 	})
 
-	// Packages outside every component.
 	diffSets(base.Unmapped, head.Unmapped, func(s string) string { return s }, func(p, op string) {
 		add(Change{Kind: KindUnmapped, Op: op, Text: p})
 	})

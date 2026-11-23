@@ -24,8 +24,6 @@ const states: Record<string, { label: string; tone: Tone }> = {
   unspecified: { label: 'Unknown', tone: 'none' },
 }
 
-// StateBadge shows the state of a tenant, organization, user, project or
-// role assignment.
 export function StateBadge({ state }: { state: string }) {
   const { label, tone } = states[state] ?? states.unspecified
   return (

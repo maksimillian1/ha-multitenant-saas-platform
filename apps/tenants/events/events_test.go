@@ -18,7 +18,6 @@ const topic = "tenant-states"
 
 var quiet = slog.New(slog.NewTextHandler(io.Discard, nil))
 
-// read returns the latest state per tenant in the topic.
 func read(t *testing.T, addrs []string) map[string]string {
 	t.Helper()
 	c, err := kgo.NewClient(kgo.SeedBrokers(addrs...), kgo.ConsumeTopics(topic),
@@ -72,7 +71,6 @@ func TestStateChangesArePublished(t *testing.T) {
 		t.Fatalf("after resync: %v", got)
 	}
 
-	// Kafka is gone: Publish logs and returns, it never blocks the caller long.
 	cluster.Close()
 	start := time.Now()
 	p.Publish(context.Background(), core.Tenant{ID: "a", State: core.StateSuspended})

@@ -5,9 +5,7 @@ import (
 	"time"
 )
 
-// Authorization is an authorization.v2 Authorization: the roles a user holds
-// in a project, on behalf of an organization (Zitadel's "role assignment",
-// formerly user grant).
+// Zitadel's "role assignment", formerly user grant.
 type Authorization struct {
 	ID           string    `json:"id"`
 	CreationDate time.Time `json:"creationDate"`
@@ -31,7 +29,6 @@ type Authorization struct {
 	Roles []Role             `json:"roles"`
 }
 
-// AuthorizationState is authorization.v2.State.
 type AuthorizationState string
 
 const (
@@ -39,14 +36,12 @@ const (
 	AuthorizationInactive AuthorizationState = "STATE_INACTIVE"
 )
 
-// Role is authorization.v2.Role.
 type Role struct {
 	Key         string `json:"key"`
 	DisplayName string `json:"displayName"`
 	Group       string `json:"group"`
 }
 
-// AuthorizationFilter narrows ListAuthorizations; set fields must all match.
 type AuthorizationFilter struct {
 	IDs       []string
 	UserID    string
@@ -58,7 +53,6 @@ type AuthorizationList struct {
 	Authorizations []Authorization
 }
 
-// ListAuthorizations returns authorizations, oldest first.
 func (c *Client) ListAuthorizations(ctx context.Context, f AuthorizationFilter, p Page) (AuthorizationList, error) {
 	type searchFilter struct {
 		AuthorizationIDs *idsFilter `json:"authorizationIds,omitempty"`
@@ -92,7 +86,6 @@ func (c *Client) ListAuthorizations(ctx context.Context, f AuthorizationFilter, 
 	return AuthorizationList{Total: uint64(resp.Pagination.TotalResult), Authorizations: resp.Authorizations}, nil
 }
 
-// GetAuthorization returns one authorization, listed by ID.
 func (c *Client) GetAuthorization(ctx context.Context, id string) (Authorization, error) {
 	list, err := c.ListAuthorizations(ctx, AuthorizationFilter{IDs: []string{id}}, Page{Limit: 1})
 	if err != nil {
@@ -104,8 +97,7 @@ func (c *Client) GetAuthorization(ctx context.Context, id string) (Authorization
 	return list.Authorizations[0], nil
 }
 
-// CreateAuthorization gives the user roles in a project. organizationID owns
-// the project or has a grant for it.
+// organizationID owns the project or has a grant for it.
 func (c *Client) CreateAuthorization(ctx context.Context, userID, projectID, organizationID string, roleKeys []string) (string, error) {
 	req := struct {
 		UserID         string   `json:"userId"`
@@ -122,7 +114,7 @@ func (c *Client) CreateAuthorization(ctx context.Context, userID, projectID, org
 	return resp.ID, nil
 }
 
-// UpdateAuthorization replaces the roles: keys left out are revoked.
+// Keys left out are revoked.
 func (c *Client) UpdateAuthorization(ctx context.Context, id string, roleKeys []string) error {
 	req := struct {
 		ID       string   `json:"id"`

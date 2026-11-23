@@ -22,7 +22,6 @@ const nav = [
 const linkStyle =
   'flex items-center gap-2.5 rounded-lg text-sm whitespace-nowrap text-muted-foreground transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground data-[status=active]:bg-sidebar-accent data-[status=active]:font-medium data-[status=active]:text-sidebar-accent-foreground'
 
-// A collapsed link keeps its label for screen readers and as a tooltip.
 function NavLinks({
   collapsed = false,
   className = '',
@@ -51,7 +50,6 @@ function NavLinks({
   )
 }
 
-// Logo is the platform's icon, or its logo, or the built-in mark.
 function Logo({ brand }: { brand: Brand }) {
   const src = brand.icon ?? brand.logo
   if (src) {
@@ -64,8 +62,6 @@ function Logo({ brand }: { brand: Brand }) {
   )
 }
 
-// Wordmark is the platform's logo when it has one; the name stays for
-// screen readers.
 function Wordmark({ brand }: { brand: Brand }) {
   if (brand.logo && brand.icon) {
     return (
@@ -83,7 +79,7 @@ function Wordmark({ brand }: { brand: Brand }) {
   )
 }
 
-// The sidebar's width survives a reload; localStorage may be unavailable.
+// localStorage may be unavailable.
 const collapsedKey = 'admin.sidebar.collapsed'
 
 function storedCollapsed() {
@@ -102,16 +98,13 @@ function storeCollapsed(collapsed: boolean) {
   }
 }
 
-// Ctrl+B (Cmd+B on a Mac) toggles the sidebar, except while typing, where it
-// may mean bold.
+// Not while typing, where it may mean bold.
 function isToggleKey(event: KeyboardEvent) {
   const target = event.target as HTMLElement | null
   const typing = target?.closest('input, textarea, select, [contenteditable="true"]')
   return (event.ctrlKey || event.metaKey) && !event.altKey && !event.shiftKey && event.key.toLowerCase() === 'b' && !typing
 }
 
-// MobileMenu replaces the sidebar on small screens: a floating button opens
-// a sheet with the same links and the user menu.
 function MobileMenu({ me, brand }: { me: Me; brand: Brand }) {
   const [open, setOpen] = useState(false)
   return (

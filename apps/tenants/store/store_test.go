@@ -16,9 +16,7 @@ import (
 	"github.com/maksimillian1/ha-multitenant-saas-platform/apps/tenants/core"
 )
 
-// These tests need a PostgreSQL superuser DSN in TEST_DATABASE_URL, e.g.
-// postgres://postgres:postgres@localhost:5432/postgres?sslmode=disable.
-// CI sets it (.github/workflows/tenants.yml); locally they are skipped without it.
+// Needs a superuser DSN in TEST_DATABASE_URL; skipped without it.
 
 const (
 	ownerRole = "tenants_owner"
@@ -47,8 +45,6 @@ func dsnFor(t *testing.T, base, user, db string) string {
 	return u.String()
 }
 
-// newTestDB creates the two roles like the CNPG cluster does and a fresh
-// database owned by the owner role, then applies the migrations as the owner.
 func newTestDB(t *testing.T) testDB {
 	t.Helper()
 	base := os.Getenv("TEST_DATABASE_URL")
@@ -62,9 +58,7 @@ func newTestDB(t *testing.T) testDB {
 	}
 	t.Cleanup(func() { super.Close(ctx) })
 
-	// Test packages run in parallel against one server, and two ALTER ROLE
-	// on the same role at once fail ("tuple concurrently updated"). The lock
-	// ends with the statement below or with the connection.
+	// Test packages share one server; concurrent ALTER ROLE fails with "tuple concurrently updated".
 	if _, err := super.Exec(ctx, "SELECT pg_advisory_lock(5100051)"); err != nil {
 		t.Fatal(err)
 	}
@@ -133,7 +127,6 @@ func TestMigrationsLeaveNoUnprotectedTables(t *testing.T) {
 		t.Fatalf("unprotected tables after migrations: %v", got)
 	}
 
-	// The exemption is for the listed platform tables only.
 	if _, err := db.owner.Exec(ctx, unprotectedTablesSQL); err != nil {
 		t.Fatal(err)
 	}
@@ -173,7 +166,6 @@ func TestTenantsTableIsPlatformOnly(t *testing.T) {
 		t.Fatalf("grants on tenants = %v, want %v", got, want)
 	}
 
-	// The application role cannot delete a row: deleted tenants stay as tombstones.
 	st := openApp(t, db)
 	if _, err := st.Create(ctx, newTenant(idA, "acme")); err != nil {
 		t.Fatal(err)
@@ -224,14 +216,12 @@ func TestConcurrentRequestOnSameTenantGets409(t *testing.T) {
 	}
 	unlockA2()
 
-	// A process that dies while holding the lock: its connection ends and
-	// the database releases the lock.
 	other := openApp(t, db)
 	unlockOther, err := other.Lock(ctx, idA)
 	if err != nil {
 		t.Fatal(err)
 	}
-	// Releases the dead connection back to the pool, so Close does not wait for it.
+	// So Close does not wait for the dead connection.
 	defer unlockOther()
 	if _, err := db.super.Exec(ctx, `
 		SELECT pg_terminate_backend(pid) FROM pg_locks
@@ -270,7 +260,6 @@ func TestNameIsUniqueAmongLiveTenants(t *testing.T) {
 		t.Fatalf("same name, other case: err = %v, want ErrNameTaken", err)
 	}
 
-	// A tombstone keeps no name, so the name is free again.
 	now := time.Now()
 	a.State, a.Parts, a.DeletedBy, a.DeletedAt = core.StateDeleted, []string{}, "admin-2", &now
 	tomb, err := st.Save(ctx, a)

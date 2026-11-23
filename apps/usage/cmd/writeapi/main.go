@@ -1,5 +1,4 @@
-// Command writeapi is UsageWriteAPI: it accepts usage events and produces them
-// to Kafka. It must not link the database driver (apps/usage/README.md).
+// Command writeapi must not link the database driver (apps/usage/README.md).
 package main
 
 import (

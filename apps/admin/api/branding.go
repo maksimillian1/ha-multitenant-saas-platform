@@ -16,10 +16,7 @@ import (
 	"github.com/maksimillian1/ha-multitenant-saas-platform/apps/admin/zitadel"
 )
 
-// BrandingClient is what the branding routes need from Zitadel for one kind of
-// scope. The organization routes use the Zitadel client with the admin app's
-// account; the platform routes use PlatformZitadel, and are the only ones
-// that do. Since HAMSP-36 both are the admin-app client.
+// Only the platform routes use PlatformZitadel; both are the admin-app client today.
 type BrandingClient interface {
 	GetBranding(ctx context.Context, s zitadel.Scope, preview bool) (zitadel.Branding, error)
 	UpdateBranding(ctx context.Context, s zitadel.Scope, settings zitadel.BrandingSettings) error
@@ -29,26 +26,19 @@ type BrandingClient interface {
 	BrandingAsset(ctx context.Context, s zitadel.Scope, a zitadel.Asset, preview bool) (zitadel.AssetFile, error)
 }
 
-// PlatformZitadel is the client for the instance's branding. Since HAMSP-36
-// it is the admin app's own client, whose account holds the custom role
-// IAM_BRANDING_MANAGER; the type keeps the platform routes' dependency
-// narrow.
+// A separate type keeps the platform routes' dependency narrow.
 type PlatformZitadel interface {
 	BrandingClient
 }
 
 var _ PlatformZitadel = (*zitadel.Client)(nil)
 
-// brandingTarget is whose branding a request is about and the client that
-// may touch it.
 type brandingTarget struct {
 	scope  zitadel.Scope
 	client BrandingClient
 }
 
-// targetOf picks the target from the route: /api/orgs/{orgId}/branding is
-// the organization, with the admin app's client, after checking that it
-// exists; /api/platform/branding is the instance, with the platform client.
+// The organization is checked to exist before its client is used.
 type targetOf func(w http.ResponseWriter, r *http.Request) (brandingTarget, bool)
 
 func (s *Service) orgBranding(w http.ResponseWriter, r *http.Request) (brandingTarget, bool) {
@@ -101,8 +91,7 @@ func (s *Service) getBranding(target targetOf) handler {
 			return
 		}
 		core.WriteJSON(w, http.StatusOK, BrandingState{
-			// The draft is the organization's own as soon as it has branding
-			// of its own, published or not.
+			// The draft is the organization's own as soon as it has any branding, published or not.
 			Inherited: !t.scope.IsInstance() && draft.IsDefault,
 			Active:    brandingFromZitadel(active),
 			Draft:     brandingFromZitadel(draft),
@@ -110,9 +99,7 @@ func (s *Service) getBranding(target targetOf) handler {
 	}
 }
 
-// saveBrandingDraft writes the draft. An organization that shows the
-// platform branding first gets branding of its own; the SPA sends the
-// platform values it showed, changed or not.
+// The SPA sends the platform values it showed, changed or not.
 func (s *Service) saveBrandingDraft(target targetOf) handler {
 	return func(w http.ResponseWriter, r *http.Request, _ core.Session) {
 		var in BrandingSettings
@@ -145,10 +132,7 @@ func (s *Service) saveBrandingDraft(target targetOf) handler {
 	}
 }
 
-// ownBranding gives an organization that shows the platform branding a
-// draft of its own: with settings, or with the platform values it showed
-// when settings is nil. It reports whether it created one; the instance
-// always has its own.
+// With nil settings the draft takes the platform values shown; the instance always has its own.
 func (s *Service) ownBranding(ctx context.Context, t brandingTarget, settings *zitadel.BrandingSettings) (bool, error) {
 	if t.scope.IsInstance() {
 		return false, nil
@@ -242,9 +226,8 @@ func (s *Service) removeBrandingAsset(target targetOf) handler {
 	}
 }
 
-// getBrandingAsset serves an asset from the app's own origin, so the CSP
-// (img-src 'self') stays as it is. The type comes from the content, never
-// from Zitadel's header, and an SVG cannot run script when opened directly.
+// Same origin keeps the CSP (img-src 'self'). The type comes from the content, never Zitadel's
+// header, and an SVG cannot run script when opened directly.
 func (s *Service) getBrandingAsset(target targetOf) handler {
 	return func(w http.ResponseWriter, r *http.Request, _ core.Session) {
 		asset, ok := assetParam(w, r)
@@ -294,8 +277,7 @@ func assetParam(w http.ResponseWriter, r *http.Request) (zitadel.Asset, bool) {
 	return zitadel.Asset(name), true
 }
 
-// readAssetFile reads the part "file" of a multipart body: at most
-// zitadel.MaxAssetSize bytes (413 beyond), any other parts skipped.
+// 413 beyond zitadel.MaxAssetSize; other parts are skipped.
 func readAssetFile(w http.ResponseWriter, r *http.Request) ([]byte, int, error) {
 	// Room for the multipart headers around the file.
 	r.Body = http.MaxBytesReader(w, r.Body, zitadel.MaxAssetSize+16<<10)
@@ -335,7 +317,6 @@ func readPart(part *multipart.Part) ([]byte, int, error) {
 	return data, 0, nil
 }
 
-// fileKind is the type of an asset, told by its content.
 type fileKind struct {
 	contentType string
 	extension   string
@@ -356,7 +337,6 @@ var kinds = map[string]fileKind{
 
 var svgKind = fileKind{contentType: "image/svg+xml", extension: ".svg", image: true, svg: true}
 
-// svgRoot finds an <svg element near the start of an XML or text file.
 var svgRoot = regexp.MustCompile(`(?is)^\s*(<\?xml[^>]*>\s*)?(<!--.*?-->\s*|<!doctype[^>]*>\s*)*<svg[\s>]`)
 
 func sniff(data []byte) fileKind {

@@ -2,7 +2,6 @@ import type { BrandingSettings } from '@/api/queries'
 
 export type PreviewMode = 'light' | 'dark'
 
-// PreviewAssets are the URLs of the draft's assets; a missing one is not set.
 export type PreviewAssets = {
   logo?: string
   logoDark?: string
@@ -11,8 +10,7 @@ export type PreviewAssets = {
   font?: string
 }
 
-// The font is loaded once per URL under its own family name; the CSP allows
-// fonts from the app's origin (default-src 'self').
+// The CSP allows fonts from the app's origin.
 function fontFamily(url: string) {
   let hash = 0
   for (const char of url) {
@@ -21,9 +19,7 @@ function fontFamily(url: string) {
   return `branding-preview-${(hash >>> 0).toString(36)}`
 }
 
-// LoginPreview is a sketch of Zitadel's login card with the draft's colors,
-// logo, icon and font. It is close to the real login, not the same: the real
-// login is checked after publishing.
+// A sketch, not the real login: that is checked after publishing.
 export function LoginPreview({
   settings,
   assets,

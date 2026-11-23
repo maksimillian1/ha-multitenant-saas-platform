@@ -42,7 +42,6 @@ describe('tenants list', () => {
     await user.click(await screen.findByRole('button', { name: 'New tenant' }))
     const dialog = await screen.findByRole('dialog', { name: 'New tenant' })
 
-    // Invalid input never reaches the API.
     await user.click(within(dialog).getByRole('button', { name: 'Create' }))
     expect(await within(dialog).findAllByText('Required')).toHaveLength(2)
     await user.type(within(dialog).getByLabelText('Name'), '  Umbrella ')
@@ -194,8 +193,6 @@ describe('tenant page', () => {
     await user.click(within(confirm).getByRole('button', { name: 'Delete' }))
 
     expect(await screen.findByText('Deletion stopped')).toBeInTheDocument()
-    // The dialog stays open on a failure; behind it the page shows the tenant
-    // as the failure left it.
     await user.click(within(confirm).getByRole('button', { name: 'Cancel' }))
     expect(screen.getByText('namespace: kube: timeout')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Retry' })).toBeInTheDocument()

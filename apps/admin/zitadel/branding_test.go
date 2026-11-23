@@ -14,10 +14,7 @@ import (
 	"testing"
 )
 
-// brandingFake answers the v1 REST and assets routes with a canned status,
-// content type and body per "METHOD path", and records what it got. The
-// paths and bodies are those of Zitadel v4.19.2 (proto/zitadel/management.proto,
-// admin.proto, internal/api/assets/generator/asset.yaml).
+// Paths and bodies of Zitadel v4.19.2 (management.proto, admin.proto, assets/generator/asset.yaml).
 type brandingFake struct {
 	t        *testing.T
 	answers  map[string]cannedAnswer
@@ -74,9 +71,6 @@ const settingsJSON = `{"primaryColor": "#1d4ed8", "backgroundColor": "#fafafa", 
 	"primaryColorDark": "#2563eb", "backgroundColorDark": "#111827", "warnColorDark": "#ff3b5b", "fontColorDark": "#ffffff",
 	"hideLoginNameSuffix": true, "disableWatermark": false, "themeMode": "THEME_MODE_DARK"}`
 
-// TestBrandingCallsCarryTheirToken checks every branding call of an
-// organization and of the instance: its method, path, body, the organization
-// header and the token of the client that made it (AC-8).
 func TestBrandingCallsCarryTheirToken(t *testing.T) {
 	ctx := context.Background()
 	org, instance := OrgScope("org-a"), InstanceScope()
@@ -85,7 +79,7 @@ func TestBrandingCallsCarryTheirToken(t *testing.T) {
 		call         func(c *Client) error
 		method, path string
 		orgHeader    string
-		body         string // expected JSON body, "" for none
+		body         string // "" for no body
 	}{
 		{"org active", func(c *Client) error { _, err := c.GetBranding(ctx, org, false); return err },
 			"GET", "/management/v1/policies/label", "org-a", ""},
@@ -260,8 +254,6 @@ func TestDownloadAsset(t *testing.T) {
 	}
 }
 
-// TestAssetErrorsCarryAConnectCode: the assets API answers in plain text,
-// not in Connect or gateway JSON.
 func TestAssetErrorsCarryAConnectCode(t *testing.T) {
 	for _, tc := range []struct {
 		status    int

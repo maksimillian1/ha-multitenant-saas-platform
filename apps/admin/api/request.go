@@ -19,11 +19,9 @@ const (
 	maxBody      = 64 << 10
 	defaultLimit = 20
 	maxLimit     = 100
-	// maxRelated is how many role assignments or roles one page shows.
-	maxRelated = 100
+	maxRelated   = 100
 )
 
-// decode reads the JSON body into v and answers 400 itself if it cannot.
 // Unknown fields are an error, so a typo does not silently change nothing.
 func decode(w http.ResponseWriter, r *http.Request, v any) bool {
 	dec := json.NewDecoder(http.MaxBytesReader(w, r.Body, maxBody))
@@ -43,7 +41,6 @@ func badRequest(w http.ResponseWriter, err error) {
 	core.WriteError(w, http.StatusBadRequest, err.Error())
 }
 
-// page reads offset and limit.
 func page(q url.Values) (zitadel.Page, error) {
 	p := zitadel.Page{Limit: defaultLimit}
 	if v := q.Get("offset"); v != "" {
@@ -63,8 +60,6 @@ func page(q url.Values) (zitadel.Page, error) {
 	return p, nil
 }
 
-// fields validates text input. Each method trims the value in place and
-// remembers the first problem; err returns it.
 type fields struct{ first error }
 
 func (f *fields) fail(format string, args ...any) {
@@ -73,7 +68,6 @@ func (f *fields) fail(format string, args ...any) {
 	}
 }
 
-// text checks a value of min to max characters.
 func (f *fields) text(name string, value *string, min, max int) {
 	*value = strings.TrimSpace(*value)
 	switch n := utf8.RuneCountInString(*value); {
@@ -86,8 +80,7 @@ func (f *fields) text(name string, value *string, min, max int) {
 	}
 }
 
-// optionalText checks a value that may be left out (nil). Empty values are
-// allowed only where allowEmpty is set; otherwise set values follow min/max.
+// Empty values only with allowEmpty.
 func (f *fields) optionalText(name string, value *string, max int, allowEmpty bool) {
 	if value == nil {
 		return
@@ -99,7 +92,7 @@ func (f *fields) optionalText(name string, value *string, max int, allowEmpty bo
 	f.text(name, value, min, max)
 }
 
-// email checks a required address; Zitadel checks the details.
+// Zitadel checks the details.
 func (f *fields) email(name string, value *string) {
 	f.text(name, value, 1, 200)
 	if *value != "" && !strings.Contains(*value, "@") {
@@ -107,7 +100,7 @@ func (f *fields) email(name string, value *string) {
 	}
 }
 
-// secret checks a password without trimming it.
+// Passwords are not trimmed.
 func (f *fields) secret(name, value string) {
 	switch n := utf8.RuneCountInString(value); {
 	case n == 0:
@@ -117,7 +110,6 @@ func (f *fields) secret(name, value string) {
 	}
 }
 
-// roleKeys checks a non-empty list of role keys and drops duplicates.
 func (f *fields) roleKeys(keys *[]string) {
 	if len(*keys) == 0 {
 		f.fail("role_keys needs at least one role")

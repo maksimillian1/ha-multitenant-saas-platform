@@ -1,6 +1,4 @@
-// Command migrate applies the migrations to the usage database and exits. It
-// runs as the owner role, in a Job before writer rolls out
-// (prototype/k8s/apps/usage/migrate-job.yaml).
+// Command migrate runs as the owner role, in a Job before writer rolls out.
 package main
 
 import (
@@ -27,8 +25,6 @@ func main() {
 	}
 }
 
-// run waits up to 5 minutes for the database, then applies the migrations and
-// fails if any relation with tenant_id is left open to another tenant.
 func run(ctx context.Context, cfg core.Config, log *slog.Logger) error {
 	if err := core.Required("MIGRATE_DATABASE_URL", cfg.MigrateDatabaseURL); err != nil {
 		return err

@@ -17,7 +17,6 @@ import { formatDateTime, plural } from '@/lib/format'
 
 const route = getRouteApi('/orgs/$orgId')
 
-// How many users and projects the page lists; the lists link to the rest.
 const PREVIEW = 10
 
 export function OrgPage() {

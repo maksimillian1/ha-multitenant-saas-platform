@@ -86,9 +86,7 @@ function sameAssets(a: Branding['assets'], b: Branding['assets']) {
   return (Object.keys(a) as BrandingAssetName[]).every((key) => a[key] === b[key])
 }
 
-// BrandingEditor edits the draft of one scope's login branding and publishes
-// it. Saving and uploading change only the draft; the login shows the active
-// version until "Publish".
+// Saving and uploading change only the draft; the login shows the active version until "Publish".
 export function BrandingEditor({ scope, name }: { scope: BrandingScope; name: string }) {
   const query = useQuery(brandingQuery(scope))
   return (

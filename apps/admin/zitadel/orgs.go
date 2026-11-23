@@ -2,8 +2,7 @@ package zitadel
 
 import "context"
 
-// Organization is an org.v2 Organization. One organization is one tenant
-// (ADR-0003).
+// One organization is one tenant (ADR-0003).
 type Organization struct {
 	ID            string            `json:"id"`
 	Details       Details           `json:"details"`
@@ -12,7 +11,6 @@ type Organization struct {
 	PrimaryDomain string            `json:"primaryDomain"`
 }
 
-// OrganizationState is org.v2.OrganizationState.
 type OrganizationState string
 
 const (
@@ -21,13 +19,11 @@ const (
 	OrganizationRemoved  OrganizationState = "ORGANIZATION_STATE_REMOVED"
 )
 
-// OrganizationFilter narrows ListOrganizations. Zero fields match every
-// organization; set fields must all match.
 type OrganizationFilter struct {
-	Name    string // part of the name, in any case
+	Name    string // part of the name, any case
 	State   OrganizationState
 	ID      string
-	Default bool // only the instance's default organization
+	Default bool
 }
 
 type OrganizationList struct {
@@ -35,7 +31,6 @@ type OrganizationList struct {
 	Organizations []Organization
 }
 
-// ListOrganizations returns organizations sorted by name.
 func (c *Client) ListOrganizations(ctx context.Context, f OrganizationFilter, p Page) (OrganizationList, error) {
 	type nameQuery struct {
 		Name   string `json:"name"`
@@ -80,8 +75,7 @@ func (c *Client) ListOrganizations(ctx context.Context, f OrganizationFilter, p 
 	return OrganizationList{Total: uint64(resp.Details.TotalResult), Organizations: resp.Result}, nil
 }
 
-// GetOrganization returns one organization. org.v2 has no get method, so it
-// lists by ID.
+// org.v2 has no get method, so it lists by ID.
 func (c *Client) GetOrganization(ctx context.Context, id string) (Organization, error) {
 	list, err := c.ListOrganizations(ctx, OrganizationFilter{ID: id}, Page{Limit: 1})
 	if err != nil {
@@ -93,8 +87,7 @@ func (c *Client) GetOrganization(ctx context.Context, id string) (Organization, 
 	return list.Organizations[0], nil
 }
 
-// DefaultOrganizationID returns the ID of the instance's default
-// organization, or "" if there is none.
+// "" if there is none.
 func (c *Client) DefaultOrganizationID(ctx context.Context) (string, error) {
 	list, err := c.ListOrganizations(ctx, OrganizationFilter{Default: true}, Page{Limit: 1})
 	if err != nil || len(list.Organizations) == 0 {
@@ -103,8 +96,7 @@ func (c *Client) DefaultOrganizationID(ctx context.Context) (string, error) {
 	return list.Organizations[0].ID, nil
 }
 
-// AddOrganization creates an organization without admin users; instance
-// administrators, such as the service account, can still manage it.
+// Instance administrators, such as the service account, can still manage it.
 func (c *Client) AddOrganization(ctx context.Context, name string) (string, error) {
 	req := struct {
 		Name string `json:"name"`
@@ -126,7 +118,6 @@ func (c *Client) UpdateOrganization(ctx context.Context, id, name string) error 
 	return c.call(ctx, orgService, "UpdateOrganization", req, nil)
 }
 
-// DeactivateOrganization stops the organization's users from signing in.
 func (c *Client) DeactivateOrganization(ctx context.Context, id string) error {
 	return c.call(ctx, orgService, "DeactivateOrganization", organizationRequest{OrganizationID: id}, nil)
 }
@@ -135,8 +126,7 @@ func (c *Client) ActivateOrganization(ctx context.Context, id string) error {
 	return c.call(ctx, orgService, "ActivateOrganization", organizationRequest{OrganizationID: id}, nil)
 }
 
-// DeleteOrganization deletes the organization with its users, projects and
-// grants in Zitadel. Data of the tenant in other stores stays.
+// Data of the tenant in other stores stays.
 func (c *Client) DeleteOrganization(ctx context.Context, id string) error {
 	return c.call(ctx, orgService, "DeleteOrganization", organizationRequest{OrganizationID: id}, nil)
 }

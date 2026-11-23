@@ -1,5 +1,5 @@
 // Negative fixture for check.sh: a module that depends on an AGPL module.
-// The check must fail on it (C-03, HAMSP-21).
+// The check must fail on it (C-03).
 module example.com/licensefixture
 
 go 1.24

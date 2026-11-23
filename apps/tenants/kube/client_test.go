@@ -13,9 +13,6 @@ import (
 	"time"
 )
 
-// fakeAPI is a tiny API server: it keeps objects by path, answers 409 on a
-// second create and 404 on an unknown path, and lets a namespace linger in
-// Terminating for a number of reads after DELETE.
 type fakeAPI struct {
 	t        *testing.T
 	mu       sync.Mutex
@@ -90,7 +87,6 @@ func (f *fakeAPI) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// removeTree drops a namespace and every object in it.
 func (f *fakeAPI) removeTree(nsPath string) {
 	name := strings.TrimPrefix(nsPath, "/api/v1/namespaces/")
 	for p := range f.objects {
@@ -169,7 +165,7 @@ func TestNamespaceOfAnotherTenantIsNeverTouched(t *testing.T) {
 	if err := c.EnsureNamespace(ctx, tenantB); err != nil {
 		t.Fatal(err)
 	}
-	// A namespace named for A but labelled for B (or not created by us).
+	// Named for A but labelled for B (or not created by us).
 	f.objects[nsA] = map[string]any{"metadata": map[string]any{
 		"name": "tenant-" + tenantA, "labels": map[string]any{TenantLabel: tenantB, "app.kubernetes.io/managed-by": "tenant-management"},
 	}}
@@ -188,7 +184,6 @@ func TestNamespaceOfAnotherTenantIsNeverTouched(t *testing.T) {
 		t.Fatal("a quota was put into a foreign namespace")
 	}
 
-	// Deleting A's own namespace leaves B's.
 	delete(f.objects, nsA)
 	if err := c.EnsureNamespace(ctx, tenantA); err != nil {
 		t.Fatal(err)
@@ -219,7 +214,6 @@ func TestDeleteNamespaceWaitsUntilGone(t *testing.T) {
 		t.Fatalf("delete again: %v", err)
 	}
 
-	// A namespace that stays in Terminating is reported, not waited for forever.
 	if err := c.EnsureNamespace(ctx, tenantA); err != nil {
 		t.Fatal(err)
 	}

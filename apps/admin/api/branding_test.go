@@ -12,7 +12,6 @@ import (
 	"github.com/maksimillian1/ha-multitenant-saas-platform/apps/admin/zitadel"
 )
 
-// brandingInput is a valid draft: the platform colors with another primary.
 func brandingInput() BrandingSettings {
 	return BrandingSettings{
 		PrimaryColor: "#7c3aed", BackgroundColor: "#fafafa", WarnColor: "#cd3d56", FontColor: "#000000",
@@ -28,7 +27,6 @@ func getBranding(t *testing.T, e *env, target string) BrandingState {
 	return state
 }
 
-// changed reports whether any of the methods reached Zitadel.
 func changed(e *env, methods ...string) []string {
 	var hit []string
 	for _, call := range e.z.called() {
@@ -133,7 +131,6 @@ func TestBadColorIsRefused(t *testing.T) {
 		})
 	}
 
-	// A missing field and an unknown one are refused too.
 	e := newEnv(t)
 	expect(t, e.do("PUT", "/api/orgs/org-b/branding", `{"primary_color":"#000000"}`), http.StatusBadRequest, nil)
 	expect(t, e.do("PUT", "/api/orgs/org-b/branding", `{"logo_url":"http://evil.test/x.png"}`), http.StatusBadRequest, nil)
@@ -166,8 +163,6 @@ func TestAssetUpload(t *testing.T) {
 		}
 	}
 
-	// An organization that inherits gets its own draft first, from the
-	// platform values.
 	e := newEnv(t)
 	expect(t, e.do("PUT", "/api/orgs/org-a/branding/assets/logo", fileBody(pngFile)), http.StatusNoContent, nil)
 	if calls := changed(e, brandingWrites...); !slices.Equal(calls, []string{"CreateOrgBranding", "UploadBrandingAsset"}) {
@@ -217,7 +212,6 @@ func TestAssetTypeAndSizeAreChecked(t *testing.T) {
 		})
 	}
 
-	// Exactly 512 KiB is accepted.
 	limit := append(slices.Clone(pngFile), make([]byte, zitadel.MaxAssetSize-len(pngFile))...)
 	expect(t, newEnv(t).do("PUT", "/api/orgs/org-b/branding/assets/logo", fileBody(limit)), http.StatusNoContent, nil)
 }
@@ -238,7 +232,6 @@ func TestPublish(t *testing.T) {
 		t.Errorf("the platform's active primary changed to %s", platform.Active.Settings.PrimaryColor)
 	}
 
-	// An organization without its own branding has nothing to publish.
 	expect(t, e.do("POST", "/api/orgs/org-a/branding/publish", nil), http.StatusNotFound, nil)
 }
 
@@ -281,12 +274,10 @@ func TestAssetProxyHeaders(t *testing.T) {
 		t.Errorf("Cache-Control %q, want no-store", svg.Header().Get("Cache-Control"))
 	}
 
-	// tenant-a inherits, so it shows the platform logo.
 	expect(t, e.do("GET", "/api/orgs/org-a/branding/assets/logo", nil), http.StatusOK, nil)
 	expect(t, e.do("GET", "/api/orgs/org-b/branding/assets/icon", nil), http.StatusNotFound, nil)
 	expect(t, e.do("GET", "/api/orgs/org-b/branding/assets/logo?version=next", nil), http.StatusBadRequest, nil)
 
-	// Something Zitadel holds that is not an image is not passed on.
 	e.z.mu.Lock()
 	e.z.orgLabels["org-b"].activeAssets[zitadel.AssetLogo] = htmlFile
 	e.z.mu.Unlock()
@@ -315,7 +306,6 @@ func TestPlatformBranding(t *testing.T) {
 	}
 	expect(t, e.do("DELETE", "/api/platform/branding/assets/icon", nil), http.StatusNoContent, nil)
 
-	// tenant-a inherits the published platform branding; tenant-b keeps its own.
 	if got := getBranding(t, e, "/api/orgs/org-a/branding").Active.Settings.PrimaryColor; got != "#7c3aed" {
 		t.Errorf("tenant-a shows %s, want the new platform primary", got)
 	}
@@ -324,8 +314,6 @@ func TestPlatformBranding(t *testing.T) {
 	}
 	expect(t, e.do("DELETE", "/api/platform/branding", nil), http.StatusMethodNotAllowed, nil)
 
-	// Instance calls go only through the platform client, and organization
-	// calls never do.
 	if calls := changed(e, "UpdateBranding", "ActivateBranding", "UploadBrandingAsset", "RemoveBrandingAsset"); len(calls) > 0 {
 		t.Errorf("the platform routes called %v with the admin app's client", calls)
 	}
@@ -337,8 +325,7 @@ func TestPlatformBranding(t *testing.T) {
 	}
 }
 
-// TestOrgClientCannotReachTheInstance checks the fake does what Zitadel does,
-// so the tests above prove which client each route uses.
+// Proves the fake behaves like Zitadel, so the tests above prove which client each route uses.
 func TestOrgClientCannotReachTheInstance(t *testing.T) {
 	z := newFakeZitadel()
 	if _, err := z.GetBranding(context.Background(), zitadel.InstanceScope(), false); !zitadel.HasCode(err, zitadel.CodePermissionDenied) {

@@ -1,8 +1,5 @@
 import { vi } from 'vitest'
 
-// The API stub replaces fetch: each test lists the answers it needs as
-// "METHOD /path": body (200 JSON), a Response, or a function of the request.
-// Every request is recorded, so a test can check what the SPA sent.
 
 export type Call = {
   method: string
@@ -26,7 +23,6 @@ export function apiError(status: number, error: string) {
   return json({ error }, status)
 }
 
-// A JSON body is parsed; any other (a multipart upload) stays text.
 function parseBody(text: string, contentType: string | null) {
   if (!text) {
     return undefined
@@ -63,15 +59,12 @@ export function mockApi(answers: Record<string, Answer>) {
 
   return {
     calls,
-    // answer sets or replaces the answer for a route.
     answer(key: string, value: Answer) {
       routes[key] = value
     },
-    // sent returns the requests to one route.
     sent(method: string, path: string) {
       return calls.filter((call) => call.method === method && call.path === path)
     },
-    // lastQuery is the query string of the last request to a route.
     lastQuery(method: string, path: string) {
       const matching = calls.filter((call) => call.method === method && call.path === path)
       return Object.fromEntries(matching.at(-1)?.query ?? [])

@@ -56,7 +56,6 @@ describe('organization branding', () => {
     const { user } = renderApp('/orgs/org-a?tab=branding')
     const primary = await screen.findByLabelText('Primary color (light)')
 
-    // A color the API would refuse never leaves the form.
     await user.clear(primary)
     await user.type(primary, '#fff')
     await user.click(screen.getByRole('button', { name: 'Save draft' }))
@@ -67,7 +66,6 @@ describe('organization branding', () => {
     await user.type(primary, '#7c3aed')
     await user.selectOptions(screen.getByLabelText('Theme mode'), 'dark')
     await user.click(screen.getByLabelText('Disable watermark'))
-    // Publishing waits for the save.
     expect(screen.getByRole('button', { name: 'Publish' })).toBeDisabled()
     await user.click(screen.getByRole('button', { name: 'Save draft' }))
 
@@ -101,7 +99,6 @@ describe('organization branding', () => {
     const { user } = renderApp('/orgs/org-b?tab=branding')
     const upload = await screen.findByLabelText('Upload logo')
 
-    // Larger than Zitadel accepts: refused before the upload.
     const big = new File([new Uint8Array(MAX_ASSET_SIZE + 1)], 'big.png', { type: 'image/png' })
     await user.upload(upload, big)
     expect(await screen.findByText('big.png is larger than 512 KiB.')).toBeInTheDocument()
@@ -113,13 +110,11 @@ describe('organization branding', () => {
     const sent = api.sent('PUT', '/api/orgs/org-b/branding/assets/logo')[0]
     expect(sent.headers.get('Content-Type')).toMatch(/^multipart\/form-data; boundary=/)
     expect(sent.headers.get('X-Requested-With')).toBe('XMLHttpRequest')
-    // jsdom's File loses its name in Node's FormData; the server names the
-    // file by its content anyway.
+    // jsdom's File loses its name in Node's FormData; the server names the file by content anyway.
     expect(sent.body).toContain('name="file"')
     expect(sent.body).toContain('Content-Type: image/png')
     expect(await screen.findByText('Logo uploaded to the draft')).toBeInTheDocument()
 
-    // The draft now has a logo: the row and the previews show it.
     const thumbnail = await screen.findByRole('img', { name: 'Logo in the draft' })
     expect(thumbnail.getAttribute('src')).toMatch(/^\/api\/orgs\/org-b\/branding\/assets\/logo\?version=draft&v=\d+$/)
     expect(within(screen.getByRole('figure', { name: 'Login preview (light)' })).getByRole('img', { name: 'Logo' })).toBeInTheDocument()
@@ -149,7 +144,6 @@ describe('organization branding', () => {
       expect.stringMatching(/^\/api\/orgs\/org-a\/branding\/assets\/logo\?version=draft/),
     )
 
-    // The preview follows the form before anything is saved.
     const darkBackground = screen.getByLabelText('Background color (dark)')
     await user.clear(darkBackground)
     await user.type(darkBackground, '#000080')
@@ -171,13 +165,11 @@ describe('organization branding', () => {
     const dark = screen.getByTestId('preview-dark')
     const src = (scope: HTMLElement, name: string) => within(scope).getByRole('img', { name }).getAttribute('src')
 
-    // Light shows the logo and icon, dark their dark versions, all from the draft.
     expect(src(light, 'Logo')).toMatch(/\/branding\/assets\/logo\?version=draft/)
     expect(src(light, 'Icon')).toMatch(/\/branding\/assets\/icon\?version=draft/)
     expect(src(dark, 'Logo')).toMatch(/\/branding\/assets\/logo-dark\?version=draft/)
     expect(src(dark, 'Icon')).toMatch(/\/branding\/assets\/icon-dark\?version=draft/)
 
-    // The draft's font is loaded from the BFF and used by both cards.
     const fontFace = screen.getByRole('figure', { name: 'Login preview (light)' }).querySelector('style')?.textContent ?? ''
     const family = fontFace.match(/font-family: "([^"]+)"/)?.[1]
     expect(fontFace).toMatch(/src: url\("\/api\/orgs\/org-b\/branding\/assets\/font\?version=draft&v=\d+"\)/)
@@ -190,7 +182,6 @@ describe('organization branding', () => {
     mockApi(orgAnswers)
     renderApp('/orgs/org-a?tab=branding')
     const dark = await screen.findByTestId('preview-dark')
-    // Without a dark logo the dark card shows the light one, as Zitadel does.
     expect(within(dark).getByRole('img', { name: 'Logo' }).getAttribute('src')).toMatch(/\/assets\/logo\?/)
     expect(within(dark).queryByRole('img', { name: 'Icon' })).not.toBeInTheDocument()
     expect(dark.style.fontFamily).toBe('')

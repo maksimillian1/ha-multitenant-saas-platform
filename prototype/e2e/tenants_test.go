@@ -16,7 +16,7 @@ import (
 const tenantsProbe = `
 if code=$(curl -s -m 5 -o /dev/null -w '%{http_code}' http://tenants.tenants.svc:8080/tenants); then echo "tenants=$code"; else echo tenants=blocked; fi`
 
-// HAMSP-51 AC-10: only pods of the admin app (namespace admin, label
+// Only pods of the admin app (namespace admin, label
 // app.kubernetes.io/name=admin) can connect to Tenant Management. The
 // control pod carries the admin app's label and must get the token check's
 // 401, so a blocked answer elsewhere is the policy, not a broken service.
@@ -83,7 +83,7 @@ func tmCall(t *testing.T, method, path, body string) string {
 	return directAccess(t, "admin", "app.kubernetes.io/name=admin", script)
 }
 
-// HAMSP-52: a suspended tenant loses API access within seconds, through the
+// A suspended tenant loses API access within seconds, through the
 // tenant-states topic, not only when its tokens expire; resume gives it back.
 //
 // Verifies: tenant-management AC-17

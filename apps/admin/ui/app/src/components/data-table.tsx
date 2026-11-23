@@ -1,8 +1,6 @@
 import type { ReactTable, RowData, TableFeatures } from '@tanstack/react-table'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 
-// DataTable renders a TanStack table with the shadcn/ui table markup. The
-// caller owns the table: its features, columns and data.
 export function DataTable<TFeatures extends TableFeatures, TData extends RowData>({
   table,
   emptyText = 'No results.',

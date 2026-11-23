@@ -11,12 +11,9 @@ import (
 	"github.com/maksimillian1/ha-multitenant-saas-platform/apps/admin/zitadel"
 )
 
-// maxLookups is how many organizations orgNames reads at the same time.
 const maxLookups = 8
 
-// orgNames returns the names of the organizations, read in parallel. An
-// organization that cannot be read has no entry: its name shows as empty
-// instead of failing the whole page.
+// An unreadable organization gets no entry instead of failing the whole page.
 func (s *Service) orgNames(ctx context.Context, ids ...string) map[string]string {
 	unique := slices.DeleteFunc(slices.Clone(ids), func(id string) bool { return id == "" })
 	slices.Sort(unique)
@@ -145,8 +142,7 @@ func userState(s zitadel.UserState) UserState {
 	}
 }
 
-// accessTokenType maps Zitadel's enum; protojson leaves out the default,
-// bearer.
+// protojson leaves out the default, bearer.
 func accessTokenType(t zitadel.AccessTokenType) AccessTokenType {
 	if t == zitadel.AccessTokenJWT {
 		return AccessTokenTypeJwt
@@ -225,7 +221,7 @@ func firstNonEmpty(values ...string) string {
 	return ""
 }
 
-// nonNil makes an absent list an empty JSON array instead of null.
+// An absent list becomes [] instead of null.
 func nonNil[T any](s []T) []T {
 	if s == nil {
 		return []T{}
@@ -233,8 +229,7 @@ func nonNil[T any](s []T) []T {
 	return s
 }
 
-// total converts a Zitadel count to the API's int64, capped at the largest
-// int64 instead of wrapping to a negative number.
+// Capped instead of wrapping to a negative number.
 func total(n uint64) int64 {
 	if n > math.MaxInt64 {
 		return math.MaxInt64

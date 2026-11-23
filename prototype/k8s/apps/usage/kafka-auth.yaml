@@ -1,4 +1,4 @@
-# The SCRAM login of this namespace's Kafka clients (HAMSP-31, feature
+# The SCRAM login of this namespace's Kafka clients (feature
 # kafka-client-auth). Local kind prototype passwords only; they match the
 # KafkaUser passwords in prototype/k8s/apps/kafka/templates/users.yaml. The
 # cluster CA (Secret usage-kafka-ca) is not in Git: prototype/kafka-ca.sh loads it.
@@ -25,3 +25,15 @@ type: Opaque
 stringData:
   KAFKA_USERNAME: usage-writer
   KAFKA_PASSWORD: dev-usage-writer-kafka # gitleaks:allow
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: usage-replay-kafka
+  namespace: usage
+  annotations:
+    argocd.argoproj.io/sync-wave: "-1"
+type: Opaque
+stringData:
+  KAFKA_USERNAME: usage-replay
+  KAFKA_PASSWORD: dev-usage-replay-kafka # gitleaks:allow

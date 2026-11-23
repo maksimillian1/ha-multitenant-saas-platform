@@ -19,13 +19,10 @@ import (
 	"github.com/maksimillian1/ha-multitenant-saas-platform/apps/admin/zitadel"
 )
 
-// fakeZitadel is an in-memory Zitadel for the handler tests. It records the
-// name of every method called, so a test can check that nothing reached
-// Zitadel, and the arguments of the last calls.
 type fakeZitadel struct {
 	mu    sync.Mutex
 	calls []string
-	err   error // every call fails with it when set
+	err   error
 
 	account        zitadel.ServiceAccount
 	defaultOrg     string
@@ -49,8 +46,6 @@ type fakeZitadel struct {
 	newGrant      [3]string // user, project, organization
 	roleKeys      []string
 
-	// Branding (fake_branding_test.go): the instance's, and the
-	// organizations' own.
 	instanceLabel *fakeLabel
 	orgLabels     map[string]*fakeLabel
 	upload        fakeUpload
@@ -58,9 +53,7 @@ type fakeZitadel struct {
 
 var created1 = time.Date(2026, 10, 1, 8, 0, 0, 0, time.UTC)
 
-// newFakeZitadel holds the instance after bootstrap-tenants.sh: the default
-// organization with the super admin, the service account and the platform
-// projects, and two tenants.
+// The instance after bootstrap-tenants.sh.
 func newFakeZitadel() *fakeZitadel {
 	z := &fakeZitadel{
 		account:        zitadel.ServiceAccount{UserID: "sa", OrganizationID: "org-zitadel"},
@@ -128,7 +121,6 @@ func (z *fakeZitadel) addGrant(id, userID, projectID string, roles ...string) {
 	z.authorizations[id] = a
 }
 
-// record notes a call and returns the configured error.
 func (z *fakeZitadel) record(method string) error {
 	z.calls = append(z.calls, method)
 	return z.err
@@ -443,8 +435,6 @@ func (z *fakeZitadel) ListProjectRoles(_ context.Context, projectID string, _ zi
 	return z.roles[projectID], nil
 }
 
-// env is the API with the fake Zitadel, signed in as the super admin
-// "admin" of the default organization.
 type env struct {
 	t    *testing.T
 	z    *fakeZitadel
@@ -474,7 +464,6 @@ func newEnvWith(t *testing.T, sessions fakeSessions) *env {
 
 func newEnv(t *testing.T) *env { return newEnvWith(t, adminSession()) }
 
-// do sends a request as the SPA does: same origin, with X-Requested-With.
 // headers can drop a header by setting it to "".
 func (e *env) do(method, target string, body any, headers ...[2]string) *httptest.ResponseRecorder {
 	e.t.Helper()
@@ -511,7 +500,6 @@ func (e *env) do(method, target string, body any, headers ...[2]string) *httptes
 	return rec
 }
 
-// expect checks the status and decodes the body into out, if given.
 func expect(t *testing.T, rec *httptest.ResponseRecorder, status int, out any) {
 	t.Helper()
 	if rec.Code != status {

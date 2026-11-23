@@ -48,7 +48,6 @@ func sign(t *testing.T, key jose.JSONWebKey, claims map[string]any) string {
 	return tok
 }
 
-// newTestVerifier serves the public part of key as the issuer's JWKS.
 func newTestVerifier(t *testing.T, key jose.JSONWebKey) *Verifier {
 	t.Helper()
 	jwks := jose.JSONWebKeySet{Keys: []jose.JSONWebKey{key.Public()}}
@@ -83,7 +82,7 @@ func TestValidTokenReturnsOrganizationID(t *testing.T) {
 	}
 }
 
-// A single audience may come as a string instead of an array (RFC 7519).
+// RFC 7519 allows a single audience as a string.
 func TestAudienceAsString(t *testing.T) {
 	key := newKey(t, "k1")
 	tok := sign(t, key, claims(func(c map[string]any) { c["aud"] = audience }))

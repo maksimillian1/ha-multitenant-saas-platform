@@ -44,8 +44,6 @@ func waitFor(t *testing.T, what string, cond func() bool) {
 	}
 }
 
-// AC-4: at the limit of unsent events, Report drops new events at once and
-// counts them on the metrics endpoint.
 func TestDropsBeyondLimitWithoutBlocking(t *testing.T) {
 	release := make(chan struct{})
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -72,8 +70,6 @@ func TestDropsBeyondLimitWithoutBlocking(t *testing.T) {
 	}
 }
 
-// AC-3: while UsageWriteAPI fails, the event is retried with the same
-// event_id and event_time until it is accepted, exactly once.
 func TestRetriesUntilDelivered(t *testing.T) {
 	var mu sync.Mutex
 	var bodies []map[string][]map[string]any
@@ -116,7 +112,6 @@ func TestRetriesUntilDelivered(t *testing.T) {
 	}
 }
 
-// An event UsageWriteAPI rejects with 400 is not retried.
 func TestRejectedEventIsNotRetried(t *testing.T) {
 	var calls atomic.Int32
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -133,7 +128,6 @@ func TestRejectedEventIsNotRetried(t *testing.T) {
 	}
 }
 
-// An event that is still failing when its retry time is over is given up and counted.
 func TestEventIsGivenUpAfterRetryFor(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusServiceUnavailable)

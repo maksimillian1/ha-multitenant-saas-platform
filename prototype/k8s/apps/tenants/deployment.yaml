@@ -1,4 +1,4 @@
-# Tenant Management (apps/tenants, ADR-0012, HAMSP-51). Called only by the
+# Tenant Management (apps/tenants, ADR-0012). Called only by the
 # admin app (network-policy.yaml), with a Zitadel token holding the role
 # tenant-manager. prototype/bootstrap-tenants.sh creates the Secret
 # tenants-zitadel; until then the pods wait in CreateContainerConfigError.
@@ -40,10 +40,10 @@ spec:
             - name: http
               containerPort: 8080
           env:
-            # Every tenant's state goes to the topic tenant-states (HAMSP-52).
+            # Every tenant's state goes to the topic tenant-states.
             - name: KAFKA_BROKERS
               value: usage-kafka-kafka-bootstrap.kafka.svc:9093
-            # HAMSP-31: TLS with the cluster CA and a
+            # TLS with the cluster CA and a
             # SCRAM login as KafkaUser tenants.
             - name: KAFKA_CA_FILE
               value: /etc/kafka-ca/ca.crt
