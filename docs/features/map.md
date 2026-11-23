@@ -22,7 +22,7 @@ Each feature's stage and the gates behind it ([Feature stages](../process/featur
 | [`kafka-client-auth`](kafka-client-auth.yaml) **critical** | alpha | n/a | ✓ | n/a | ✓ basic | ? |  | ✓ (owner) |  | 2026-11-18 ready for alpha | HAMSP-31 |
 | [`network-policies`](network-policies.yaml) **critical** | — |  |  |  |  |  |  |  |  | — | HAMSP-23 |
 | [`tenant-management`](tenant-management.yaml) **critical** | alpha | n/a | ✓ | ✓ | ✓ basic | ✓ |  | ✓ (owner) |  | 2026-11-11 ready for alpha | HAMSP-51, HAMSP-6, HAMSP-52 |
-| [`tenant-self-admin`](tenant-self-admin.yaml) **critical** | — |  |  |  |  |  |  |  |  | — | HAMSP-57 |
+| [`tenant-self-admin`](tenant-self-admin.yaml) **critical** | — |  |  |  |  |  |  | ✓ (owner) |  | — | HAMSP-57 |
 | [`usage-ingest`](usage-ingest.yaml) **critical** | — |  |  |  |  |  |  |  |  | — | HAMSP-23 |
 | [`usage-store`](usage-store.yaml) **critical** | — |  |  |  |  |  |  |  |  | — | HAMSP-23 |
 | [`usage-writer`](usage-writer.yaml) **critical** | alpha | n/a | ✓ (owner) | n/a | ✓ basic | ? |  | ✓ (owner) |  | 2026-11-23 ready for alpha | HAMSP-23, HAMSP-30 |
