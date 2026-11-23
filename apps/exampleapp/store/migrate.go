@@ -13,12 +13,9 @@ import (
 //go:embed migrations/*.sql
 var migrations embed.FS
 
-// migrationLockID serialises concurrent migration runs (pg_advisory_xact_lock).
 const migrationLockID = 5_000_001
 
-// Migrate applies the embedded migrations in file name order. Each file runs in
-// its own transaction and is recorded in schema_migrations. It must run as the
-// owner role of the database, not as the application role.
+// Migrate must run as the database owner role, not as the application role.
 func Migrate(ctx context.Context, conn *pgx.Conn) error {
 	if _, err := conn.Exec(ctx, `CREATE TABLE IF NOT EXISTS schema_migrations (
 		version    text        PRIMARY KEY,
@@ -65,9 +62,6 @@ func Migrate(ctx context.Context, conn *pgx.Conn) error {
 	return nil
 }
 
-// UnprotectedTables returns every table with a tenant_id column that does not
-// have row level security both enabled and forced. An empty result means every
-// multi-tenant table is covered by RLS.
 func UnprotectedTables(ctx context.Context, conn *pgx.Conn) ([]string, error) {
 	rows, err := conn.Query(ctx, `
 		SELECT n.nspname || '.' || c.relname

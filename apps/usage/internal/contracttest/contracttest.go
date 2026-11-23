@@ -1,8 +1,4 @@
-// Package contracttest gives tests the usage event contract of
-// docs/contracts/usage-event (ADR-0010): the versions a service declares in
-// participants.json and the examples in those versions' schemas. A service's
-// tests run against every version it declares, so a declaration the code does
-// not keep fails. Only tests import it.
+// Package contracttest runs tests against every contract version a service declares (ADR-0010).
 package contracttest
 
 import (
@@ -14,8 +10,6 @@ import (
 	"testing"
 )
 
-// Dir is docs/contracts/usage-event, found from this file so that tests in
-// any package reach it.
 func Dir(t testing.TB) string {
 	t.Helper()
 	_, file, _, ok := runtime.Caller(0)
@@ -46,13 +40,11 @@ func manifest(t testing.TB) map[string]channel {
 	return m
 }
 
-// Produces returns the versions service writes on channel ("http", "kafka").
 func Produces(t testing.TB, ch, service string) []string {
 	t.Helper()
 	return versions(t, ch, service, func(p []string, _ []string) []string { return p })
 }
 
-// Consumes returns the versions service reads on channel.
 func Consumes(t testing.TB, ch, service string) []string {
 	t.Helper()
 	return versions(t, ch, service, func(_ []string, c []string) []string { return c })
@@ -75,9 +67,7 @@ func versions(t testing.TB, ch, service string, pick func(produces, consumes []s
 	return v
 }
 
-// Examples returns the examples of the channel's schema in version, e.g.
-// schemas/kafka-record.v1.json for ("kafka", "v1"), as written, so large
-// integers keep their digits.
+// Examples are returned as written, so large integers keep their digits.
 func Examples(t testing.TB, ch, version string) []json.RawMessage {
 	t.Helper()
 	c, ok := manifest(t)[ch]

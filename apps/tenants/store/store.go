@@ -1,4 +1,3 @@
-// Package store keeps the tenant registry (ADR-0012, item 2).
 package store
 
 import (
@@ -13,8 +12,7 @@ import (
 	"github.com/maksimillian1/ha-multitenant-saas-platform/apps/tenants/core"
 )
 
-// lockClass is the first key of the advisory locks on tenants, so they do not
-// collide with other advisory locks of the database.
+// Separates these advisory locks from others in the database.
 const lockClass = 51
 
 type Postgres struct {
@@ -63,7 +61,6 @@ func nullIfEmpty(s string) *string {
 	return &s
 }
 
-// Create inserts a new tenant in state provisioning.
 func (s *Postgres) Create(ctx context.Context, t core.Tenant) (core.Tenant, error) {
 	row := s.pool.QueryRow(ctx, `
 		INSERT INTO tenants (tenant_id, name, admin_email, state, created_by)
@@ -83,7 +80,6 @@ func (s *Postgres) Get(ctx context.Context, id string) (core.Tenant, error) {
 	return scan(s.pool.QueryRow(ctx, `SELECT `+columns+` FROM tenants WHERE tenant_id = $1`, id))
 }
 
-// List returns the tenants, newest first; deleted ones only if asked for.
 func (s *Postgres) List(ctx context.Context, includeDeleted bool) ([]core.Tenant, error) {
 	rows, err := s.pool.Query(ctx, `
 		SELECT `+columns+` FROM tenants
@@ -104,8 +100,7 @@ func (s *Postgres) List(ctx context.Context, includeDeleted bool) ([]core.Tenant
 	return list, rows.Err()
 }
 
-// Save writes the tenant's state, parts, last error and, for a tombstone,
-// clears its name and admin email.
+// A tombstone loses its name and admin email.
 func (s *Postgres) Save(ctx context.Context, t core.Tenant) (core.Tenant, error) {
 	return scan(s.pool.QueryRow(ctx, `
 		UPDATE tenants SET
@@ -118,10 +113,7 @@ func (s *Postgres) Save(ctx context.Context, t core.Tenant) (core.Tenant, error)
 		t.ID, string(t.State), t.Parts, nullIfEmpty(t.LastError), nullIfEmpty(t.DeletedBy), t.DeletedAt))
 }
 
-// Lock takes the tenant's lock for one request: a session advisory lock on a
-// connection held until unlock. A second request on the same tenant gets
-// core.ErrBusy at once. When the process dies, its connection closes and the
-// database releases the lock.
+// Session lock on a held connection: a dead process releases it. A second request gets ErrBusy.
 func (s *Postgres) Lock(ctx context.Context, id string) (unlock func(), err error) {
 	conn, err := s.pool.Acquire(ctx)
 	if err != nil {

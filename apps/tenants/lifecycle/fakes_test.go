@@ -11,7 +11,6 @@ import (
 	"github.com/maksimillian1/ha-multitenant-saas-platform/apps/tenants/store/storetest"
 )
 
-// newService wires the lifecycle to a fresh database and the fakes.
 func newService(t *testing.T) (*Service, *fakes.Deps) {
 	t.Helper()
 	db := storetest.New(t)

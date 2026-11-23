@@ -17,9 +17,6 @@ import {
 import { FieldGroup } from '@/components/ui/field'
 import { Spinner } from '@/components/ui/spinner'
 
-// FormDialog is a form in a dialog. It resets the form to `values` when it
-// opens, keeps it open and shows the server's message when the submit
-// fails, and closes when it succeeds.
 export function FormDialog<T extends FieldValues>({
   trigger,
   title,

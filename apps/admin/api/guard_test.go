@@ -16,8 +16,6 @@ import (
 
 func ptr[T any](v T) *T { return &v }
 
-// apiRoutes is every route with a request that succeeds for the admin in
-// the fake instance.
 var apiRoutes = []struct {
 	method, path string
 	body         any
@@ -84,8 +82,7 @@ func TestEveryRouteWorksForTheAdmin(t *testing.T) {
 	}
 }
 
-// TestRoutesMatchOpenAPI keeps the hand-written routes and openapi.yaml in
-// step (ADR-0009: only the types are generated).
+// ADR-0009: only the types are generated.
 func TestRoutesMatchOpenAPI(t *testing.T) {
 	spec, err := os.Open("../openapi.yaml")
 	if err != nil {
@@ -121,7 +118,7 @@ func TestRoutesMatchOpenAPI(t *testing.T) {
 			t.Errorf("%s has no entry in apiRoutes", op)
 		}
 	}
-	if len(tested) != len(documented)-1 { // apiRoutes leaves out /api/me
+	if len(tested) != len(documented)-1 {
 		t.Errorf("%d routes tested, %d documented", len(tested), len(documented))
 	}
 }
@@ -226,7 +223,6 @@ func TestSelfLockoutIsRefused(t *testing.T) {
 		}
 	}
 
-	// The service account's organization, when it is not the admin's.
 	e := newEnv(t)
 	e.z.account.OrganizationID = "org-a"
 	rec := e.do("POST", "/api/orgs/org-a/deactivate", nil)
@@ -237,7 +233,6 @@ func TestSelfLockoutIsRefused(t *testing.T) {
 		t.Error("the service account's organization was deactivated")
 	}
 
-	// Other users, organizations and role assignments can be changed.
 	e = newEnv(t)
 	expect(t, e.do("POST", "/api/users/ann/lock", nil), http.StatusNoContent, nil)
 	expect(t, e.do("POST", "/api/orgs/org-a/deactivate", nil), http.StatusNoContent, nil)

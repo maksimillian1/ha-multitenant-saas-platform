@@ -9,8 +9,6 @@ import (
 	"github.com/maksimillian1/ha-multitenant-saas-platform/apps/admin/zitadel"
 )
 
-// overview counts organizations, humans, machines and projects. Each count
-// is the total of a list call for one item, made in parallel.
 func (s *Service) overview(w http.ResponseWriter, r *http.Request, _ core.Session) {
 	ctx := r.Context()
 	one := zitadel.Page{Limit: 1}

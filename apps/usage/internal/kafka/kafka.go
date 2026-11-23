@@ -1,5 +1,3 @@
-// Package kafka connects the usage pipeline to the usage topic: UsageWriteAPI
-// produces to it and Usage Writer consumes from it.
 package kafka
 
 import (
@@ -14,10 +12,7 @@ import (
 	"github.com/maksimillian1/ha-multitenant-saas-platform/apps/usage/internal/core"
 )
 
-// Producer produces every event to the topic with tenant_id as the key, so one
-// tenant's events keep their order. Writes wait for all
-// in-sync replicas and the producer is idempotent, so a retried send is not
-// written twice (ADR-0005).
+// tenant_id is the key, so one tenant's events keep their order (ADR-0005).
 type Producer struct {
 	client *kgo.Client
 }
@@ -29,8 +24,7 @@ func NewProducer(brokers []string, topic string, extra ...kgo.Opt) (*Producer, e
 		kgo.SeedBrokers(brokers...),
 		kgo.DefaultProduceTopic(topic),
 		kgo.RequiredAcks(kgo.AllISRAcks()),
-		// A request that Kafka cannot confirm fails within this time, so the
-		// sender gets 503 and retries instead of hanging.
+		// The sender gets 503 and retries instead of hanging.
 		kgo.RecordDeliveryTimeout(10 * time.Second),
 	}, extra...)
 	client, err := kgo.NewClient(opts...)
@@ -56,9 +50,7 @@ func (p *Producer) Produce(ctx context.Context, events []core.Event) error {
 	return p.client.ProduceSync(ctx, records...).FirstErr()
 }
 
-// NewConsumer is the consumer group client: offsets are committed only by
-// Usage Writer, and a new group starts at the beginning of the topic, so
-// events produced before the first writer started are not skipped.
+// A new group starts at the beginning, so events produced before the first writer are not skipped.
 func NewConsumer(brokers []string, topic, group string, extra ...kgo.Opt) (*kgo.Client, error) {
 	opts := append([]kgo.Opt{
 		kgo.SeedBrokers(brokers...),
@@ -70,14 +62,11 @@ func NewConsumer(brokers []string, topic, group string, extra ...kgo.Opt) (*kgo.
 	return kgo.NewClient(opts...)
 }
 
-// Encode is the value of e's Kafka record in the current schema version.
 func Encode(e core.Event) ([]byte, error) {
 	return json.Marshal(core.Record{SchemaVersion: core.SchemaVersion, Event: e})
 }
 
-// Decode reads a record value of any schema version up to core.SchemaVersion.
-// UsageWriteAPI validated the event before it reached Kafka; Decode checks
-// only what the store needs to deduplicate it.
+// Decode checks only what the store needs to deduplicate; UsageWriteAPI validated the rest.
 func Decode(value []byte) (core.Event, error) {
 	var r core.Record
 	if err := json.Unmarshal(value, &r); err != nil {

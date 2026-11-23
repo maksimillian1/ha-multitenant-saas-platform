@@ -1,13 +1,5 @@
-// Package writer is Usage Writer: it consumes the usage
-// topic and stores every event once (ADR-0007). It commits a batch's offsets
-// only after the database transaction committed and every poison record is in
-// the DLQ (HAMSP-30), so a crash in between makes Kafka deliver the batch
-// again, and the store's dedup key turns the replay into a no-op.
-//
-// A poison record is one that can never be stored: it does not decode, it
-// breaks the contract, or the database rejects it as bad data. It goes to the
-// DLQ instead of being skipped or blocking the partition. Only a transient
-// error, such as a database that cannot be reached, stops the partition.
+// Package writer commits offsets only after the DB commit and the DLQ write (ADR-0007); only a
+// transient error stops a partition, poison goes to the DLQ.
 package writer
 
 import (
@@ -29,8 +21,7 @@ const (
 	maxBackoff = 5 * time.Second
 )
 
-// DeadLetters is the DLQ topic (kafka.DLQ). Send returns nil only once Kafka
-// confirmed every record.
+// Send returns nil only once Kafka confirmed every record.
 type DeadLetters interface {
 	Send(ctx context.Context, poison []kafka.Poison) error
 }
@@ -41,28 +32,24 @@ type Service struct {
 	DLQ    DeadLetters
 	Log    *slog.Logger
 
-	// afterStore runs between the database commit and the offset commit.
-	// Tests use it to simulate a crash there.
+	// Tests use it to simulate a crash between the database commit and the offset commit.
 	afterStore func() error
 
-	Stored       atomic.Int64 // new events stored
-	Skipped      atomic.Int64 // duplicates
-	Malformed    atomic.Int64 // records that are not a valid event
-	DeadLettered atomic.Int64 // records sent to the DLQ
+	Stored       atomic.Int64
+	Skipped      atomic.Int64
+	Malformed    atomic.Int64
+	DeadLettered atomic.Int64
 }
 
-// NewService takes a client from kafka.NewConsumer and a kafka.DLQ.
 func NewService(client *kgo.Client, store core.EventWriter, dlq DeadLetters, log *slog.Logger) *Service {
 	return &Service{Client: client, Store: store, DLQ: dlq, Log: log}
 }
 
-// pending is a decoded, valid event and the record it came from.
 type pending struct {
 	event  core.Event
 	record *kgo.Record
 }
 
-// Run consumes until ctx is done or the afterStore hook fails.
 func (w *Service) Run(ctx context.Context) error {
 	for {
 		fetches := w.Client.PollRecords(ctx, maxPoll)
@@ -79,28 +66,24 @@ func (w *Service) Run(ctx context.Context) error {
 		events, poison := w.decode(ctx, records)
 		bad, ok := w.storeWithRetry(ctx, events)
 		if !ok {
-			return nil // shutting down; nothing committed, the batch is delivered again
+			return nil // nothing committed, the batch is delivered again
 		}
 		poison = append(poison, bad...)
 		if !w.deadLetterWithRetry(ctx, poison) {
-			return nil // as above: the batch, poison included, is delivered again
+			return nil
 		}
 		if w.afterStore != nil {
 			if err := w.afterStore(); err != nil {
 				return err
 			}
 		}
-		// A failed commit is not data loss: the batch is delivered again and
-		// stored as duplicates, which the dedup key drops.
+		// A failed commit only redelivers the batch; the dedup key drops the duplicates.
 		if err := w.Client.CommitRecords(ctx, records...); err != nil && ctx.Err() == nil {
 			w.Log.WarnContext(ctx, "offset commit failed", "records", len(records), "err", err)
 		}
 	}
 }
 
-// decode splits records into events to store and poison for the DLQ. A record
-// that does not decode, including a schema version newer than this writer,
-// or that breaks the contract (core.Event.ValidateContent) is poison.
 func (w *Service) decode(ctx context.Context, records []*kgo.Record) ([]pending, []kafka.Poison) {
 	events := make([]pending, 0, len(records))
 	var poison []kafka.Poison
@@ -129,9 +112,7 @@ func eventsOf(ps []pending) []core.Event {
 	return out
 }
 
-// deadLetterWithRetry retries until every poison record is in the DLQ or ctx
-// is done. While the DLQ cannot be written nothing is committed, so the
-// records wait in the usage topic.
+// Nothing is committed while the DLQ is down, so the records wait in the usage topic.
 func (w *Service) deadLetterWithRetry(ctx context.Context, poison []kafka.Poison) bool {
 	if len(poison) == 0 {
 		return true
@@ -156,11 +137,8 @@ func (w *Service) deadLetterWithRetry(ctx context.Context, poison []kafka.Poison
 	}
 }
 
-// storeWithRetry stores events and returns the ones the database rejects as
-// bad data (core.ErrBadData). A batch with such an event is split in halves
-// until the event is alone, so the others are stored and only it goes to the
-// DLQ. Any other error is retried until it passes or ctx is done: while the
-// database is down nothing is committed, so the events wait in Kafka.
+// A batch with bad data is halved until the bad event is alone. Other errors are retried:
+// nothing is committed, so the events wait in Kafka.
 func (w *Service) storeWithRetry(ctx context.Context, events []pending) ([]kafka.Poison, bool) {
 	if len(events) == 0 {
 		return nil, true

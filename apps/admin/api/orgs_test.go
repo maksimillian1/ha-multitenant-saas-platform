@@ -60,10 +60,6 @@ func TestOrgLifecycle(t *testing.T) {
 	}
 }
 
-// TestOrgCreateAndDeleteAreGone: organizations are created and deleted only
-// as tenants, through Tenant Management (ADR-0012). The former routes answer
-// 404 or 405 and reach neither Zitadel nor Tenant Management.
-//
 // Verifies: tenant-management AC-15
 func TestOrgCreateAndDeleteAreGone(t *testing.T) {
 	for _, tc := range []struct {

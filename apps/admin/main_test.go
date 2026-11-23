@@ -18,8 +18,6 @@ import (
 	"github.com/maksimillian1/ha-multitenant-saas-platform/apps/admin/ui"
 )
 
-// TestRoutes checks that the patterns register without a conflict and that
-// each path reaches its handler. Nobody is signed in.
 func TestRoutes(t *testing.T) {
 	log := slog.New(slog.NewTextHandler(io.Discard, nil))
 	authService := auth.NewService(nil, auth.NewCookies("0123456789abcdef0123456789abcdef"), "http://admin.test", "client", log)
@@ -67,16 +65,11 @@ func (adminSession) Session(*http.Request) (core.Session, bool) {
 	return core.Session{Subject: "admin", Roles: []string{"super-admin"}, Expires: time.Now().Add(time.Hour)}, true
 }
 
-// testTokens is a fixed access token in place of the key's tokens.
 type testTokens string
 
 func (s testTokens) Token(context.Context) (string, error) { return string(s), nil }
 func (testTokens) Invalidate(string)                       {}
 
-// TestBrandingCallsUseTheAdminAppAccount checks that the organization and
-// the platform branding routes both call Zitadel as admin-app. Until HAMSP-36
-// the platform routes used a second account with IAM_OWNER (HAMSP-37, AC-7).
-//
 // Verifies: admin-zitadel AC-14
 func TestBrandingCallsUseTheAdminAppAccount(t *testing.T) {
 	var (
@@ -125,10 +118,7 @@ func TestBrandingCallsUseTheAdminAppAccount(t *testing.T) {
 	}
 }
 
-// TestTokensNeverReachTheBrowser calls every branding route against a
-// Zitadel that echoes the caller's token wherever it can: in a header, in
-// the message of failed writes and as the content of an asset. Neither token
-// may appear in what the BFF answers (HAMSP-37, AC-8).
+// Zitadel echoes the caller's token wherever it can; neither token may reach the browser.
 func TestTokensNeverReachTheBrowser(t *testing.T) {
 	zitadel := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		token := strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer ")

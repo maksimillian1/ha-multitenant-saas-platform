@@ -1,7 +1,5 @@
-// Package tenantstate follows the tenant states that Tenant Management
-// publishes to the compacted Kafka topic tenant-states (ADR-0012, item 5) and
-// answers whether a tenant is blocked. The state is kept in memory, so the
-// request path makes no call; while Kafka is down the last state read stays.
+// Package tenantstate keeps states in memory, so the request path makes no call; while Kafka is
+// down the last state read stays (ADR-0012).
 package tenantstate
 
 import (
@@ -13,13 +11,11 @@ import (
 	"github.com/twmb/franz-go/pkg/kgo"
 )
 
-// Event is one record of tenant-states, keyed by tenant_id.
 type Event struct {
 	TenantID string `json:"tenant_id"`
 	State    string `json:"state"`
 }
 
-// blocked holds every state of docs/contracts/tenant-states; true blocks.
 // A state not listed is ignored, so the tenant keeps its earlier state.
 var blocked = map[string]bool{
 	"provisioning": false, "active": false,
@@ -33,8 +29,7 @@ type States struct {
 
 func New() *States { return &States{blocked: map[string]bool{}} }
 
-// Blocked reports whether the tenant's latest state is suspended, deleting or
-// deleted. A tenant not seen yet is not blocked.
+// A tenant not seen yet is not blocked.
 func (s *States) Blocked(tenant string) bool {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
@@ -55,8 +50,7 @@ func (s *States) apply(e Event) {
 	}
 }
 
-// Follow reads the whole topic from the start, without a consumer group, so
-// every replica holds every tenant, and keeps reading until ctx ends.
+// No consumer group, so every replica holds every tenant.
 func (s *States) Follow(ctx context.Context, brokers []string, topic string, log *slog.Logger, extra ...kgo.Opt) error {
 	client, err := kgo.NewClient(append([]kgo.Opt{
 		kgo.SeedBrokers(brokers...),

@@ -1,13 +1,4 @@
-// Package storetest gives tests a fresh tenants database. It is imported by
-// tests only.
-//
-// The store package's own tests keep a copy of New, since they cannot import
-// this package (it imports store).
-//
-// The tests need a PostgreSQL superuser DSN in TEST_DATABASE_URL, e.g.
-// postgres://postgres:postgres@localhost:5432/postgres?sslmode=disable.
-// CI sets it (.github/workflows/tenants.yml); without it they are skipped,
-// and CI fails on a skipped test.
+// Package storetest: store's own tests keep a copy of New, since this package imports store.
 package storetest
 
 import (
@@ -47,8 +38,6 @@ func dsnFor(t testing.TB, base, user, db string) string {
 	return u.String()
 }
 
-// New creates the two roles like the CNPG cluster does and a fresh database
-// owned by the owner role, then applies the migrations as the owner.
 func New(t testing.TB) DB {
 	t.Helper()
 	base := os.Getenv("TEST_DATABASE_URL")
@@ -62,9 +51,7 @@ func New(t testing.TB) DB {
 	}
 	t.Cleanup(func() { super.Close(ctx) })
 
-	// Test packages run in parallel against one server, and two ALTER ROLE
-	// on the same role at once fail ("tuple concurrently updated"). The lock
-	// ends with the statement below or with the connection.
+	// Test packages share one server; concurrent ALTER ROLE fails with "tuple concurrently updated".
 	if _, err := super.Exec(ctx, "SELECT pg_advisory_lock(5100051)"); err != nil {
 		t.Fatal(err)
 	}
@@ -101,7 +88,6 @@ func New(t testing.TB) DB {
 	return DB{Super: super, Owner: owner, Name: db, AppDSN: dsnFor(t, base, AppRole, db)}
 }
 
-// Open connects as the application role.
 func (db DB) Open(t testing.TB) *store.Postgres {
 	t.Helper()
 	st, err := store.Open(context.Background(), db.AppDSN)

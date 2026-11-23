@@ -1,6 +1,3 @@
-// Package proxy is the request path of the API Gateway: authenticate the
-// caller, set the tenant header and forward to the service that owns the path
-// (docs/contracts/gateway-headers.md).
 package proxy
 
 import (
@@ -20,14 +17,12 @@ import (
 	"github.com/maksimillian1/ha-multitenant-saas-platform/apps/gateway/core"
 )
 
-// Route sends every path equal to Prefix or below it ("/items", "/items/1",
-// not "/itemsx") to Upstream, keeping the path.
+// "/items" matches "/items/1" but not "/itemsx".
 type Route struct {
 	Prefix   string
 	Upstream *url.URL
 }
 
-// ParseRoutes reads "prefix=url,prefix=url", e.g. "/items=http://exampleapp.exampleapp.svc:8080".
 func ParseRoutes(spec string) ([]Route, error) {
 	var routes []Route
 	for _, part := range strings.Split(spec, ",") {
@@ -61,7 +56,7 @@ type Service struct {
 
 type upstreamKey struct{}
 
-// NewService returns the gateway. A nil reporter disables usage reporting.
+// A nil reporter disables usage reporting.
 func NewService(authn core.Authenticator, routes []Route, reporter core.UsageReporter, log *slog.Logger) *Service {
 	// Longest prefix first, so "/items/archive" wins over "/items".
 	routes = append([]Route(nil), routes...)
@@ -121,22 +116,20 @@ func (s *Service) Handler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Every request served for a tenant is one usage event, whatever its
-	// status. Requests rejected with 401 above have no tenant and none.
+	// Every request served for a tenant is billed, whatever its status.
 	if s.Usage != nil {
 		start := time.Now()
 		rec := &usageRecorder{ResponseWriter: w, status: http.StatusOK}
 		body := &countingBody{ReadCloser: r.Body}
 		r.Body, w = body, rec
 		defer func() {
-			// URL.Path carries no query string; headers and bodies are never reported.
+			// Headers, bodies and query strings are never reported.
 			s.Usage.Report(core.APICallEvent(tenant, start, r.Method, r.URL.Path, rec.status,
 				time.Since(start), body.n, rec.bytes))
 		}()
 	}
 
-	// Routes are matched only after authentication, so unknown paths do not
-	// reveal which services exist.
+	// Routes are matched only after authentication, so unknown paths do not reveal which services exist.
 	route := s.match(r.URL.Path)
 	if route == nil {
 		core.WriteError(w, http.StatusNotFound, "no such route")
@@ -146,7 +139,6 @@ func (s *Service) Handler(w http.ResponseWriter, r *http.Request) {
 	s.proxy.ServeHTTP(w, r.WithContext(context.WithValue(r.Context(), upstreamKey{}, route.Upstream)))
 }
 
-// usageRecorder notes the status and the response bytes for the usage event.
 type usageRecorder struct {
 	http.ResponseWriter
 	status      int
@@ -168,11 +160,9 @@ func (u *usageRecorder) Write(b []byte) (int, error) {
 	return n, err
 }
 
-// Unwrap lets http.ResponseController (used by ReverseProxy to flush) reach
-// the real writer.
+// Lets ReverseProxy's http.ResponseController reach the real writer to flush.
 func (u *usageRecorder) Unwrap() http.ResponseWriter { return u.ResponseWriter }
 
-// countingBody counts the request bytes read by the upstream.
 type countingBody struct {
 	io.ReadCloser
 	n int64

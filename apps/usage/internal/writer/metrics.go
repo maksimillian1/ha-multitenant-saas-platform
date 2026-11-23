@@ -6,9 +6,7 @@ import (
 	"sync/atomic"
 )
 
-// MetricsHandler serves the writer's counters in the Prometheus text format.
-// The alert on usage_writer_records_dead_lettered_total is in
-// prototype/monitoring/usage-writer.rules.yaml (HAMSP-30, AC-6).
+// The alert is in prototype/monitoring/usage-writer.rules.yaml.
 func (w *Service) MetricsHandler(rw http.ResponseWriter, _ *http.Request) {
 	rw.Header().Set("Content-Type", "text/plain; version=0.0.4; charset=utf-8")
 	for _, m := range []struct {

@@ -11,8 +11,6 @@ import (
 	"github.com/maksimillian1/ha-multitenant-saas-platform/apps/admin/tenants"
 )
 
-// Tenants is what the API needs from Tenant Management; *tenants.Client
-// implements it. Every change names the admin who asked for it.
 type Tenants interface {
 	List(ctx context.Context, includeDeleted bool) ([]tenants.Tenant, error)
 	Get(ctx context.Context, id string) (tenants.Tenant, error)
@@ -35,7 +33,6 @@ func (s *Service) registerTenants(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/tenants/{tenantId}/resume", s.change(s.withTenants(s.tenantChange(Tenants.Resume))))
 }
 
-// withTenants answers 503 when the app has no Tenant Management configured.
 func (s *Service) withTenants(h handler) handler {
 	return func(w http.ResponseWriter, r *http.Request, admin core.Session) {
 		if s.Tenants == nil {
@@ -101,8 +98,6 @@ func (s *Service) createTenant(w http.ResponseWriter, r *http.Request, admin cor
 	core.WriteJSON(w, http.StatusCreated, tenantFrom(t))
 }
 
-// tenantChange serves a change of one tenant: retry, suspend, resume or
-// delete. Each answers with the tenant after the change.
 func (s *Service) tenantChange(call func(Tenants, context.Context, string, string) (tenants.Tenant, error)) handler {
 	return func(w http.ResponseWriter, r *http.Request, admin core.Session) {
 		t, err := call(s.Tenants, r.Context(), admin.Subject, r.PathValue("tenantId"))
@@ -114,10 +109,7 @@ func (s *Service) tenantChange(call func(Tenants, context.Context, string, strin
 	}
 }
 
-// tenantFail answers for a failed call to Tenant Management. Its 400 and 404
-// pass through; its 409, 502 and 504 pass through with the tenant as the
-// failure left it, so the admin sees the step and the error. An outage is
-// 502, a call that took too long 504.
+// 409, 502 and 504 carry the tenant as the failure left it, so the admin sees the step and the error.
 func (s *Service) tenantFail(w http.ResponseWriter, r *http.Request, err error) {
 	ctx := r.Context()
 	var terr *tenants.Error
@@ -161,7 +153,6 @@ func (s *Service) tenantFail(w http.ResponseWriter, r *http.Request, err error) 
 	core.WriteError(w, http.StatusBadGateway, "Tenant Management is unavailable")
 }
 
-// setTarget names the tenant in the change log once its ID is known.
 func setTarget(w http.ResponseWriter, id string) {
 	if a, ok := w.(*auditWriter); ok && id != "" {
 		a.target = id

@@ -17,7 +17,6 @@ import (
 	"github.com/maksimillian1/ha-multitenant-saas-platform/apps/gateway/core"
 )
 
-// fakeAuth accepts "token-<tenant>" and returns <tenant>.
 type fakeAuth struct{}
 
 func (fakeAuth) Tenant(_ context.Context, token string) (string, error) {
@@ -80,7 +79,6 @@ func TestRequestsWithoutValidTokenNeverReachUpstream(t *testing.T) {
 			t.Errorf("auth %q: status %d, want 401", auth, w.Code)
 		}
 	}
-	// Unknown paths also answer 401 without a token, so routes are not probed.
 	if w := send(g, "/nope", ""); w.Code != http.StatusUnauthorized {
 		t.Errorf("unknown path without token: status %d, want 401", w.Code)
 	}
@@ -174,8 +172,6 @@ func reportingGateway(t *testing.T) (http.Handler, *fakeReporter) {
 	return http.HandlerFunc(s.Handler), rep
 }
 
-// AC-1: a served request becomes one api_calls event of the caller's tenant
-// with method, path without query string, status, duration and bytes.
 func TestUsageEventDescribesTheRequest(t *testing.T) {
 	g, rep := reportingGateway(t)
 	r := httptest.NewRequest(http.MethodPost, "/items/42?secret=s3cr3t", strings.NewReader("hello"))
@@ -205,7 +201,6 @@ func TestUsageEventDescribesTheRequest(t *testing.T) {
 	}
 }
 
-// Requests served for a tenant are reported whatever their status.
 func TestUsageEventKeepsErrorStatus(t *testing.T) {
 	g, rep := reportingGateway(t)
 	send(g, "/nope", "Bearer token-a")
@@ -219,7 +214,6 @@ func TestUsageEventKeepsErrorStatus(t *testing.T) {
 	}
 }
 
-// AC-2: requests rejected with 401 have no tenant and produce no usage event.
 func TestRejectedRequestsAreNotReported(t *testing.T) {
 	g, rep := reportingGateway(t)
 	for _, auth := range []string{"", "Bearer wrong", "Basic token-a"} {

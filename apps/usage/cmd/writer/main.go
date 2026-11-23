@@ -1,10 +1,5 @@
-// Command writer is Usage Writer: it consumes the usage topic and stores every
-// event once. It must not link the HTTP ingestion code or the migrations
-// (apps/usage/README.md).
-//
-// writer replay -partition P -from A -to B puts DLQ records back on the usage
-// topic (HAMSP-30). It needs only the Kafka settings, as the KafkaUser
-// usage-replay, and no database.
+// Command writer must not link the HTTP ingestion code or the migrations.
+// `writer replay` needs no database and runs as the KafkaUser usage-replay.
 package main
 
 import (

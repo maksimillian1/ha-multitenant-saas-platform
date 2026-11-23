@@ -7,7 +7,6 @@ import (
 )
 
 type Service struct {
-	// Ping reports whether the database is reachable.
 	Ping func(context.Context) error
 }
 

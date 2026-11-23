@@ -112,7 +112,6 @@ describe('users list', () => {
     await user.click(await screen.findByRole('button', { name: 'New machine user' }))
     const dialog = await screen.findByRole('dialog', { name: 'New machine user' })
 
-    // The organization filter of the list is the default.
     await waitFor(() => expect(within(dialog).getByLabelText('Organization')).toHaveValue('org-a'))
     await user.type(within(dialog).getByLabelText('Username'), 'ci-2')
     await user.type(within(dialog).getByLabelText('Name'), 'CI 2')

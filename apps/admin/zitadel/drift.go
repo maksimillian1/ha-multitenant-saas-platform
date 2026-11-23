@@ -6,29 +6,23 @@ import (
 	"time"
 )
 
-// DriftEvent is the log message of a credential the app did not expect
-// (HAMSP-36). Until alerts exist (HAMSP-89) it is an ERROR line in the log.
+// An ERROR log line until alerts exist.
 const DriftEvent = "service_account_credential_drift"
 
-// MaxKeyValidity is how long a service account key may be valid. Keys are
-// issued for 30 days; an hour of slack covers the clock of the issuer.
+// Keys are issued for 30 days; an hour of slack covers the issuer's clock.
 const MaxKeyValidity = 30*24*time.Hour + time.Hour
 
-// Account is a machine user whose credentials are watched.
 type Account struct {
-	Name     string // for the log
+	Name     string
 	UserID   string // looked up by Name when empty
-	OwnKeyID string // the key the app uses; empty: the app holds none
+	OwnKeyID string // empty: the app holds none
 }
 
-// DriftFinding is one unexpected credential.
 type DriftFinding struct {
 	Kind, ID, Reason string
 }
 
-// Drift returns what is unexpected in the credentials of an account: any
-// personal access token, a key other than OwnKeyID (or more than one key
-// when the app holds none), and a key valid for longer than maxValidity.
+// Any PAT, a key other than OwnKeyID (or any second key when the app holds none), or a too-long key.
 func Drift(a Account, creds []Credential, now time.Time, maxValidity time.Duration) []DriftFinding {
 	var out []DriftFinding
 	keys := 0
@@ -54,9 +48,7 @@ func Drift(a Account, creds []Credential, now time.Time, maxValidity time.Durati
 	return out
 }
 
-// DriftCheck lists the credentials of the watched accounts and logs every
-// finding as an ERROR event DriftEvent. It never logs a secret: Zitadel's
-// listings carry none.
+// Never logs a secret: Zitadel's listings carry none.
 type DriftCheck struct {
 	Client   *Client
 	Accounts []Account
@@ -64,7 +56,6 @@ type DriftCheck struct {
 	Now      func() time.Time
 }
 
-// Run checks every account once.
 func (d *DriftCheck) Run(ctx context.Context) {
 	now := time.Now
 	if d.Now != nil {
@@ -91,7 +82,6 @@ func (d *DriftCheck) Run(ctx context.Context) {
 	}
 }
 
-// Loop runs the check now and then every interval until ctx ends.
 func (d *DriftCheck) Loop(ctx context.Context, interval time.Duration) {
 	d.Run(ctx)
 	t := time.NewTicker(interval)

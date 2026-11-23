@@ -1,6 +1,6 @@
 import type { Authorization, BrandingSettings, BrandingState, Me, Org, Project, Tenant, User } from '@/api/queries'
 
-// The instance after bootstrap-tenants.sh, as the API returns it.
+// The instance after bootstrap-tenants.sh.
 
 export const me: Me = {
   subject: 'admin',
@@ -139,13 +139,10 @@ export const grantAnn = grant('grant-ann', ann, ['viewer'])
 
 export const list = <T>(items: T[], total = items.length) => ({ items, total })
 
-// signedIn are the answers every page needs.
 export const signedIn = {
   'GET /api/me': me,
 }
 
-// Branding as the API returns it: the platform's, with a logo, and
-// tenant-b's own, published green with a red draft.
 export const platformSettings: BrandingSettings = {
   primary_color: '#5469d4',
   background_color: '#fafafa',
@@ -176,7 +173,6 @@ export const tenantBBranding: BrandingState = {
   draft: { settings: { ...platformSettings, primary_color: '#dc2626' }, assets: noAssets, changed_at: created },
 }
 
-// Tenants as Tenant Management returns them (ADR-0012).
 const allParts: Tenant['parts'] = ['organization', 'admin', 'namespace']
 
 export const tenantActive: Tenant = {

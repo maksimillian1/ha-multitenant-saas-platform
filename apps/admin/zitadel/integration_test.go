@@ -11,14 +11,10 @@ import (
 	"time"
 )
 
-// integrationClient is a client of the Zitadel on the kind cluster with the
-// admin app's key, as the admin app uses it. The test is skipped unless both
-// variables are set:
+// Skipped unless both are set:
 //
 //	ZITADEL_TEST_URL=http://zitadel.localtest.me:30080
-//	ZITADEL_TEST_KEY_FILE=<a file with the key.json field of Secret admin/admin-zitadel>
-//
-// prototype/README.md shows how to write the file.
+//	ZITADEL_TEST_KEY_FILE=<key.json of Secret admin/admin-zitadel> (prototype/README.md)
 func integrationClient(t *testing.T) (*Client, string) {
 	t.Helper()
 	base, keyFile := os.Getenv("ZITADEL_TEST_URL"), os.Getenv("ZITADEL_TEST_KEY_FILE")
@@ -38,12 +34,7 @@ func integrationClient(t *testing.T) (*Client, string) {
 	return NewClient(base, tokens, httpClient), base
 }
 
-// TestIntegration runs the client against a real Zitadel: the instance on
-// the kind cluster, with the admin app's key (integrationClient).
-//
-// It creates an organization with a human and a machine user, changes them
-// and deletes everything again. With the platform-admin project of
-// bootstrap-tenants.sh it also assigns and revokes a role.
+// Everything it creates is deleted again.
 func TestIntegration(t *testing.T) {
 	c, _ := integrationClient(t)
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
@@ -157,7 +148,7 @@ func must(t *testing.T, err error) {
 	}
 }
 
-// eventually waits for Zitadel's projections to catch up with a write.
+// Zitadel's projections catch up with a write only eventually.
 func eventually(t *testing.T, ok func() bool) {
 	t.Helper()
 	for range 50 {

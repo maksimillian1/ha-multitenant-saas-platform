@@ -1,14 +1,5 @@
-// Package zitadel is Tenant Management's client for the Zitadel calls of the
-// tenant lifecycle (ADR-0012): the tenant's organization and its first admin.
-//
-// It calls the v2 services over the Connect protocol with JSON bodies, and
-// the v1 management REST gateway for the one call without a v2 equivalent
-// (organization members). It needs no SDK and imports nothing from
-// github.com/zitadel/zitadel (ADR-0003, C-03). Messages follow the protos of
-// Zitadel v4.19.2.
-//
-// Every method is idempotent: called again after it succeeded, or after an
-// attempt whose answer was lost, it ends in the same state and returns nil.
+// Package zitadel imports nothing from github.com/zitadel/zitadel (ADR-0003, C-03); messages follow
+// the protos of Zitadel v4.19.2. Every method is idempotent, also after a lost answer.
 package zitadel
 
 import (
@@ -29,7 +20,6 @@ const (
 	userService = "zitadel.user.v2.UserService"
 )
 
-// Connect error codes the client acts on.
 const (
 	CodeNotFound           = "not_found"
 	CodeAlreadyExists      = "already_exists"
@@ -38,26 +28,20 @@ const (
 	CodeUnauthenticated    = "unauthenticated"
 )
 
-// OwnerRole makes a user the administrator of an organization.
 const OwnerRole = "ORG_OWNER"
 
-// maxAnswer bounds what the client reads from one answer of Zitadel.
 const maxAnswer = 1 << 20
 
-// Client calls Zitadel as Tenant Management's service account, with the
-// short-lived access tokens of tokens.
 type Client struct {
 	baseURL string
 	tokens  Tokens
 	http    *http.Client
 }
 
-// NewClient returns a client for the Zitadel instance at baseURL (the issuer).
 func NewClient(baseURL string, tokens Tokens, httpClient *http.Client) *Client {
 	return &Client{baseURL: strings.TrimSuffix(baseURL, "/"), tokens: tokens, http: httpClient}
 }
 
-// Error is an error answer of Zitadel.
 type Error struct {
 	Status  int
 	Code    string
@@ -66,21 +50,16 @@ type Error struct {
 
 func (e *Error) Error() string { return fmt.Sprintf("zitadel: %s: %s", e.Code, e.Message) }
 
-// Timeout reports whether Zitadel ran out of time.
 func (e *Error) Timeout() bool { return e.Code == CodeDeadlineExceeded }
 
-// HasCode reports whether err is an error answer of Zitadel with the code.
 func HasCode(err error, code string) bool {
 	var zerr *Error
 	return errors.As(err, &zerr) && zerr.Code == code
 }
 
-// ErrNameTaken: an organization with the tenant's name exists in Zitadel
-// but is not the tenant's.
 var ErrNameTaken = fmt.Errorf("zitadel: another organization has this name: %w", core.ErrForeign)
 
-// CreateOrganization creates the tenant's organization with the tenant ID as
-// its ID. If it exists already, from an earlier attempt, that is success.
+// An organization existing from an earlier attempt is success.
 func (c *Client) CreateOrganization(ctx context.Context, id, name string) error {
 	req := struct {
 		Name           string `json:"name"`
@@ -129,9 +108,7 @@ func (c *Client) organizationExists(ctx context.Context, id string) (bool, error
 	return false, nil
 }
 
-// CreateAdmin creates the tenant's first admin in its organization: a human
-// user with the given ID whose username is the email, makes it ORG_OWNER and
-// lets Zitadel email an invitation. Already done parts are skipped.
+// Already done parts are skipped.
 func (c *Client) CreateAdmin(ctx context.Context, orgID, userID, email string) error {
 	type organization struct {
 		OrgID string `json:"orgId"`
@@ -142,8 +119,7 @@ func (c *Client) CreateAdmin(ctx context.Context, orgID, userID, email string) e
 	}
 	type emailField struct {
 		Email string `json:"email"`
-		// Zitadel would send a verification code; the invitation below
-		// verifies the email instead, so the code is returned and dropped.
+		// The invitation below verifies the email, so the verification code is dropped.
 		ReturnCode struct{} `json:"returnCode"`
 	}
 	user := struct {
@@ -188,26 +164,23 @@ func (c *Client) CreateAdmin(ctx context.Context, orgID, userID, email string) e
 	return err
 }
 
-// DeactivateOrganization stops the organization's users from signing in.
 func (c *Client) DeactivateOrganization(ctx context.Context, id string) error {
 	err := c.call(ctx, orgService, "DeactivateOrganization", organizationRequest{ID: id}, nil)
-	if HasCode(err, CodeFailedPrecondition) { // already inactive
+	if HasCode(err, CodeFailedPrecondition) {
 		return nil
 	}
 	return err
 }
 
-// ActivateOrganization lets the organization's users sign in again.
 func (c *Client) ActivateOrganization(ctx context.Context, id string) error {
 	err := c.call(ctx, orgService, "ActivateOrganization", organizationRequest{ID: id}, nil)
-	if HasCode(err, CodeFailedPrecondition) { // already active
+	if HasCode(err, CodeFailedPrecondition) {
 		return nil
 	}
 	return err
 }
 
-// DeleteOrganization deletes the organization with its users. An
-// organization that does not exist is already deleted.
+// An organization that does not exist is already deleted.
 func (c *Client) DeleteOrganization(ctx context.Context, id string) error {
 	err := c.call(ctx, orgService, "DeleteOrganization", organizationRequest{ID: id}, nil)
 	if HasCode(err, CodeNotFound) {
@@ -220,7 +193,6 @@ type organizationRequest struct {
 	ID string `json:"organizationId"`
 }
 
-// call sends one unary Connect request and decodes the answer into resp.
 func (c *Client) call(ctx context.Context, service, method string, req, resp any) error {
 	body, err := json.Marshal(req)
 	if err != nil {
@@ -234,7 +206,7 @@ func (c *Client) call(ctx context.Context, service, method string, req, resp any
 	return c.do(httpReq, resp)
 }
 
-// rest sends a v1 REST gateway request on behalf of the organization orgID.
+// v1 REST gateway: organization members have no v2 call.
 func (c *Client) rest(ctx context.Context, method, path, orgID string, req any) error {
 	body, err := json.Marshal(req)
 	if err != nil {
@@ -267,9 +239,7 @@ func (c *Client) do(req *http.Request, resp any) error {
 	return nil
 }
 
-// send sends req with the current access token. When Zitadel refuses the
-// token (401: revoked, or expired earlier than it said), send drops it and
-// sends req once more with a new one.
+// On 401 (revoked, or expired early) the token is dropped and req is sent once more.
 func (c *Client) send(req *http.Request) (*http.Response, []byte, error) {
 	res, data, token, err := c.sendWithToken(req)
 	if err != nil || res.StatusCode != http.StatusUnauthorized {
@@ -309,13 +279,10 @@ func (c *Client) sendWithToken(req *http.Request) (*http.Response, []byte, strin
 	return res, data, token, nil
 }
 
-// grpcCodes names the numeric gRPC codes of the v1 REST gateway's errors.
 var grpcCodes = []string{"ok", "canceled", "unknown", "invalid_argument", CodeDeadlineExceeded, CodeNotFound,
 	CodeAlreadyExists, "permission_denied", "resource_exhausted", CodeFailedPrecondition, "aborted",
 	"out_of_range", "unimplemented", "internal", "unavailable", "data_loss", CodeUnauthenticated}
 
-// parseError reads a Connect error ({"code": "not_found", ...}) or a gRPC
-// gateway error with a numeric code; without either, the code is "unknown".
 func parseError(status int, body []byte) error {
 	var answer struct {
 		Code    json.RawMessage `json:"code"`

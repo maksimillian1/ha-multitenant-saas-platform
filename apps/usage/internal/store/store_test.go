@@ -47,8 +47,7 @@ func write(t *testing.T, st *store.Postgres, events ...core.Event) []core.Event 
 	return fresh
 }
 
-// runJob runs the TimescaleDB policy job proc of the hypertable or continuous
-// aggregate rel now, as the owner, instead of waiting for its schedule.
+// runJob runs a policy job now instead of waiting for its schedule.
 func runJob(t *testing.T, db testpg.DB, proc, rel string) {
 	t.Helper()
 	ctx := context.Background()
@@ -71,7 +70,6 @@ func refreshHourly(t *testing.T, db testpg.DB) {
 	runJob(t, db, "policy_refresh_continuous_aggregate", "usage_hourly")
 }
 
-// compressed reports whether the chunk holding at is in the columnstore.
 func compressed(t *testing.T, db testpg.DB, at time.Time) bool {
 	t.Helper()
 	var c bool
@@ -92,8 +90,7 @@ func count(t *testing.T, db testpg.DB, sql string, args ...any) int {
 	return n
 }
 
-// asRole runs fn in a transaction as role, with tenant as app.current_tenant_id
-// unless it is empty. The superuser connection drops its rights with SET ROLE.
+// The superuser connection drops its rights with SET ROLE.
 func asRole(t *testing.T, db testpg.DB, role, tenant string, fn func(tx pgx.Tx) error) error {
 	t.Helper()
 	ctx := context.Background()
@@ -115,8 +112,6 @@ func isPermissionDenied(err error) bool {
 	return errors.As(err, &pgErr) && pgErr.Code == "42501"
 }
 
-// AC-5, AC-10 (CI): with raw, compressed and aggregated data in place, no
-// relation with tenant_id is open to an application role without isolation.
 func TestMigrationsLeaveNoUnprotectedTables(t *testing.T) {
 	db := testpg.New(t)
 	st := openStore(t, db)
@@ -136,8 +131,6 @@ func TestMigrationsLeaveNoUnprotectedTables(t *testing.T) {
 	}
 }
 
-// AC-10 negative fixture: the check reports granted tables without forced RLS
-// and granted views that do not filter by tenant behind a security barrier.
 func TestUnprotectedTablesFlagsGrantedTableWithoutRLS(t *testing.T) {
 	db := testpg.New(t)
 	fixture, err := os.ReadFile("testdata/unprotected_tables.sql")
@@ -157,8 +150,6 @@ func TestUnprotectedTablesFlagsGrantedTableWithoutRLS(t *testing.T) {
 	}
 }
 
-// AC-5: usage_events is a hypertable with 1-day chunks, keyed by the dedup key
-// of ADR-0007, owned by the owner role; Usage Writer's role is not privileged.
 func TestUsageEventsIsHypertableWithDayChunks(t *testing.T) {
 	db := testpg.New(t)
 	ctx := context.Background()
@@ -185,8 +176,6 @@ func TestUsageEventsIsHypertableWithDayChunks(t *testing.T) {
 	}
 }
 
-// AC-5: write_usage_events rejects a batch without tenant context or with an
-// event of another tenant, and stores nothing of it.
 func TestWriteRejectsOtherTenant(t *testing.T) {
 	db := testpg.New(t)
 	ctx := context.Background()
@@ -229,9 +218,6 @@ func TestWriteRejectsOtherTenant(t *testing.T) {
 	}
 }
 
-// AC-5, AC-10: Usage Writer's and the reader's roles cannot touch any table
-// directly: not the hypertable, its chunks, compressed chunks, the aggregate
-// or its materialization table.
 func TestWriterRoleHasNoDirectAccess(t *testing.T) {
 	db := testpg.New(t)
 	st := openStore(t, db)
@@ -257,7 +243,7 @@ func TestWriterRoleHasNoDirectAccess(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(internal) < 4 { // 2 chunks, 1 compressed chunk, 1 materialization table
+	if len(internal) < 4 {
 		t.Fatalf("internal relations %v: want chunks, a compressed chunk and the materialization table", internal)
 	}
 	rels = append(rels, internal...)
@@ -283,8 +269,6 @@ func TestWriterRoleHasNoDirectAccess(t *testing.T) {
 	}
 }
 
-// AC-10: the tenant views return only the session's tenant, and nothing
-// without a tenant.
 func TestTenantViewsShowOnlyCurrentTenant(t *testing.T) {
 	db := testpg.New(t)
 	st := openStore(t, db)
@@ -314,8 +298,6 @@ func TestTenantViewsShowOnlyCurrentTenant(t *testing.T) {
 	}
 }
 
-// AC-6: the columnstore policy compresses chunks older than 8 days and leaves
-// younger ones uncompressed.
 func TestColumnstorePolicyCompressesOnlyOlderThan8Days(t *testing.T) {
 	db := testpg.New(t)
 	st := openStore(t, db)
@@ -341,8 +323,6 @@ func TestColumnstorePolicyCompressesOnlyOlderThan8Days(t *testing.T) {
 	}
 }
 
-// AC-7, QS-06: an event sent again after its original was compressed is not
-// stored twice and is not reported as new.
 func TestDuplicateIntoCompressedChunkIsStoredOnce(t *testing.T) {
 	db := testpg.New(t)
 	st := openStore(t, db)
@@ -360,8 +340,6 @@ func TestDuplicateIntoCompressedChunkIsStoredOnce(t *testing.T) {
 	}
 }
 
-// AC-8: retention drops raw chunks and aggregate rows older than 13 months and
-// keeps younger ones.
 func TestRetentionDropsOnlyOlderThan13Months(t *testing.T) {
 	db := testpg.New(t)
 	st := openStore(t, db)
@@ -392,8 +370,6 @@ func TestRetentionDropsOnlyOlderThan13Months(t *testing.T) {
 	}
 }
 
-// AC-9: after a refresh the hourly aggregate holds the sum and count of the
-// hour, including an event that arrived late into a compressed chunk.
 func TestHourlyAggregateIncludesLateEvent(t *testing.T) {
 	db := testpg.New(t)
 	st := openStore(t, db)
@@ -425,9 +401,6 @@ func TestHourlyAggregateIncludesLateEvent(t *testing.T) {
 	}
 }
 
-// AC-11, QS-18: deleting one tenant's events removes them from compressed and
-// uncompressed chunks and, after a refresh, from the aggregate; other tenants
-// keep theirs.
 func TestDeleteTenantFromCompressedChunks(t *testing.T) {
 	db := testpg.New(t)
 	st := openStore(t, db)
@@ -460,8 +433,6 @@ func TestDeleteTenantFromCompressedChunks(t *testing.T) {
 	}
 }
 
-// AC-12 of HAMSP-26: a batch that mixes tenants stores every row under its own
-// tenant.
 func TestMixedBatchKeepsTenantsApart(t *testing.T) {
 	db := testpg.New(t)
 	st := openStore(t, db)
@@ -482,8 +453,6 @@ func TestMixedBatchKeepsTenantsApart(t *testing.T) {
 	}
 }
 
-// AC-9 of HAMSP-26 at the store level: a repeated event, in a later batch or
-// in the same one, is stored once and is not reported as new again.
 func TestWriteStoresEachEventOnce(t *testing.T) {
 	db := testpg.New(t)
 	st := openStore(t, db)
@@ -501,7 +470,6 @@ func TestWriteStoresEachEventOnce(t *testing.T) {
 	}
 }
 
-// The attributes are stored as given, for the api_calls fields of HAMSP-26 AC-1.
 func TestWriteKeepsAttributes(t *testing.T) {
 	db := testpg.New(t)
 	st := openStore(t, db)
@@ -518,10 +486,7 @@ func TestWriteKeepsAttributes(t *testing.T) {
 	}
 }
 
-// A write the database rejects as bad data (SQLSTATE class 22 or 23) wraps
-// core.ErrBadData, so the writer sends the event to the DLQ; a lost
-// connection does not, so the writer retries it (HAMSP-30).
-//
+// A lost connection is not bad data, so the writer retries it instead of dead-lettering.
 // Verifies: usage-writer AC-3; AC-4
 func TestBadDataIsMarkedAndOutageIsNot(t *testing.T) {
 	db := testpg.New(t)

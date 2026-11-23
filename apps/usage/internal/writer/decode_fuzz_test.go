@@ -8,11 +8,7 @@ import (
 	"github.com/maksimillian1/ha-multitenant-saas-platform/apps/usage/internal/contracttest"
 )
 
-// Any bytes on the usage topic either decode into a valid event or go to the
-// DLQ unchanged; nothing panics and nothing is lost between the two
-// (HAMSP-30). Any pod with usage-writeapi's login, or a bug in it, can write
-// such bytes.
-//
+// Any pod with usage-writeapi's login, or a bug in it, can write such bytes.
 // Verifies: usage-writer AC-1; AC-2; T-11
 func FuzzDecode(f *testing.F) {
 	for _, v := range contracttest.Consumes(f, "kafka", "writer") {

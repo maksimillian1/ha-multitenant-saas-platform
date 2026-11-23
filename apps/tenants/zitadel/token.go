@@ -13,41 +13,30 @@ import (
 	"golang.org/x/oauth2"
 )
 
-// Tokens gives the client the access token for its calls. Invalidate drops a
-// token that Zitadel refused, so the next Token gets a new one.
 type Tokens interface {
 	Token(ctx context.Context) (string, error)
 	Invalidate(token string)
 }
 
-// zitadelAPIScope asks for Zitadel's own API in the token's audience.
 const zitadelAPIScope = "urn:zitadel:iam:org:project:id:zitadel:aud"
 
-// renewBefore is how long before its expiry an access token is replaced, at
-// most: a token that lives less than four times as long is replaced when a
-// quarter of its life is left (the prototype's tokens live 60 s).
+// Tokens shorter than 4×renewBefore renew at a quarter of life left (the prototype's live 60 s).
 const renewBefore = 2 * time.Minute
 
-// tokenSource is the part of zitadel/oidc's profile.TokenSource we use.
 type tokenSource interface {
 	TokenCtx(ctx context.Context) (*oauth2.Token, error)
 }
 
-// KeyTokens gets access tokens from Zitadel by the JWT bearer grant
-// (RFC 7523) with a machine user's JWT profile key, keeps the current one and
-// gets the next one shortly before it expires.
 type KeyTokens struct {
 	src tokenSource
 	now func() time.Time
 
 	mu     sync.Mutex
 	tok    *oauth2.Token
-	margin time.Duration // renew when less than this is left
+	margin time.Duration
 }
 
-// NewKeyTokens returns the tokens of the machine user of key at the Zitadel
-// instance whose issuer is issuer. httpClient carries the token requests;
-// ctx is used only while the source is set up (no request is made).
+// ctx is used only during setup; no request is made.
 func NewKeyTokens(ctx context.Context, issuer string, key Key, httpClient *http.Client) (*KeyTokens, error) {
 	issuer = strings.TrimSuffix(issuer, "/")
 	src, err := jwtprofile.NewJWTProfileTokenSource(ctx, issuer, key.UserID, key.KeyID, []byte(key.Key),
@@ -61,8 +50,6 @@ func NewKeyTokens(ctx context.Context, issuer string, key Key, httpClient *http.
 	return &KeyTokens{src: src, now: time.Now}, nil
 }
 
-// Token returns the current access token, getting a new one when there is
-// none or when it expires within renewBefore.
 func (k *KeyTokens) Token(ctx context.Context) (string, error) {
 	k.mu.Lock()
 	defer k.mu.Unlock()
@@ -82,7 +69,6 @@ func (k *KeyTokens) Token(ctx context.Context) (string, error) {
 	return tok.AccessToken, nil
 }
 
-// Invalidate drops token if it is still the current one.
 func (k *KeyTokens) Invalidate(token string) {
 	k.mu.Lock()
 	defer k.mu.Unlock()

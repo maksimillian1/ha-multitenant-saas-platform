@@ -1,10 +1,5 @@
-// Package kube creates and deletes a tenant's namespace through the
-// Kubernetes REST API (ADR-0001, item 3; ADR-0012). It talks plain HTTP with
-// JSON, without client-go, and needs RBAC for namespaces, resourcequotas and
-// ciliumnetworkpolicies only.
-//
-// Every namespace it creates carries the tenant's ID as a label, and it never
-// changes or deletes a namespace whose label names another tenant.
+// Package kube uses plain HTTP without client-go. It never changes or deletes a namespace whose
+// tenant label names another tenant.
 package kube
 
 import (
@@ -26,7 +21,6 @@ import (
 )
 
 const (
-	// TenantLabel holds the tenant ID on every tenant namespace.
 	TenantLabel    = "hamsp.io/tenant-id"
 	managedByLabel = "app.kubernetes.io/managed-by"
 	managedBy      = "tenant-management"
@@ -39,21 +33,17 @@ const (
 )
 
 var (
-	// ErrNotOurs: the namespace exists but belongs to another tenant or was
-	// not created by Tenant Management.
-	ErrNotOurs = fmt.Errorf("kube: the namespace belongs to someone else: %w", core.ErrForeign)
-	// ErrTerminating: the namespace is still being deleted.
+	// Also for a namespace not created by Tenant Management.
+	ErrNotOurs     = fmt.Errorf("kube: the namespace belongs to someone else: %w", core.ErrForeign)
 	ErrTerminating = errors.New("kube: the namespace is still being deleted")
 )
 
-// Quota is the ResourceQuota of every tenant namespace.
 type Quota struct {
 	CPU    string
 	Memory string
 	Pods   string
 }
 
-// Client calls one Kubernetes API server.
 type Client struct {
 	baseURL   string
 	token     func() (string, error)
@@ -63,8 +53,7 @@ type Client struct {
 	deleteFor time.Duration
 }
 
-// NewClient returns a client for the API server at baseURL with a bearer
-// token from token (read again on every call: service account tokens rotate).
+// token is read on every call: service account tokens rotate.
 func NewClient(baseURL string, token func() (string, error), httpClient *http.Client, quota Quota) *Client {
 	return &Client{
 		baseURL: strings.TrimSuffix(baseURL, "/"), token: token, http: httpClient, quota: quota,
@@ -72,8 +61,7 @@ func NewClient(baseURL string, token func() (string, error), httpClient *http.Cl
 	}
 }
 
-// InCluster returns a client for the cluster the pod runs in, with the pod's
-// service account. baseURL overrides the API server's address when set.
+// baseURL overrides the API server address when set.
 func InCluster(baseURL string, timeout time.Duration, quota Quota) (*Client, error) {
 	if baseURL == "" {
 		host, port := os.Getenv("KUBERNETES_SERVICE_HOST"), os.Getenv("KUBERNETES_SERVICE_PORT")
@@ -116,8 +104,7 @@ func (c *Client) labels(tenantID string) map[string]string {
 	return map[string]string{TenantLabel: tenantID, managedByLabel: managedBy}
 }
 
-// EnsureNamespace creates the tenant's namespace with its ResourceQuota and
-// its default-deny CiliumNetworkPolicy. Parts that exist are kept.
+// Parts that exist are kept.
 func (c *Client) EnsureNamespace(ctx context.Context, tenantID string) error {
 	ns := core.Namespace(tenantID)
 	err := c.create(ctx, "/api/v1/namespaces", object{
@@ -159,10 +146,7 @@ func (c *Client) EnsureNamespace(ctx context.Context, tenantID string) error {
 	return nil
 }
 
-// isolationPolicy lets the tenant's pods talk to each other, to cluster DNS
-// and to the internet, and to nothing else in the cluster: no other tenant's
-// namespace and no platform service. Traffic into the namespace comes only
-// from the namespace itself. HAMSP-58 tests it across tenants (QS-02).
+// No other tenant's namespace and no platform service; ingress only from the namespace itself.
 func isolationPolicy(labels map[string]string) object {
 	sameNamespace := []map[string]any{{}}
 	return object{
@@ -185,8 +169,7 @@ func isolationPolicy(labels map[string]string) object {
 	}
 }
 
-// DeleteNamespace deletes the tenant's namespace, and with it everything in
-// it, and waits until it is gone. A namespace that does not exist is deleted.
+// A namespace that does not exist counts as deleted.
 func (c *Client) DeleteNamespace(ctx context.Context, tenantID string) error {
 	path := "/api/v1/namespaces/" + core.Namespace(tenantID)
 	existing, err := c.get(ctx, path)
@@ -236,7 +219,6 @@ var (
 	errNotFound = errors.New("kube: not found")
 )
 
-// StatusError is an error answer of the API server.
 type StatusError struct {
 	Status  int
 	Message string

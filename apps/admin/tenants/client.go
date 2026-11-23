@@ -1,7 +1,3 @@
-// Package tenants is the admin app's client for Tenant Management
-// (ADR-0012, docs/contracts/tenants). It calls with the app's machine token,
-// a Zitadel access token for the project tenant-management with the role
-// tenant-manager, and names the acting admin on every change.
 package tenants
 
 import (
@@ -20,14 +16,11 @@ import (
 	"golang.org/x/oauth2/clientcredentials"
 )
 
-// AdminHeader carries the Zitadel user ID of the admin who asked for a change.
 const AdminHeader = "X-Admin-User-Id"
 
-// maxAnswer bounds what is read from an answer: a list of 1 000 tenants is
-// far below it.
+// A list of 1 000 tenants is far below it.
 const maxAnswer = 4 << 20
 
-// Tenant is a tenant as Tenant Management returns it.
 type Tenant struct {
 	ID         string     `json:"id"`
 	Name       string     `json:"name,omitempty"`
@@ -42,14 +35,12 @@ type Tenant struct {
 	DeletedAt  *time.Time `json:"deleted_at,omitempty"`
 }
 
-// Create is the body of POST /tenants.
 type Create struct {
 	Name       string `json:"name"`
 	AdminEmail string `json:"admin_email"`
 }
 
-// Error is an answer of Tenant Management that is not a success. Tenant is
-// set when the request changed the tenant before it failed.
+// Tenant is set when the request changed the tenant before it failed.
 type Error struct {
 	Status  int
 	Message string
@@ -60,23 +51,16 @@ func (e *Error) Error() string {
 	return fmt.Sprintf("tenant management: %d: %s", e.Status, e.Message)
 }
 
-// Config is where Tenant Management is and how the app gets its token.
 type Config struct {
-	// URL is Tenant Management's base URL.
-	URL string
-	// TokenURL is Zitadel's token endpoint.
-	TokenURL string
-	// ClientID and ClientSecret are the machine user's client credentials.
+	URL                    string
+	TokenURL               string
 	ClientID, ClientSecret string
-	// Audience is the ID of the Zitadel project tenant-management.
+	// ID of the Zitadel project tenant-management.
 	Audience string
-	// Timeout bounds one call; a create or delete runs every step in the
-	// request, so it is minutes, not seconds.
+	// Minutes, not seconds: a create or delete runs every step in the request.
 	Timeout time.Duration
 }
 
-// Scopes asks Zitadel for a token whose audience is the project and that
-// holds the project's roles.
 func Scopes(audience string) []string {
 	return []string{
 		"openid",
@@ -85,15 +69,12 @@ func Scopes(audience string) []string {
 	}
 }
 
-// Client calls Tenant Management.
 type Client struct {
 	base string
 	http *http.Client
 }
 
-// New returns a client. tokenHTTP reaches Zitadel's token endpoint; the
-// token is cached until shortly before it expires. ctx bounds the token
-// fetches: the app's lifetime, not one request's.
+// ctx bounds token fetches for the app's lifetime, not one request's.
 func New(ctx context.Context, cfg Config, tokenHTTP *http.Client) *Client {
 	cc := clientcredentials.Config{
 		ClientID:     cfg.ClientID,
@@ -112,7 +93,6 @@ func New(ctx context.Context, cfg Config, tokenHTTP *http.Client) *Client {
 	}
 }
 
-// List returns the tenants, newest first; tombstones only when asked.
 func (c *Client) List(ctx context.Context, includeDeleted bool) ([]Tenant, error) {
 	path := "/tenants"
 	if includeDeleted {
@@ -127,36 +107,30 @@ func (c *Client) List(ctx context.Context, includeDeleted bool) ([]Tenant, error
 	return out.Tenants, nil
 }
 
-// Get returns one tenant.
 func (c *Client) Get(ctx context.Context, id string) (Tenant, error) {
 	var t Tenant
 	err := c.do(ctx, http.MethodGet, tenantPath(id, ""), "", nil, &t)
 	return t, err
 }
 
-// Create creates a tenant and runs every provisioning step.
 func (c *Client) Create(ctx context.Context, adminID string, in Create) (Tenant, error) {
 	var t Tenant
 	err := c.do(ctx, http.MethodPost, "/tenants", adminID, in, &t)
 	return t, err
 }
 
-// Retry resumes a tenant left in provisioning or deleting.
 func (c *Client) Retry(ctx context.Context, adminID, id string) (Tenant, error) {
 	return c.change(ctx, http.MethodPost, tenantPath(id, "/retry"), adminID)
 }
 
-// Suspend suspends an active tenant.
 func (c *Client) Suspend(ctx context.Context, adminID, id string) (Tenant, error) {
 	return c.change(ctx, http.MethodPost, tenantPath(id, "/suspend"), adminID)
 }
 
-// Resume makes a suspended tenant active again.
 func (c *Client) Resume(ctx context.Context, adminID, id string) (Tenant, error) {
 	return c.change(ctx, http.MethodPost, tenantPath(id, "/resume"), adminID)
 }
 
-// Delete deletes a tenant and returns its tombstone.
 func (c *Client) Delete(ctx context.Context, adminID, id string) (Tenant, error) {
 	return c.change(ctx, http.MethodDelete, tenantPath(id, ""), adminID)
 }
@@ -171,7 +145,7 @@ func tenantPath(id, suffix string) string {
 	return "/tenants/" + url.PathEscape(id) + suffix
 }
 
-// do sends one request. adminID is required for a change; a read has none.
+// adminID is required for a change; a read has none.
 func (c *Client) do(ctx context.Context, method, path, adminID string, in, out any) error {
 	if method != http.MethodGet && adminID == "" {
 		return errors.New("tenant management: a change needs the admin's user ID")

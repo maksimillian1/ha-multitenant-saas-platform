@@ -1,6 +1,4 @@
-// Package store is the usage store of ADR-0006: the only way into the usage
-// tables. They live in a TimescaleDB hypertable on the usage cluster
-// (ADR-0008), which Usage Writer reaches only through write_usage_events.
+// Package store is the only way into the usage tables (ADR-0006, ADR-0008).
 package store
 
 import (
@@ -17,15 +15,13 @@ import (
 	"github.com/maksimillian1/ha-multitenant-saas-platform/apps/usage/internal/core"
 )
 
-// Postgres is the TimescaleDB store of ADR-0008.
 type Postgres struct {
 	pool *pgxpool.Pool
 }
 
 var _ core.EventWriter = (*Postgres)(nil)
 
-// Open connects as Usage Writer's role. Statements use the extended protocol
-// with unnamed statements, which PgBouncer in transaction mode supports.
+// Unnamed statements of the extended protocol, which PgBouncer in transaction mode supports.
 func Open(ctx context.Context, dsn string) (*Postgres, error) {
 	cfg, err := pgxpool.ParseConfig(dsn)
 	if err != nil {
@@ -43,8 +39,7 @@ func (s *Postgres) Close() { s.pool.Close() }
 
 func (s *Postgres) Ping(ctx context.Context) error { return s.pool.Ping(ctx) }
 
-// writeEvents stores one tenant's events and returns the new ones. The function
-// checks every event against app.current_tenant_id (ADR-0008).
+// write_usage_events checks every event against app.current_tenant_id (ADR-0008).
 const writeEvents = `
 SELECT event_id::text, event_time
 FROM write_usage_events($1::uuid[], $2::timestamptz[], $3::text[], $4::text[], $5::bigint[], $6::text[])`
@@ -70,7 +65,6 @@ func (s *Postgres) Write(ctx context.Context, events []core.Event) ([]core.Event
 	err := pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
 		for _, tenant := range order {
 			group := byTenant[tenant]
-			// set_config(..., true) is SET LOCAL: write_usage_events accepts only this tenant's events.
 			if _, err := tx.Exec(ctx, "SELECT set_config('app.current_tenant_id', $1, true)", tenant); err != nil {
 				return err
 			}
@@ -120,10 +114,7 @@ func (s *Postgres) Write(ctx context.Context, events []core.Event) ([]core.Event
 	return fresh, nil
 }
 
-// classify marks errors of SQLSTATE class 22 (data exception) and 23
-// (integrity constraint violation) as core.ErrBadData: they come from the
-// events and fail again on every retry. Everything else, such as a lost
-// connection, may pass on a retry.
+// Classes 22 and 23 come from the events and fail on every retry; anything else may pass.
 func classify(err error) error {
 	var pgErr *pgconn.PgError
 	if errors.As(err, &pgErr) && (strings.HasPrefix(pgErr.Code, "22") || strings.HasPrefix(pgErr.Code, "23")) {

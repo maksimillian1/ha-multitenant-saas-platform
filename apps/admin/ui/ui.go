@@ -1,6 +1,4 @@
-// Package ui serves the SPA in app/ to signed-in users; without a session it
-// sends the browser to the login. Roles are checked by the API, and the SPA
-// shows its access denied page when the API answers 403.
+// Package ui leaves role checks to the API; the SPA shows access denied on its 403.
 package ui
 
 import (
@@ -15,20 +13,18 @@ import (
 	"github.com/maksimillian1/ha-multitenant-saas-platform/apps/admin/core"
 )
 
-// app/dist is written by `npm run build` in app/; dist/.gitkeep lets the
-// package compile before the first build.
+// dist/.gitkeep lets the package compile before the first `npm run build`.
 //
 //go:embed all:app/dist
 var app embed.FS
 
-// csp allows only the SPA's own files and API. Inline styles stay allowed
-// because Radix UI injects <style> elements.
+// Inline styles stay allowed because Radix UI injects <style> elements.
 const csp = "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; " +
 	"frame-ancestors 'none'; base-uri 'none'; object-src 'none'"
 
 type Service struct {
 	Sessions core.SessionReader
-	Files    fs.FS // the built SPA, index.html at the root
+	Files    fs.FS
 	Log      *slog.Logger
 }
 

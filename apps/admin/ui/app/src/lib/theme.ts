@@ -1,8 +1,6 @@
 import { useSyncExternalStore } from 'react'
 
-// The admin picks a light or dark theme, or follows the system; shadcn/ui
-// switches on the .dark class. The choice lives in localStorage, which a
-// private window or blocked site data may refuse.
+// localStorage may be refused in a private window or with blocked site data.
 export const themes = ['light', 'dark', 'system'] as const
 export type Theme = (typeof themes)[number]
 
@@ -26,8 +24,6 @@ function apply() {
   document.documentElement.classList.toggle('dark', dark)
 }
 
-// initTheme applies the stored choice before the first render and follows
-// the system theme while the choice is "system".
 export function initTheme() {
   apply()
   darkScheme().addEventListener('change', apply)

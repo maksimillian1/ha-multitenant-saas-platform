@@ -1,8 +1,5 @@
-// Package auth validates Zitadel access tokens locally against the issuer's
-// JWKS (ADR-0003) and returns the caller's tenant: the Organization ID claim.
-// A token must carry the platform API's audience, so a token issued for
-// another application of the same Zitadel instance is rejected. Every
-// organization except the Zitadel admin organization is a tenant.
+// Package auth requires the platform API audience, so a token for another app of the same
+// Zitadel instance is rejected. Every organization except the Zitadel admin one is a tenant.
 package auth
 
 import (
@@ -22,7 +19,7 @@ import (
 	"github.com/zitadel/oidc/v3/pkg/op"
 )
 
-// TenantClaim holds the Zitadel Organization ID of the token's user.
+// Zitadel Organization ID of the token's user.
 const TenantClaim = "urn:zitadel:iam:user:resourceowner:id"
 
 var (
@@ -39,20 +36,16 @@ type Verifier struct {
 	verifier        *op.AccessTokenVerifier
 	audience        string
 	zitadelAdminOrg string
-	// Blocked reports a suspended or deleted tenant; nil blocks none.
+	// nil blocks none.
 	Blocked func(tenant string) bool
 }
 
-// NewVerifier validates tokens of issuer that list audience in aud. Keys come
-// from jwksURL and are cached; an unknown key ID triggers a refetch, so
-// Zitadel's key rotation needs no restart.
+// An unknown key ID triggers a JWKS refetch, so key rotation needs no restart.
 func NewVerifier(issuer, audience, zitadelAdminOrg, jwksURL string, client *http.Client) *Verifier {
 	keys := rp.NewRemoteKeySet(client, jwksURL)
 	return &Verifier{verifier: op.NewAccessTokenVerifier(issuer, keys), audience: audience, zitadelAdminOrg: zitadelAdminOrg}
 }
 
-// Tenant checks the token's issuer, signature, expiry and audience and returns
-// its tenant.
 func (v *Verifier) Tenant(ctx context.Context, token string) (string, error) {
 	claims, err := op.VerifyAccessToken[*oidc.AccessTokenClaims](ctx, token, v.verifier)
 	if err != nil {
@@ -75,7 +68,6 @@ func (v *Verifier) Tenant(ctx context.Context, token string) (string, error) {
 	return tenant, nil
 }
 
-// BearerToken returns the token from an "Authorization: Bearer <token>" header.
 func BearerToken(r *http.Request) (string, error) {
 	scheme, token, ok := strings.Cut(r.Header.Get("Authorization"), " ")
 	if !ok || !strings.EqualFold(scheme, "Bearer") || token == "" {
@@ -84,9 +76,7 @@ func BearerToken(r *http.Request) (string, error) {
 	return token, nil
 }
 
-// NewIssuerClient fetches the JWKS. With dialAddr set, connections to the
-// issuer's host go to dialAddr instead: inside the cluster the public issuer
-// name does not resolve, but Zitadel must still see it as the Host header.
+// Inside the cluster the public issuer name does not resolve, but Zitadel must still see it as Host.
 func NewIssuerClient(issuer, dialAddr string) (*http.Client, error) {
 	u, err := url.Parse(issuer)
 	if err != nil {

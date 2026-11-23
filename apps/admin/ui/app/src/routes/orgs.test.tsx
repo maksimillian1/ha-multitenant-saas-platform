@@ -38,7 +38,6 @@ describe('organizations list', () => {
     expect(router.state.location.search).toEqual({ q: 'tenant', state: 'inactive', offset: 20 })
   })
 
-  // Organizations are created only as tenants (ADR-0012, AC-15).
   it('has no create action and points to the Tenants page', async () => {
     const api = mockApi({ ...signedIn, 'GET /api/orgs': orgs })
     renderApp('/orgs')
@@ -106,7 +105,6 @@ describe('organization page', () => {
     await waitFor(() => expect(api.sent('POST', '/api/orgs/org-b/activate')).toHaveLength(1))
   })
 
-  // Organizations are deleted only as tenants (ADR-0012, AC-15).
   it('has no delete action', async () => {
     const api = mockApi(answers())
     renderApp('/orgs/org-a')

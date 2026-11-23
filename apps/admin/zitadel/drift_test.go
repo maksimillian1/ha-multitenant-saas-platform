@@ -15,7 +15,6 @@ import (
 
 var driftNow = time.Date(2026, 11, 9, 12, 0, 0, 0, time.UTC)
 
-// credentialAnswers is what the fake Zitadel lists for one machine user.
 func credentialAnswers(keys map[string]time.Time, pats ...string) map[string]string {
 	list := func(items []string) string { return `{"result":[` + strings.Join(items, ",") + `]}` }
 	var k, p []string
@@ -46,8 +45,6 @@ type driftEvent struct {
 	Reason       string `json:"reason"`
 }
 
-// runDrift runs the check for one account against a fake Zitadel and returns
-// the logged events.
 func runDrift(t *testing.T, a Account, answers map[string]string) ([]driftEvent, *fakeZitadel) {
 	t.Helper()
 	f, c := newFake(t, answers)
@@ -168,9 +165,6 @@ func TestCredentialDriftIAMAdmin(t *testing.T) {
 	})
 }
 
-// A broken answer to a credential listing is an error: the check logs that it
-// failed and reports no finding.
-//
 // Verifies: admin-zitadel T-02
 func TestBrokenCredentialAnswer(t *testing.T) {
 	app := Account{Name: "admin-app", UserID: "user-admin-app", OwnKeyID: "own"}

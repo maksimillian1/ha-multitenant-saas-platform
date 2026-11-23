@@ -4,7 +4,6 @@ import { render } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { createAppRouter, createQueryClient } from '@/router'
 
-// renderApp renders the whole SPA at path, with a fresh cache and router.
 export function renderApp(path: string) {
   const queryClient = createQueryClient()
   queryClient.setDefaultOptions({ queries: { retry: false, staleTime: 30_000 } })

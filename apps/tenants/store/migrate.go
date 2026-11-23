@@ -15,17 +15,12 @@ import (
 //go:embed migrations/*.sql
 var migrations embed.FS
 
-// migrationLockID serialises concurrent migration runs (pg_advisory_xact_lock).
 const migrationLockID = 5_100_001
 
-// PlatformTables have a tenant key but hold no tenant's data, so they have no
-// RLS. Every other table with a tenant_id column must have RLS enabled and
-// forced (ADR-0002); adding a table here needs the owner's review.
+// Adding a table here needs the owner's review: it exempts it from RLS (ADR-0002).
 var PlatformTables = []string{"public.tenants"}
 
-// Migrate applies the embedded migrations in file name order. Each file runs in
-// its own transaction and is recorded in schema_migrations. It must run as the
-// owner role of the database, not as the application role.
+// Migrate must run as the database owner role, not as the application role.
 func Migrate(ctx context.Context, conn *pgx.Conn) error {
 	if _, err := conn.Exec(ctx, `CREATE TABLE IF NOT EXISTS schema_migrations (
 		version    text        PRIMARY KEY,
@@ -72,8 +67,6 @@ func Migrate(ctx context.Context, conn *pgx.Conn) error {
 	return nil
 }
 
-// UnprotectedTables lists tables with a tenant_id column that do not have RLS
-// both enabled and forced, except the PlatformTables.
 func UnprotectedTables(ctx context.Context, conn *pgx.Conn) ([]string, error) {
 	rows, err := conn.Query(ctx, `
 		SELECT n.nspname || '.' || c.relname
@@ -91,8 +84,7 @@ func UnprotectedTables(ctx context.Context, conn *pgx.Conn) ([]string, error) {
 	return pgx.CollectRows(rows, pgx.RowTo[string])
 }
 
-// Connect retries until ctx is done, because on a fresh cluster the database
-// may still be starting when the migration job runs.
+// On a fresh cluster the database may still be starting when the migration job runs.
 func Connect(ctx context.Context, log *slog.Logger, dsn string) (*pgx.Conn, error) {
 	for {
 		conn, err := pgx.Connect(ctx, dsn)
