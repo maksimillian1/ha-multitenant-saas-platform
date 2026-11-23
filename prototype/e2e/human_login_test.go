@@ -128,14 +128,12 @@ func loginClientToken(t testing.TB) string {
 	return input + "." + base64.RawURLEncoding.EncodeToString(sig)
 }
 
-// humanToken signs a human user in through Login V2 and returns the access token.
-// It acts on the session API as Login V2's own system user.
-func humanToken(t testing.TB, _ string, c oidcClient, scope, loginName, password string) string {
+// finishAuthRequest does what Login V2 does once the user typed the password:
+// a session with the password check, linked to the auth request. It returns
+// the client's callback URL with the code.
+func finishAuthRequest(t testing.TB, authRequest, loginName, password string) *url.URL {
 	t.Helper()
-	verifier := randomID() + randomID() + randomID() + randomID() + randomID() + randomID() + randomID() + randomID()
-	authRequest := startLogin(t, c, scope, verifier)
 	login := loginClientToken(t)
-
 	r := zitadelCall(t, login, http.MethodPost, "/v2/sessions", map[string]any{
 		"checks": map[string]any{"user": map[string]string{"loginName": loginName}, "password": map[string]string{"password": password}},
 	})
@@ -145,7 +143,6 @@ func humanToken(t testing.TB, _ string, c oidcClient, scope, loginName, password
 		SessionToken string `json:"sessionToken"`
 	}
 	r.decode(t, &session)
-
 	r = zitadelCall(t, login, http.MethodPost, "/v2/oidc/auth_requests/"+authRequest, map[string]any{
 		"session": map[string]string{"sessionId": session.SessionID, "sessionToken": session.SessionToken},
 	})
@@ -155,8 +152,21 @@ func humanToken(t testing.TB, _ string, c oidcClient, scope, loginName, password
 	}
 	r.decode(t, &cb)
 	u, err := url.Parse(cb.CallbackURL)
-	if err != nil || u.Query().Get("code") == "" {
-		t.Fatalf("callback %q has no code", cb.CallbackURL)
+	if err != nil {
+		t.Fatalf("callback %q: %v", cb.CallbackURL, err)
+	}
+	return u
+}
+
+// humanToken signs a human user in through Login V2 and returns the access token.
+// It acts on the session API as Login V2's own system user.
+func humanToken(t testing.TB, _ string, c oidcClient, scope, loginName, password string) string {
+	t.Helper()
+	verifier := randomID() + randomID() + randomID() + randomID() + randomID() + randomID() + randomID() + randomID()
+	authRequest := startLogin(t, c, scope, verifier)
+	u := finishAuthRequest(t, authRequest, loginName, password)
+	if u.Query().Get("code") == "" {
+		t.Fatalf("callback %q has no code", u)
 	}
 
 	form := url.Values{

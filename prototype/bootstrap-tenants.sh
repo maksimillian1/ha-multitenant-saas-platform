@@ -49,6 +49,8 @@ ADMIN_ROLE="super-admin"
 # access denied page.
 VIEWER_ROLE="viewer"
 ADMIN_URL="http://admin.localtest.me:30080"
+EXAMPLEWEB_APP="exampleweb"
+EXAMPLEWEB_URL="http://exampleweb.localtest.me:30080"
 ADMIN_EMAIL_DOMAIN="admin.localtest.me"
 # The admin app calls the Zitadel APIs as this machine user. IAM_ORG_MANAGER
 # covers the organizations, users, role assignments and projects of every
@@ -496,6 +498,45 @@ for d in tenants/tenants admin/admin; do
   fi
 done
 
+# ── 9. the tenant web page of ExampleApp (apps/exampleweb) ───────────────────
+
+# Its app sits in the platform API project, so the users' access tokens carry
+# the audience the API Gateway requires; JWT access tokens, because the API
+# Gateway validates them locally. Refresh tokens keep a session past the short
+# access token lifetime.
+ORG=""
+exampleweb_cfg=$(jq -nc --arg n "${EXAMPLEWEB_APP}" --arg url "${EXAMPLEWEB_URL}" \
+  '{name: $n, redirectUris: [$url + "/auth/callback"], postLogoutRedirectUris: [$url + "/"],
+    responseTypes: ["OIDC_RESPONSE_TYPE_CODE"],
+    grantTypes: ["OIDC_GRANT_TYPE_AUTHORIZATION_CODE", "OIDC_GRANT_TYPE_REFRESH_TOKEN"],
+    appType: "OIDC_APP_TYPE_WEB", authMethodType: "OIDC_AUTH_METHOD_TYPE_BASIC", devMode: true,
+    accessTokenType: "OIDC_TOKEN_TYPE_JWT", idTokenUserinfoAssertion: true}')
+app=$(zitadel POST "/management/v1/projects/${project_id}/apps/_search" "$(jq -nc --arg n "${EXAMPLEWEB_APP}" \
+  '{queries: [{nameQuery: {name: $n, method: "TEXT_QUERY_METHOD_EQUALS"}}]}')" | jq -c '.result[0] // empty')
+if [[ -z "${app}" ]]; then
+  created=$(zitadel POST "/management/v1/projects/${project_id}/apps/oidc" "${exampleweb_cfg}")
+  exampleweb_client_id=$(jq -r '.clientId' <<<"${created}")
+  exampleweb_client_secret=$(jq -r '.clientSecret' <<<"${created}")
+  echo "Created OIDC app ${EXAMPLEWEB_APP}"
+else
+  app_id=$(jq -r '.id' <<<"${app}")
+  exampleweb_client_id=$(jq -r '.oidcConfig.clientId' <<<"${app}")
+  if ! out=$(zitadel PUT "/management/v1/projects/${project_id}/apps/${app_id}/oidc_config" "$(jq -c 'del(.name)' <<<"${exampleweb_cfg}")"); then
+    grep -q "No changes" <<<"${out}" || { echo "ERROR: ${out}"; exit 1; }
+  fi
+  exampleweb_client_secret=$(zitadel POST "/management/v1/projects/${project_id}/apps/${app_id}/oidc_config/_generate_client_secret" \
+    '{}' | jq -r '.clientSecret')
+  echo "Reusing OIDC app ${EXAMPLEWEB_APP}, client secret regenerated"
+fi
+kubectl create namespace exampleweb --dry-run=client -o yaml | kubectl apply -f - >/dev/null
+kubectl -n exampleweb create secret generic exampleweb-oidc \
+  --from-literal=CLIENT_ID="${exampleweb_client_id}" --from-literal=CLIENT_SECRET="${exampleweb_client_secret}" \
+  --from-literal=AUDIENCE="${project_id}" \
+  --dry-run=client -o yaml | kubectl apply -f - >/dev/null
+if kubectl -n exampleweb get deployment exampleweb &>/dev/null; then
+  kubectl -n exampleweb rollout restart deployment/exampleweb >/dev/null
+fi
+
 tm_json=$(jq -nc --arg aud "${tm_project_id}" --arg role "${TM_ROLE}" \
   --arg cid "$(jq -r '.clientId' <<<"${tm_secret}")" --arg cs "$(jq -r '.clientSecret' <<<"${tm_secret}")" \
   '{audience: $aud, role: $role, client_id: $cid, client_secret: $cs}')
@@ -507,8 +548,9 @@ admin_json=$(jq -nc --arg url "${ADMIN_URL}" --arg role "${ADMIN_ROLE}" --arg vr
                                     {username: "regular-user", password: $rp, roles: []}]}')
 
 jq -n --arg issuer "${ISSUER}" --arg gw "${GATEWAY}" --arg aud "${project_id}" --argjson t "${tenants_json}" \
-  --argjson admin "${admin_json}" --argjson tm "${tm_json}" \
-  '{issuer: $issuer, gateway: $gw, audience: $aud, tenants: $t, admin: $admin, tenant_management: $tm}' >"${OUT}"
+  --argjson admin "${admin_json}" --argjson tm "${tm_json}" --arg web "${EXAMPLEWEB_URL}" \
+  '{issuer: $issuer, gateway: $gw, audience: $aud, tenants: $t, admin: $admin, tenant_management: $tm,
+    exampleweb: {url: $web}}' >"${OUT}"
 chmod 600 "${OUT}"
 echo ""
 echo "Wrote ${OUT}. Super admin page: ${ADMIN_URL} (users: jq .admin.users ${OUT})"

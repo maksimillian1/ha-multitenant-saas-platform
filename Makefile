@@ -6,7 +6,7 @@
 # c4sync and go-arch-lint are built from tools/c4sync (go-arch-lint is pinned as
 # a Go tool there). The README diagrams need Structurizr: see docs/architecture/c4/README.md.
 
-C4_SERVICES := usage exampleapp gateway admin
+C4_SERVICES := usage exampleapp gateway admin exampleweb
 C4SYNC := $(CURDIR)/bin/c4sync
 
 .PHONY: c4 c4-generate c4-check c4-diff c4sync
