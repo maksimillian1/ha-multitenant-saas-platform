@@ -1,0 +1,68 @@
+feature: tenant-self-admin
+title: Tenant admins manage their users, roles and SSO in the Zitadel Console; tenant web login for ExampleApp
+critical: true
+c4: [authService, exampleApp]
+links:
+  issues: [HAMSP-57]
+requirements: [FR-02, FR-03, QS-11, C-04, C-06]
+
+acceptance:
+  AC-1:
+    text: >-
+      On kind, Zitadel's Login v2 runs (arm64 image) and the Console at /ui/console uses it: a
+      tenant's ORG_OWNER created by provisioning accepts the invite, sets a password and logs
+      in to the Console.
+    level: e2e
+  AC-2:
+    text: >-
+      In the Console, tenant A's ORG_OWNER creates a user in organization A and grants it a
+      project role; the user then gets a token whose organization ID is tenant A's tenant_id.
+    level: e2e
+  AC-3:
+    text: >-
+      With the Console's token, tenant A's ORG_OWNER is denied (permission_denied or not found)
+      when it reads or changes users, role grants, identity providers or the label policy of
+      tenant B's organization, and cannot see organization B in the organization list.
+    level: integration
+  AC-4:
+    text: >-
+      Tenant A's ORG_OWNER cannot change instance settings: adding an instance member, an
+      instance identity provider or changing the instance label policy is denied.
+    level: integration
+  AC-5:
+    text: >-
+      An OIDC identity provider that tenant A's ORG_OWNER adds to organization A is offered on
+      the login of organization A only; a user logging in through it lands in organization A.
+    level: e2e
+  AC-6:
+    text: >-
+      After the admin app sets organization A's branding, the Console and login of tenant A's
+      users serve organization A's logo and colors.
+    level: e2e
+  AC-7:
+    text: >-
+      exampleapp-web logs a user in by the OIDC authorization code flow with PKCE against
+      Zitadel; the browser gets only an httpOnly, Secure, SameSite=Lax session cookie, never a
+      token. A request without a valid session is redirected to the login.
+    level: unit
+  AC-8:
+    text: >-
+      On kind, a user of tenant A logs in to exampleapp-web and sees tenant A's items, which
+      exampleapp-web reads from GET /items through the API Gateway with the user's access token;
+      tenant B's items never appear.
+    level: e2e
+  AC-9:
+    text: >-
+      The page shows a "Manage users" link to the Zitadel Console only when the user's token
+      holds ORG_OWNER of its organization; the Console URL comes from configuration.
+    level: unit
+  AC-10:
+    text: >-
+      Logout ends the session in exampleapp-web and at Zitadel (end_session); the old cookie
+      no longer opens the page.
+    level: unit
+  AC-11:
+    text: >-
+      When the API Gateway answers 401 for an expired token, exampleapp-web refreshes the token
+      once and repeats the call; when the refresh fails, it sends the user to the login.
+    level: unit
