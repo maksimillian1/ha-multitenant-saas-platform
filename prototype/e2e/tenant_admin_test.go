@@ -194,6 +194,17 @@ func humanOrgOwner(t *testing.T, iamAdmin, orgID string) string {
 	return humanToken(t, iamAdmin, consoleClient(t), consoleScope, loginName, password)
 }
 
+// userinfoOrg returns the organization of a token's user; the Console's tokens are opaque.
+func userinfoOrg(t testing.TB, bearer string) string {
+	t.Helper()
+	r := zitadelCall(t, bearer, http.MethodGet, "/oidc/v1/userinfo", nil)
+	mustStatus(t, r, http.StatusOK, "userinfo")
+	var info map[string]any
+	r.decode(t, &info)
+	org, _ := info[tenantClaim].(string)
+	return org
+}
+
 // Verifies: tenant-self-admin AC-1
 func TestOrgOwnerLogsInThroughLoginV2(t *testing.T) {
 	iamAdmin := keyToken(t, loadServiceKey(t, iamAdminKeySecret, iamAdminKeyField))
@@ -201,9 +212,8 @@ func TestOrgOwnerLogsInThroughLoginV2(t *testing.T) {
 
 	r := zitadelCall(t, owner, http.MethodPost, "/management/v1/orgs/me/members/_search", map[string]any{})
 	mustStatus(t, r, http.StatusOK, "read the members of its organization with the Console token")
-	_, _, _, claims := jwtParts(t, owner)
-	if claims[tenantClaim] != tenA.OrgID {
-		t.Errorf("Console token organization = %v, want tenant A %s", claims[tenantClaim], tenA.OrgID)
+	if org := userinfoOrg(t, owner); org != tenA.OrgID {
+		t.Errorf("Console token organization = %q, want tenant A %s", org, tenA.OrgID)
 	}
 }
 
@@ -230,8 +240,7 @@ func TestOrgOwnerCreatesUserWithRole(t *testing.T) {
 
 	scope := "openid urn:zitadel:iam:user:resourceowner urn:zitadel:iam:org:project:id:" + project.ID + ":aud urn:zitadel:iam:org:project:role:viewer"
 	tok := humanToken(t, iamAdmin, consoleClient(t), scope, loginName, password)
-	_, _, _, claims := jwtParts(t, tok)
-	if claims[tenantClaim] != tenA.OrgID {
-		t.Errorf("new user's token organization = %v, want tenant A %s", claims[tenantClaim], tenA.OrgID)
+	if org := userinfoOrg(t, tok); org != tenA.OrgID {
+		t.Errorf("new user's token organization = %q, want tenant A %s", org, tenA.OrgID)
 	}
 }

@@ -5,14 +5,21 @@ package e2e
 // what Login V2 does after the user typed the password.
 
 import (
+	"context"
+	"crypto"
+	"crypto/rand"
+	"crypto/rsa"
 	"crypto/sha256"
+	"crypto/x509"
 	"encoding/base64"
 	"encoding/json"
+	"encoding/pem"
 	"io"
 	"net/http"
 	"net/url"
 	"strings"
 	"testing"
+	"time"
 )
 
 // noRedirect is the e2e client that returns redirects instead of following them.
@@ -81,14 +88,55 @@ func startLogin(t testing.TB, c oidcClient, scope, verifier string) string {
 	return authRequest
 }
 
+// loginClientToken is a token of Login V2's own system user login-client (role
+// IAM_LOGIN_CLIENT): a JWT signed with its key from the chart's Secret, as Login V2 makes it.
+func loginClientToken(t testing.TB) string {
+	t.Helper()
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+	defer cancel()
+	raw, err := secretField(ctx, "zitadel/zitadel-login-service-key", "tls.key")
+	if err != nil {
+		t.Fatalf("Login V2 key: %v", err)
+	}
+	block, _ := pem.Decode([]byte(raw))
+	if block == nil {
+		t.Fatal("Login V2 key is not PEM")
+	}
+	var priv *rsa.PrivateKey
+	if k, err := x509.ParsePKCS8PrivateKey(block.Bytes); err == nil {
+		priv, _ = k.(*rsa.PrivateKey)
+	} else if priv, err = x509.ParsePKCS1PrivateKey(block.Bytes); err != nil {
+		t.Fatalf("Login V2 key: %v", err)
+	}
+	if priv == nil {
+		t.Fatal("Login V2 key is not RSA")
+	}
+	enc := func(v any) string {
+		b, _ := json.Marshal(v)
+		return base64.RawURLEncoding.EncodeToString(b)
+	}
+	now := time.Now()
+	input := enc(map[string]string{"alg": "RS256", "typ": "JWT"}) + "." + enc(map[string]any{
+		"iss": "login-client", "sub": "login-client", "aud": cfg.Issuer,
+		"iat": now.Unix(), "exp": now.Add(time.Minute).Unix(),
+	})
+	sum := sha256.Sum256([]byte(input))
+	sig, err := rsa.SignPKCS1v15(rand.Reader, priv, crypto.SHA256, sum[:])
+	if err != nil {
+		t.Fatal(err)
+	}
+	return input + "." + base64.RawURLEncoding.EncodeToString(sig)
+}
+
 // humanToken signs a human user in through Login V2 and returns the access token.
-// iamAdmin stands in for Login V2's own service user on the session API.
-func humanToken(t testing.TB, iamAdmin string, c oidcClient, scope, loginName, password string) string {
+// It acts on the session API as Login V2's own system user.
+func humanToken(t testing.TB, _ string, c oidcClient, scope, loginName, password string) string {
 	t.Helper()
 	verifier := randomID() + randomID() + randomID() + randomID() + randomID() + randomID() + randomID() + randomID()
 	authRequest := startLogin(t, c, scope, verifier)
+	login := loginClientToken(t)
 
-	r := zitadelCall(t, iamAdmin, http.MethodPost, "/v2/sessions", map[string]any{
+	r := zitadelCall(t, login, http.MethodPost, "/v2/sessions", map[string]any{
 		"checks": map[string]any{"user": map[string]string{"loginName": loginName}, "password": map[string]string{"password": password}},
 	})
 	mustStatus(t, r, http.StatusCreated, "create a session with the password")
@@ -98,7 +146,7 @@ func humanToken(t testing.TB, iamAdmin string, c oidcClient, scope, loginName, p
 	}
 	r.decode(t, &session)
 
-	r = zitadelCall(t, iamAdmin, http.MethodPost, "/v2/oidc/auth_requests/"+authRequest, map[string]any{
+	r = zitadelCall(t, login, http.MethodPost, "/v2/oidc/auth_requests/"+authRequest, map[string]any{
 		"session": map[string]string{"sessionId": session.SessionID, "sessionToken": session.SessionToken},
 	})
 	mustStatus(t, r, http.StatusOK, "finish the auth request with the session")
@@ -154,18 +202,19 @@ func invitedHuman(t testing.TB, iamAdmin, creator, orgID string) (userID, loginN
 		zitadelCall(t, iamAdmin, http.MethodDelete, "/v2/users/"+user.UserID, nil)
 	})
 
-	r = zitadelCall(t, creator, http.MethodPost, "/v2/users/"+user.UserID+"/invite_code", map[string]any{"returnCode": map[string]any{}})
+	r = zitadelCall(t, creator, http.MethodPost, "/zitadel.user.v2.UserService/CreateInviteCode",
+		map[string]any{"userId": user.UserID, "returnCode": map[string]any{}})
 	mustStatus(t, r, http.StatusOK, "create the invite code")
 	var invite struct {
 		InviteCode string `json:"inviteCode"`
 	}
 	r.decode(t, &invite)
-	mustStatus(t, zitadelCall(t, iamAdmin, http.MethodPost, "/v2/users/"+user.UserID+"/invite_code/_verify",
-		map[string]string{"verificationCode": invite.InviteCode}), http.StatusOK, "verify the invite code")
+	mustStatus(t, zitadelCall(t, iamAdmin, http.MethodPost, "/zitadel.user.v2.UserService/VerifyInviteCode",
+		map[string]string{"userId": user.UserID, "verificationCode": invite.InviteCode}), http.StatusOK, "verify the invite code")
 
 	password = "E2e-" + randomID() + "-Pw1!"
-	mustStatus(t, zitadelCall(t, iamAdmin, http.MethodPost, "/v2/users/"+user.UserID+"/password", map[string]any{
-		"newPassword": map[string]any{"password": password, "changeRequired": false},
+	mustStatus(t, zitadelCall(t, iamAdmin, http.MethodPost, "/zitadel.user.v2.UserService/SetPassword", map[string]any{
+		"userId": user.UserID, "newPassword": map[string]any{"password": password, "changeRequired": false},
 	}), http.StatusOK, "set the password")
 	return user.UserID, name, password
 }
