@@ -1,4 +1,4 @@
-# Alert rules of Usage Writer (HAMSP-30, feature usage-writer, AC-6), in the
+# Alert rules of Usage Writer (feature usage-writer, AC-6), in the
 # plain Prometheus rules format. Not synced by ArgoCD: the cluster has no
 # Prometheus and no PrometheusRule CRD yet, so this file is inert until a
 # monitoring stack exists. promtool tests it: usage-writer.rules.test.yaml.

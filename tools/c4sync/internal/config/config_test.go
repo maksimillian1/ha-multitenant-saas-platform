@@ -16,7 +16,7 @@ func write(t *testing.T, content string) string {
 	return p
 }
 
-// AC (HAMSP-74): an unknown key fails with an error naming the line.
+// An unknown key fails with an error naming the line.
 // Verifies: c4-from-code AC-3
 func TestUnknownKeyNamesLine(t *testing.T) {
 	p := write(t, "name: x\noutputs:\n  code: a.dsl\n")
@@ -26,7 +26,7 @@ func TestUnknownKeyNamesLine(t *testing.T) {
 	}
 }
 
-// AC (HAMSP-74, HAMSP-77): metadata for a component that go-arch-lint does
+// Metadata for a component that go-arch-lint does
 // not define fails with the file and line.
 // Verifies: c4-from-code AC-3
 func TestUnknownComponentNamesLine(t *testing.T) {

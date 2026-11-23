@@ -1,6 +1,6 @@
 package e2e
 
-// Kafka client authentication and ACLs (HAMSP-31, feature kafka-client-auth).
+// Kafka client authentication and ACLs (feature kafka-client-auth).
 // The checks run the Kafka CLI of the Strimzi image in a pod that carries an
 // allowed pod label, so the network policy lets it through and only the login
 // and the ACLs decide.
@@ -525,8 +525,8 @@ func settled(ctx context.Context) bool {
 	return true
 }
 
-// TestDLQAndReplayUsersACLs checks the Kafka access of the Usage Writer DLQ
-// (HAMSP-30): usage-writer may write usage-events-dlq but still not
+// TestDLQAndReplayUsersACLs checks the Kafka access of the Usage Writer DLQ:
+// usage-writer may write usage-events-dlq but still not
 // usage-events; usage-replay moves records from usage-events-dlq to
 // usage-events and nothing else; usage-writeapi cannot touch the DLQ.
 //

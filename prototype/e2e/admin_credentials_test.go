@@ -1,7 +1,7 @@
 package e2e
 
-// Boundary tests of the Zitadel service accounts (feature admin-zitadel,
-// HAMSP-36). They call Zitadel directly with short-lived tokens that they get
+// Boundary tests of the Zitadel service accounts (feature admin-zitadel).
+// They call Zitadel directly with short-lived tokens that they get
 // from the accounts' JWT profile keys, read from the cluster's Secrets:
 //
 //   - iam-admin: the IAM_OWNER machine user of the Zitadel Helm chart, key in

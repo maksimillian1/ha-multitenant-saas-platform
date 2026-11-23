@@ -1,4 +1,4 @@
-# promtool test rules usage-writer.rules.test.yaml (HAMSP-30, AC-6).
+# promtool test rules usage-writer.rules.test.yaml (AC-6).
 rule_files:
   - usage-writer.rules.yaml
 evaluation_interval: 1m

@@ -62,7 +62,7 @@ __pycache__/
 */chunker/debug/**/*
 tmp/*
 
-# HAMSP-5: test tenant credentials written by prototype/bootstrap-tenants.sh
+# Test tenant credentials written by prototype/bootstrap-tenants.sh
 prototype/.tenants.json
 # The local cluster CA of usage-kafka with its private key (prototype/kafka-ca.sh).
 prototype/.kafka-ca/

@@ -1,6 +1,6 @@
 package e2e
 
-// Usage pipeline (HAMSP-26): API Gateway → UsageWriteAPI → Kafka → Usage Writer
+// Usage pipeline: API Gateway → UsageWriteAPI → Kafka → Usage Writer
 // → the usage database on the usage cluster (ADR-0008). Events are found by
 // their path (a probe UUID per test) or their event_id, as the superuser.
 
@@ -382,8 +382,8 @@ if curl -s -m 5 -o /dev/null http://usage-writeapi.usage.svc:8080/healthz; then 
 }
 
 // AC-8: only UsageWriteAPI, Usage Writer, the API Gateway and Tenant
-// Management can connect to the Kafka client listener (9093 since HAMSP-31
-// removed the plain one). The control pod carries Usage Writer's label and gets through.
+// Management can connect to the Kafka client listener (9093; there is no
+// plain one). The control pod carries Usage Writer's label and gets through.
 func TestDirectAccessToKafkaIsBlocked(t *testing.T) {
 	// time_connect is 0 when the TCP connection was never established.
 	script := `curl -s -m 8 --connect-timeout 4 -o /dev/null -w 'connect=%{time_connect}' telnet://usage-kafka-kafka-bootstrap.kafka.svc:9093 </dev/null; true`
@@ -395,8 +395,8 @@ func TestDirectAccessToKafkaIsBlocked(t *testing.T) {
 	if out := directAccess(t, "usage", "app.kubernetes.io/name=usage-writer", script); !connected(out) {
 		t.Fatalf("a pod with Usage Writer's label could not connect, so the check proves nothing: %q", out)
 	}
-	// The Gateway and Tenant Management reach it only from their own pods
-	// (HAMSP-52), not from any pod of their namespace.
+	// The Gateway and Tenant Management reach it only from their own pods,
+	// not from any pod of their namespace.
 	for _, ns := range []string{"default", "usage", "gateway", "tenants"} {
 		if out := directAccess(t, ns, "", script); connected(out) {
 			t.Fatalf("pod in %s connected to Kafka: %q", ns, out)
@@ -444,7 +444,7 @@ func TestUsageWriterRestartsStoreOnce(t *testing.T) {
 	}
 }
 
-// AC-11 of HAMSP-26, HAMSP-25 AC-4/AC-5: Usage Writer connects to the usage
+// Usage Writer connects to the usage
 // cluster as a role that is NOSUPERUSER NOBYPASSRLS and owns nothing; it has no
 // privilege on usage_events and writes only through write_usage_events.
 func TestUsageTablesClosedToWriterRole(t *testing.T) {

@@ -1,4 +1,4 @@
-# writer replay (HAMSP-30, feature usage-writer, AC-7): puts DLQ records back
+# writer replay (feature usage-writer, AC-7): puts DLQ records back
 # on usage-events. Not synced by ArgoCD; start it by hand after the cause of
 # the DLQ records is fixed. Pick the records by partition and offset, from the
 # dlq-source and dlq-reason headers (docs/contracts/usage-event):

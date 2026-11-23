@@ -1,6 +1,6 @@
 package e2e
 
-// The usage cluster (HAMSP-25, ADR-0008): its own CNPG cluster on PostgreSQL 18
+// The usage cluster (ADR-0008): its own CNPG cluster on PostgreSQL 18
 // with TimescaleDB from our extension image, and no usage data left in the
 // main cluster.
 

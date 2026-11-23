@@ -1,5 +1,5 @@
-# One KafkaUser per Kafka client (HAMSP-31): UsageWriteAPI, Usage Writer,
-# writer replay (HAMSP-30), Tenant Management and the API Gateway. usage migrate has none: it needs no
+# One KafkaUser per Kafka client: UsageWriteAPI, Usage Writer,
+# writer replay, Tenant Management and the API Gateway. usage migrate has none: it needs no
 # Kafka. Local kind prototype passwords only; the same values are in
 # the Secrets of each client's namespace, because a Strimzi user lives in the
 # Kafka namespace and the pods read their password in the usage namespace.
@@ -44,7 +44,7 @@ spec:
         operations: [IdempotentWrite]
 ---
 # Usage Writer: read usage-events with its own consumer group only, and write
-# poison records to usage-events-dlq (HAMSP-30).
+# poison records to usage-events-dlq.
 apiVersion: kafka.strimzi.io/v1
 kind: KafkaUser
 metadata:
@@ -79,7 +79,7 @@ type: Opaque
 stringData:
   password: dev-usage-replay-kafka # gitleaks:allow
 ---
-# writer replay (HAMSP-30): read usage-events-dlq without a consumer group and
+# writer replay: read usage-events-dlq without a consumer group and
 # write the chosen records back to usage-events. It cannot read usage-events
 # or write usage-events-dlq.
 apiVersion: kafka.strimzi.io/v1
@@ -122,7 +122,7 @@ type: Opaque
 stringData:
   password: dev-api-gateway-kafka # gitleaks:allow
 ---
-# Tenant Management: publishes every tenant's state to tenant-states (HAMSP-52).
+# Tenant Management: publishes every tenant's state to tenant-states.
 apiVersion: kafka.strimzi.io/v1
 kind: KafkaUser
 metadata:
@@ -145,7 +145,7 @@ spec:
       - resource: {type: cluster}
         operations: [IdempotentWrite]
 ---
-# API Gateway: reads tenant-states without a consumer group (HAMSP-52), so it
+# API Gateway: reads tenant-states without a consumer group, so it
 # needs no group ACL.
 apiVersion: kafka.strimzi.io/v1
 kind: KafkaUser

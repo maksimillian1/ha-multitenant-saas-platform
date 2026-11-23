@@ -1,4 +1,4 @@
-# Kafka for the usage pipeline (ADR-0005, HAMSP-26): 3 dual-role KRaft nodes
+# Kafka for the usage pipeline (ADR-0005): 3 dual-role KRaft nodes
 # with the production durability settings, small enough for kind.
 # SkipDryRunOnMissingResource: the CRDs come from the operator chart in the
 # same sync; ArgoCD retries until they exist.
@@ -37,7 +37,7 @@ metadata:
   annotations:
     argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
 spec:
-  # Our own cluster CA (cluster-ca.yaml, HAMSP-31): the clients trust it.
+  # Our own cluster CA (cluster-ca.yaml): the clients trust it.
   clusterCa:
     generateCertificateAuthority: false
   kafka:
@@ -47,8 +47,7 @@ spec:
     # sits in its own AZ (ADR-0005, rack.topologyKey: topology.kubernetes.io/zone).
     listeners:
       # The only client listener: every client logs in as its own KafkaUser
-      # over TLS with the cluster CA (users.yaml, prototype/kafka-ca.sh,
-      # HAMSP-31).
+      # over TLS with the cluster CA (users.yaml, prototype/kafka-ca.sh).
       - name: tls
         port: 9093
         type: internal
@@ -80,7 +79,7 @@ spec:
             podSelector:
               matchLabels:
                 app.kubernetes.io/name: usage-writer
-          # writer replay (HAMSP-30), a Job started by hand: prototype/usage-replay-job.yaml.
+          # writer replay, a Job started by hand: prototype/usage-replay-job.yaml.
           - namespaceSelector:
               matchLabels:
                 kubernetes.io/metadata.name: usage
@@ -126,7 +125,7 @@ spec:
     min.insync.replicas: 2
     retention.ms: 604800000
 ---
-# Usage Writer's dead-letter topic (HAMSP-30, feature usage-writer): poison
+# Usage Writer's dead-letter topic (feature usage-writer): poison
 # records, key and value unchanged, the reason in headers. Retention counts
 # from the DLQ write and is the time to replay them (writer replay).
 apiVersion: kafka.strimzi.io/v1
@@ -145,7 +144,7 @@ spec:
     retention.ms: 604800000
 ---
 # Every tenant's latest state, key tenant_id, written by Tenant Management and
-# read in full by every API Gateway replica (ADR-0012, item 5, HAMSP-52).
+# read in full by every API Gateway replica (ADR-0012, item 5).
 # Compacted: the latest state per tenant is kept forever.
 apiVersion: kafka.strimzi.io/v1
 kind: KafkaTopic
