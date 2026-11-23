@@ -28,7 +28,6 @@ func TestUserAuthorizations(t *testing.T) {
 func TestAuthorizationLifecycle(t *testing.T) {
 	e := newEnv(t)
 	var made Created
-	// Without org_id the roles are given on behalf of the project's owner.
 	expect(t, e.do("POST", "/api/authorizations", AuthorizationCreate{UserId: "ann", ProjectId: "p-api", RoleKeys: []string{"reader", " reader "}}),
 		http.StatusCreated, &made)
 	if made.Id == "" || e.z.newGrant != [3]string{"ann", "p-api", "org-zitadel"} || !slices.Equal(e.z.roleKeys, []string{"reader"}) {

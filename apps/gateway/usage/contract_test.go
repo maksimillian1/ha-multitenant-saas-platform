@@ -14,11 +14,9 @@ import (
 	"github.com/maksimillian1/ha-multitenant-saas-platform/apps/gateway/core"
 )
 
-// The usage event contract (docs/contracts/usage-event, ADR-0010).
 const contracts = "../../../docs/contracts/usage-event"
 
-// shape is the JSON kind of every field, objects recursively, so a renamed,
-// missing, extra or retyped field changes it while the values do not matter.
+// Only kinds, so a renamed, missing, extra or retyped field changes the shape while values do not.
 func shape(v any) any {
 	switch v := v.(type) {
 	case map[string]any:
@@ -54,8 +52,6 @@ func decodeJSON(t *testing.T, r io.Reader) any {
 	return v
 }
 
-// examples returns the HTTP versions the gateway declares in participants.json
-// and, per version, the first example of its request schema.
 func examples(t *testing.T) map[string]any {
 	t.Helper()
 	raw, err := os.ReadFile(contracts + "/participants.json")
@@ -94,14 +90,11 @@ func examples(t *testing.T) map[string]any {
 	return out
 }
 
-// What the API Gateway sends for an API call has the shape of the first event
-// of the example of every HTTP version it declares: the same fields and
-// attributes, of the same kinds.
 func TestSentEventMatchesDeclaredVersion(t *testing.T) {
 	for v, example := range examples(t) {
 		t.Run(v, func(t *testing.T) {
 			want := example.(map[string]any)
-			want["events"] = want["events"].([]any)[:1] // the event with attributes
+			want["events"] = want["events"].([]any)[:1]
 
 			bodies := make(chan any, 1)
 			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -122,7 +115,7 @@ func TestSentEventMatchesDeclaredVersion(t *testing.T) {
 	}
 }
 
-// mustJSON prints a shape; encoding/json sorts map keys, so equal shapes print equally.
+// encoding/json sorts map keys, so equal shapes print equally.
 func mustJSON(t *testing.T, v any) string {
 	t.Helper()
 	b, err := json.Marshal(v)

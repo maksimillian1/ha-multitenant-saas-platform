@@ -11,22 +11,14 @@ import (
 	"github.com/maksimillian1/ha-multitenant-saas-platform/apps/usage/internal/kafka"
 )
 
-// ReplaySpec chooses DLQ records: offsets From to To, both included, of one
-// partition of the DLQ topic.
+// From and To are both included.
 type ReplaySpec struct {
 	Partition int32
 	From, To  int64
 }
 
-// Replay is writer replay (HAMSP-30): it puts the chosen DLQ records back on
-// the usage topic with the same key and value, the original headers and
-// replayed-from=dlq, and returns how many it wrote. It runs as the KafkaUser
-// usage-replay, which may read only the DLQ and write only the usage topic.
-//
-// Replaying is safe to repeat: the writer's dedup key (tenant_id, event_id,
-// event_time) stores an event once however often it arrives (ADR-0007). A
-// record that is still poison goes back to the DLQ. Replay is not for events
-// of a closed billing period: that rule is open (HAMSP-30, Open questions).
+// Repeating is safe: the dedup key stores an event once (ADR-0007). Not for events of a closed
+// billing period: that rule is still open.
 func Replay(ctx context.Context, brokers []string, dlqTopic, usageTopic string, spec ReplaySpec, extra ...kgo.Opt) (int, error) {
 	if spec.From < 0 || spec.To < spec.From {
 		return 0, fmt.Errorf("offsets %d to %d: want 0 <= from <= to", spec.From, spec.To)
@@ -79,8 +71,6 @@ func Replay(ctx context.Context, brokers []string, dlqTopic, usageTopic string, 
 	return len(out), nil
 }
 
-// replayRecord is the usage topic copy of a DLQ record: the DLQ headers are
-// dropped, replayed-from is added.
 func replayRecord(r *kgo.Record) *kgo.Record {
 	headers := make([]kgo.RecordHeader, 0, len(r.Headers)+1)
 	for _, h := range r.Headers {

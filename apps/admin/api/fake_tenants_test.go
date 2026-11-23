@@ -12,19 +12,14 @@ import (
 	"github.com/maksimillian1/ha-multitenant-saas-platform/apps/admin/tenants"
 )
 
-// fakeTenants is an in-memory Tenant Management with its state rules. It
-// records every call with the admin who made it, so a test can check that
-// nothing reached it and who was named.
 type fakeTenants struct {
 	mu      sync.Mutex
 	calls   []string // "Method admin id"
-	err     error    // every call fails with it when set
+	err     error
 	tenants map[string]*tenants.Tenant
 	nextID  int
 }
 
-// newFakeTenants holds three tenants: active, suspended and one whose
-// provisioning stopped after the organization step.
 func newFakeTenants() *fakeTenants {
 	f := &fakeTenants{tenants: map[string]*tenants.Tenant{}}
 	for _, t := range []tenants.Tenant{
@@ -107,7 +102,6 @@ func (f *fakeTenants) Create(_ context.Context, admin string, in tenants.Create)
 	return *t, nil
 }
 
-// change applies a state change allowed only from the states in from.
 func (f *fakeTenants) change(method, admin, id string, from []string, apply func(*tenants.Tenant)) (tenants.Tenant, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()

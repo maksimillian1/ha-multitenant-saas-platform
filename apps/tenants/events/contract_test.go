@@ -43,10 +43,6 @@ func loadSchema(t *testing.T) recordSchema {
 	return s
 }
 
-// Every state Tenant Management has is in the contract, and every record it
-// publishes has exactly the contract's fields, the key equal to tenant_id and
-// an RFC 3339 time.
-//
 // Verifies: tenant-management T-02; AC-18
 // Verifies: kafka-client-auth T-02
 func TestRecordsMatchContract(t *testing.T) {

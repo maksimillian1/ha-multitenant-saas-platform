@@ -1,8 +1,5 @@
-// Package events publishes every tenant's state to the compacted Kafka topic
-// tenant-states, keyed by tenant_id (ADR-0012, item 5). The API Gateway reads
-// it and rejects a tenant that is suspended or deleted. Publishing is best
-// effort: the admin's request never fails on it, and Resync, run every
-// minute, repairs a publish that was lost.
+// Package events publishes best effort: requests never fail on it, and the per-minute Resync
+// repairs lost publishes (ADR-0012, item 5).
 package events
 
 import (
@@ -54,14 +51,13 @@ func (p *Publisher) Close() {
 	p.client.Close()
 }
 
-// Publish sends t's state and logs a failure instead of returning it.
 func (p *Publisher) Publish(ctx context.Context, t core.Tenant) {
 	if err := p.send(ctx, []core.Tenant{t}); err != nil {
 		p.log.Error("publishing the tenant state failed; the next resync repairs it", "tenant_id", t.ID, "state", t.State, "err", err)
 	}
 }
 
-// Resync publishes the state of every tenant, deleted ones included.
+// Deleted tenants are included.
 func (p *Publisher) Resync(ctx context.Context, list func(context.Context) ([]core.Tenant, error)) error {
 	tenants, err := list(ctx)
 	if err != nil {
@@ -70,7 +66,6 @@ func (p *Publisher) Resync(ctx context.Context, list func(context.Context) ([]co
 	return p.send(ctx, tenants)
 }
 
-// Run resyncs at start and then every interval until ctx ends.
 func (p *Publisher) Run(ctx context.Context, every time.Duration, list func(context.Context) ([]core.Tenant, error)) {
 	for {
 		if err := p.Resync(ctx, list); err != nil && ctx.Err() == nil {
@@ -108,9 +103,8 @@ func (p *Publisher) send(ctx context.Context, tenants []core.Tenant) error {
 	case err := <-done:
 		return err
 	case <-ctx.Done():
-		// franz-go keeps a record that waits for metadata past ctx. A new
-		// client drops it, so a long outage neither blocks nor fills a buffer;
-		// the resync sends the states again.
+		// franz-go keeps a record waiting for metadata past ctx; a new client drops it, so an outage
+		// neither blocks nor fills a buffer.
 		fresh, err := kgo.NewClient(p.opts...)
 		if err != nil {
 			return err

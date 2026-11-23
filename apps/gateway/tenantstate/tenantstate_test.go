@@ -70,7 +70,6 @@ func TestSuspendedTenantIsBlocked(t *testing.T) {
 		eventually(t, s+" tenant is not blocked", func() bool { return states.Blocked("c-" + s) })
 	}
 
-	// Kafka goes away: the last state read stays.
 	cluster.Close()
 	time.Sleep(100 * time.Millisecond)
 	if !states.Blocked("a") || states.Blocked("b") {

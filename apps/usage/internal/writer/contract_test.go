@@ -18,8 +18,6 @@ func records(values ...[]byte) []*kgo.Record {
 	return rs
 }
 
-// Usage Writer reads the examples of every Kafka version it declares in
-// participants.json.
 // Verifies: kafka-client-auth T-02
 func TestReadsEveryConsumedVersion(t *testing.T) {
 	for _, v := range contracttest.Consumes(t, "kafka", "writer") {
@@ -37,9 +35,7 @@ func TestReadsEveryConsumedVersion(t *testing.T) {
 	}
 }
 
-// A record written before schema_version existed is read as version 1 while
-// such records can still be in the topic. It does not match the current
-// record schema, so it lives here and not among the schema's examples.
+// Such records can still be in the topic; they do not match the current schema, so not among its examples.
 func TestReadsRecordWithoutSchemaVersion(t *testing.T) {
 	w := &Service{Log: quiet}
 	legacy := []byte(`{"event_id": "0192f6a8-7c1e-7b3a-9c4d-2f1e8a6b5c3d", "event_time": "2026-10-24T20:15:03.123Z",
@@ -51,8 +47,6 @@ func TestReadsRecordWithoutSchemaVersion(t *testing.T) {
 	}
 }
 
-// A schema version newer than this writer goes to the DLQ, not stored
-// half-understood and not skipped (HAMSP-30).
 // Verifies: usage-writer AC-1
 func TestSendsNewerVersionToDLQ(t *testing.T) {
 	w := &Service{Log: quiet}

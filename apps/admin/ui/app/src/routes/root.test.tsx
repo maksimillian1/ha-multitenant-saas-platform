@@ -7,7 +7,6 @@ import { renderApp } from '@/test/render'
 
 type User = ReturnType<typeof renderApp>['user']
 
-// pickTheme picks a theme in the user menu at the foot of the sidebar.
 async function pickTheme(user: User, theme: 'Light' | 'Dark' | 'System') {
   const sidebar = await screen.findByRole('complementary')
   await user.click(within(sidebar).getByRole('button', { name: new RegExp(me.name) }))
@@ -31,7 +30,6 @@ describe('layout', () => {
     await user.click(screen.getByRole('button', { name: 'Collapse sidebar' }))
 
     expect(within(sidebar).queryByText('Manage')).not.toBeInTheDocument()
-    // The label stays for screen readers and becomes the tooltip.
     const orgs = within(sidebar).getByRole('link', { name: 'Organizations' })
     expect(orgs).toHaveAttribute('title', 'Organizations')
     expect(screen.getByRole('button', { name: 'Expand sidebar' })).toHaveAttribute('aria-expanded', 'false')
@@ -111,7 +109,6 @@ describe('layout', () => {
 
     await waitFor(() => expect(document.getElementById('platform-brand')).not.toBeNull())
     const css = document.getElementById('platform-brand')?.textContent
-    // A light primary gets dark text, a dark one light text.
     expect(css).toContain(':root { --primary: #facc15; --primary-foreground: #0a0a0a;')
     expect(css).toContain('.dark { --primary: #1e3a8a; --primary-foreground: #fafafa;')
 
@@ -123,7 +120,6 @@ describe('layout', () => {
     const icon = () => sidebar.querySelector('img[alt=""]')?.getAttribute('src')
     expect(icon()).toMatch(/^\/api\/platform\/branding\/assets\/icon\?version=active/)
 
-    // The dark theme takes the dark icon; there is no dark logo, so the logo stays.
     await pickTheme(user, 'Dark')
     expect(icon()).toMatch(/^\/api\/platform\/branding\/assets\/icon-dark\?/)
     expect(within(sidebar).getByRole('img', { name: 'HAMSP admin' }).getAttribute('src')).toMatch(/\/logo\?/)
@@ -132,7 +128,6 @@ describe('layout', () => {
   it('falls back to the built-in look', async () => {
     for (const answer of [
       apiError(502, 'Zitadel refused the admin app\'s service account'),
-      // Nothing usable set: no assets, and colors that are not #rrggbb.
       {
         ...platformBranding,
         active: {
@@ -145,7 +140,6 @@ describe('layout', () => {
       const api = mockApi({ ...signedIn, ...overview, 'GET /api/platform/branding': answer })
       const { unmount } = renderApp('/')
 
-      // The pages keep working.
       expect(await screen.findByRole('heading', { name: 'Overview' })).toBeInTheDocument()
       await waitFor(() => expect(api.sent('GET', '/api/platform/branding')).toHaveLength(1))
       expect(document.getElementById('platform-brand')).toBeNull()

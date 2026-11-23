@@ -1,7 +1,4 @@
-// Package store keeps ExampleApp items in PostgreSQL. Every query runs inside a
-// transaction that first sets app.current_tenant_id, so RLS limits it to one
-// tenant. This works with PgBouncer in transaction mode because the setting is
-// local to the transaction.
+// Package store works with PgBouncer in transaction mode because app.current_tenant_id is SET LOCAL.
 package store
 
 import (
@@ -22,9 +19,7 @@ type Postgres struct {
 
 var _ core.ItemStore = (*Postgres)(nil)
 
-// Open connects to the database as the application role. Statements use the
-// extended protocol with unnamed statements, which PgBouncer in transaction
-// mode supports.
+// Unnamed statements of the extended protocol, which PgBouncer in transaction mode supports.
 func Open(ctx context.Context, dsn string) (*Postgres, error) {
 	cfg, err := pgxpool.ParseConfig(dsn)
 	if err != nil {
@@ -111,8 +106,7 @@ func (s *Postgres) Delete(ctx context.Context, tenantID, id string) error {
 	})
 }
 
-// Connect retries for up to the deadline of ctx, because on a fresh cluster
-// the database may still be starting when the migration job runs.
+// On a fresh cluster the database may still be starting when the migration job runs.
 func Connect(ctx context.Context, log *slog.Logger, dsn string) (*pgx.Conn, error) {
 	for {
 		conn, err := pgx.Connect(ctx, dsn)

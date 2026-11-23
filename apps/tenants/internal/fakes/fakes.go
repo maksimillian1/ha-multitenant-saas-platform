@@ -1,5 +1,3 @@
-// Package fakes stands in for Zitadel and Kubernetes in tests of the
-// lifecycle and the API. It is imported by tests only.
 package fakes
 
 import (
@@ -11,17 +9,14 @@ import (
 	"github.com/maksimillian1/ha-multitenant-saas-platform/apps/tenants/core"
 )
 
-// Deps stands in for Zitadel and Kubernetes: it keeps what exists, logs
-// every call, and fails or blocks a call when told to.
 type Deps struct {
 	Mu         sync.Mutex
-	Orgs       map[string]bool // id → active
+	Orgs       map[string]bool
 	OrgNames   map[string]string
-	Admins     map[string]string // user id → org id
+	Admins     map[string]string
 	Namespaces map[string]bool
 	Calls      []string
-	// failNext[method] fails the next n calls of method; lostAnswer makes
-	// the call take effect and still fail, as if its answer were lost.
+	// lostAnswer makes the call take effect and still fail, as if its answer were lost.
 	FailNext   map[string]int
 	LostAnswer map[string]bool
 	FailWith   error
@@ -36,7 +31,6 @@ func New() *Deps {
 	}
 }
 
-// ErrTimeout is a client error that reports a timeout.
 var ErrTimeout = timeoutError{}
 
 type timeoutError struct{}
@@ -44,7 +38,6 @@ type timeoutError struct{}
 func (timeoutError) Error() string { return "deadline exceeded" }
 func (timeoutError) Timeout() bool { return true }
 
-// enter logs the call and decides its fate: fail before, fail after, or go.
 func (f *Deps) enter(ctx context.Context, method, arg string) (before, after error) {
 	f.Mu.Lock()
 	f.Calls = append(f.Calls, method+" "+arg)
@@ -169,7 +162,6 @@ func (f *Deps) ResetCalls() {
 	f.Mu.Unlock()
 }
 
-// exists reports the organization, admin and namespace of a tenant.
 func (f *Deps) Exists(id string) (org, admin, ns bool) {
 	f.Mu.Lock()
 	defer f.Mu.Unlock()

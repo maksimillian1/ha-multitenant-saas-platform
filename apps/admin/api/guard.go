@@ -9,16 +9,8 @@ import (
 	"github.com/maksimillian1/ha-multitenant-saas-platform/apps/admin/zitadel"
 )
 
-// checkCSRF protects state-changing requests against cross-site request
-// forgery (the risk ADR-0009 lists for the first mutation). The session
-// cookie is SameSite=Lax, and on top of that:
-//
-//   - the request must carry X-Requested-With, which a cross-site form cannot
-//     send and a cross-site fetch cannot send without a CORS preflight, which
-//     this server never answers;
-//   - Go's CrossOriginProtection rejects requests that the browser marks as
-//     cross-site (Sec-Fetch-Site) or whose Origin is neither the request's
-//     host nor PUBLIC_URL.
+// SameSite=Lax plus X-Requested-With (no cross-site form can send it, and we never answer a CORS
+// preflight) plus Go's CrossOriginProtection on Sec-Fetch-Site and Origin (ADR-0009).
 func (s *Service) checkCSRF(r *http.Request) error {
 	if r.Header.Get("X-Requested-With") != "XMLHttpRequest" {
 		return errors.New("no X-Requested-With: XMLHttpRequest header")
@@ -26,14 +18,12 @@ func (s *Service) checkCSRF(r *http.Request) error {
 	return s.csrf.Check(r)
 }
 
-// refusal is a change the API does not make because it would lock the admin
-// or the app itself out; it is answered with 409.
+// Answered with 409.
 type refusal struct{ message string }
 
 func (r *refusal) Error() string { return r.message }
 
-// checkUserChange refuses to lock, deactivate or delete the signed-in admin
-// or the app's own service account.
+// Refuses to lock out the signed-in admin or the app's own service account.
 func (s *Service) checkUserChange(ctx context.Context, admin core.Session, userID, verb string) error {
 	if userID == admin.Subject {
 		return &refusal{"You cannot " + verb + " your own user."}
@@ -48,8 +38,6 @@ func (s *Service) checkUserChange(ctx context.Context, admin core.Session, userI
 	return nil
 }
 
-// checkOrgChange refuses to deactivate the organization of the
-// signed-in admin or of the app's service account.
 func (s *Service) checkOrgChange(ctx context.Context, admin core.Session, orgID, verb string) error {
 	me, err := s.Zitadel.GetUser(ctx, admin.Subject)
 	switch {
@@ -68,8 +56,7 @@ func (s *Service) checkOrgChange(ctx context.Context, admin core.Session, orgID,
 	return nil
 }
 
-// checkAuthorizationChange refuses to change or remove the signed-in admin's
-// own role assignments, which could take away their admin role.
+// Changing their own role assignments could take away the admin's role.
 func (s *Service) checkAuthorizationChange(ctx context.Context, admin core.Session, id string) error {
 	a, err := s.Zitadel.GetAuthorization(ctx, id)
 	if err != nil {

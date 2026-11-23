@@ -7,10 +7,7 @@ import (
 	"testing"
 )
 
-// The writer exports how many records it sent to the DLQ, in the name the
-// alert rule in prototype/monitoring/usage-writer.rules.yaml uses; the rule
-// itself is tested with promtool (usage-writer.rules.test.yaml).
-//
+// The rule itself is tested with promtool.
 // Verifies: usage-writer AC-6
 func TestDLQCounterAndAlertRule(t *testing.T) {
 	w := &Service{Log: quiet}

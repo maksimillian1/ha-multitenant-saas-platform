@@ -12,37 +12,23 @@ import (
 	"strings"
 )
 
-// Branding is what Zitadel calls a label policy: the colors, flags and
-// assets of the login pages. The instance has one, the platform default;
-// an organization may have its own. Each has an active version, which the
-// login shows, and a preview (the draft), which every change writes to until
-// it is activated.
-//
-// v4.19.2 has no v2 API to change it, so these calls use the v1 REST gateway
-// (management API for an organization, admin API for the instance) and the
+// v4.19.2 has no v2 API to change label policies: these calls use the v1 REST gateway and the
 // assets API (internal/api/assets/generator/asset.yaml).
 
-// Scope is whose branding a call reads or changes. The zero Scope is
-// neither, and every call refuses it.
+// The zero Scope is neither, and every call refuses it.
 type Scope struct {
 	orgID    string
 	instance bool
 }
 
-// OrgScope is the branding of one organization: management API calls with
-// the x-zitadel-orgid header. The token needs policy.read and policy.write
-// on the organization (IAM_ORG_MANAGER has them).
+// Needs policy.read and policy.write on the organization (IAM_ORG_MANAGER has them).
 func OrgScope(orgID string) Scope { return Scope{orgID: orgID} }
 
-// InstanceScope is the instance's branding, the default of every
-// organization. The token needs iam.policy.read and iam.policy.write
-// (IAM_BRANDING_MANAGER, HAMSP-36).
+// Needs iam.policy.read and iam.policy.write (IAM_BRANDING_MANAGER).
 func InstanceScope() Scope { return Scope{instance: true} }
 
-// OrgID is the organization of an OrgScope, "" for the instance.
 func (s Scope) OrgID() string { return s.orgID }
 
-// IsInstance reports whether the scope is the instance's branding.
 func (s Scope) IsInstance() bool { return s.instance }
 
 var errNoScope = errors.New("zitadel: branding call without an organization or the instance")
@@ -68,8 +54,6 @@ func (s Scope) assetsPath() string {
 	return "/assets/v1/org/policy/label/"
 }
 
-// ThemeMode is policy.v1.ThemeMode: whether the login follows the browser
-// or is always light or dark.
 type ThemeMode string
 
 const (
@@ -78,9 +62,7 @@ const (
 	ThemeModeDark  ThemeMode = "THEME_MODE_DARK"
 )
 
-// BrandingSettings are the fields of a label policy that an add or update
-// request sets. Colors are hex values such as "#5469d4"; an empty one leaves
-// Zitadel's built-in color.
+// An empty color leaves Zitadel's built-in one.
 type BrandingSettings struct {
 	PrimaryColor        string    `json:"primaryColor"`
 	BackgroundColor     string    `json:"backgroundColor"`
@@ -95,9 +77,7 @@ type BrandingSettings struct {
 	ThemeMode           ThemeMode `json:"themeMode,omitempty"`
 }
 
-// Branding is policy.v1.LabelPolicy. IsDefault means an organization has no
-// branding of its own and shows the instance's. The asset URLs are object
-// names in Zitadel's store, set while the asset exists.
+// IsDefault: an organization without its own branding shows the instance's.
 type Branding struct {
 	BrandingSettings
 	Details     Details `json:"details"`
@@ -109,7 +89,6 @@ type Branding struct {
 	FontURL     string  `json:"fontUrl"`
 }
 
-// Asset is one file of a label policy.
 type Asset string
 
 const (
@@ -120,11 +99,9 @@ const (
 	AssetFont     Asset = "font"
 )
 
-// Assets lists every asset of a label policy.
 var Assets = []Asset{AssetLogo, AssetLogoDark, AssetIcon, AssetIconDark, AssetFont}
 
-// assetRoutes are the asset's path under the assets API and the last path
-// segment of its v1 remove call.
+// Asset path under the assets API, and the last segment of its v1 remove call.
 var assetRoutes = map[Asset][2]string{
 	AssetLogo:     {"logo", "logo"},
 	AssetLogoDark: {"logo/dark", "logo_dark"},
@@ -133,7 +110,6 @@ var assetRoutes = map[Asset][2]string{
 	AssetFont:     {"font", "font"},
 }
 
-// HasAsset reports whether the policy has the asset.
 func (b Branding) HasAsset(a Asset) bool {
 	switch a {
 	case AssetLogo:
@@ -150,13 +126,10 @@ func (b Branding) HasAsset(a Asset) bool {
 	return false
 }
 
-// MaxAssetSize is the largest logo, icon or font Zitadel accepts
-// (1 << 19 in internal/api/assets/login_policy.go).
+// 1 << 19 in internal/api/assets/login_policy.go.
 const MaxAssetSize = 512 << 10
 
-// GetBranding returns the active branding, or the draft with preview. For
-// an organization without its own branding it is the instance's, with
-// IsDefault set.
+// Without its own branding an organization gets the instance's, with IsDefault set.
 func (c *Client) GetBranding(ctx context.Context, s Scope, preview bool) (Branding, error) {
 	if err := s.check(); err != nil {
 		return Branding{}, err
@@ -174,7 +147,6 @@ func (c *Client) GetBranding(ctx context.Context, s Scope, preview bool) (Brandi
 	return resp.Policy, nil
 }
 
-// CreateOrgBranding gives an organization branding of its own, as a draft;
 // Zitadel answers already_exists if it has one.
 func (c *Client) CreateOrgBranding(ctx context.Context, orgID string, settings BrandingSettings) error {
 	s := OrgScope(orgID)
@@ -184,8 +156,7 @@ func (c *Client) CreateOrgBranding(ctx context.Context, orgID string, settings B
 	return c.rest(ctx, http.MethodPost, s.policyPath(), s, settings, nil)
 }
 
-// UpdateBranding changes the draft. An organization must have branding of
-// its own (CreateOrgBranding); Zitadel answers not_found otherwise.
+// An organization needs its own branding first (CreateOrgBranding), else not_found.
 func (c *Client) UpdateBranding(ctx context.Context, s Scope, settings BrandingSettings) error {
 	if err := s.check(); err != nil {
 		return err
@@ -193,7 +164,6 @@ func (c *Client) UpdateBranding(ctx context.Context, s Scope, settings BrandingS
 	return c.rest(ctx, http.MethodPut, s.policyPath(), s, settings, nil)
 }
 
-// ActivateBranding publishes the draft: the login shows it from now on.
 func (c *Client) ActivateBranding(ctx context.Context, s Scope) error {
 	if err := s.check(); err != nil {
 		return err
@@ -201,8 +171,6 @@ func (c *Client) ActivateBranding(ctx context.Context, s Scope) error {
 	return c.rest(ctx, http.MethodPost, s.policyPath()+"/_activate", s, struct{}{}, nil)
 }
 
-// ResetOrgBranding removes an organization's own branding, active and
-// draft, so that it shows the instance's again.
 func (c *Client) ResetOrgBranding(ctx context.Context, orgID string) error {
 	s := OrgScope(orgID)
 	if err := s.check(); err != nil {
@@ -211,7 +179,6 @@ func (c *Client) ResetOrgBranding(ctx context.Context, orgID string) error {
 	return c.rest(ctx, http.MethodDelete, s.policyPath(), s, nil, nil)
 }
 
-// RemoveBrandingAsset removes an asset from the draft.
 func (c *Client) RemoveBrandingAsset(ctx context.Context, s Scope, a Asset) error {
 	route, err := assetRoute(s, a)
 	if err != nil {
@@ -220,9 +187,7 @@ func (c *Client) RemoveBrandingAsset(ctx context.Context, s Scope, a Asset) erro
 	return c.rest(ctx, http.MethodDelete, s.policyPath()+"/"+route[1], s, nil, nil)
 }
 
-// UploadBrandingAsset puts an asset into the draft. Zitadel detects the type
-// from the content and refuses what is not an image (logo, icon) or a font,
-// or is larger than MaxAssetSize.
+// Zitadel refuses what is not an image or font by content, or is larger than MaxAssetSize.
 func (c *Client) UploadBrandingAsset(ctx context.Context, s Scope, a Asset, filename, contentType string, data []byte) error {
 	route, err := assetRoute(s, a)
 	if err != nil {
@@ -258,14 +223,12 @@ func (c *Client) UploadBrandingAsset(ctx context.Context, s Scope, a Asset, file
 	return nil
 }
 
-// AssetFile is the content of an asset.
 type AssetFile struct {
 	ContentType string
 	Data        []byte
 }
 
-// BrandingAsset downloads an asset of the active branding, or of the draft
-// with preview; not_found if the policy has none.
+// not_found if the policy has none.
 func (c *Client) BrandingAsset(ctx context.Context, s Scope, a Asset, preview bool) (AssetFile, error) {
 	route, err := assetRoute(s, a)
 	if err != nil {
@@ -300,8 +263,6 @@ func assetRoute(s Scope, a Asset) ([2]string, error) {
 	return route, nil
 }
 
-// rest sends a v1 REST gateway request with req as its JSON body (none if
-// nil) and decodes the answer into resp.
 func (c *Client) rest(ctx context.Context, method, path string, s Scope, req, resp any) error {
 	var body io.Reader
 	if req != nil {
@@ -321,9 +282,7 @@ func (c *Client) rest(ctx context.Context, method, path string, s Scope, req, re
 	return c.do(httpReq, resp)
 }
 
-// request builds a request to path; an organization's calls name it in the
-// x-zitadel-orgid header, without which Zitadel acts on the token's own
-// organization.
+// Without x-zitadel-orgid Zitadel acts on the token's own organization.
 func (c *Client) request(ctx context.Context, method, path string, s Scope, body io.Reader) (*http.Request, error) {
 	req, err := http.NewRequestWithContext(ctx, method, c.baseURL+path, body)
 	if err != nil {
@@ -335,8 +294,7 @@ func (c *Client) request(ctx context.Context, method, path string, s Scope, body
 	return req, nil
 }
 
-// assetError reads an error of the assets API, which answers in plain text
-// (http.Error) rather than in Connect or gateway JSON.
+// The assets API answers in plain text, not Connect or gateway JSON.
 func assetError(status int, body []byte) error {
 	msg := strings.TrimSpace(string(body))
 	if msg == "" {

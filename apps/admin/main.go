@@ -1,14 +1,5 @@
-// Command admin is the platform's super admin app: a Go backend for frontend
-// that serves the React SPA (ui/app) and its JSON API (openapi.yaml) to users
-// who sign in with Zitadel; the API answers only to the super-admin role of the
-// platform-admin project. It does its own OIDC sign-in and keeps the tokens on
-// the server; the browser holds only an encrypted session cookie. Its public
-// route does not go through the API Gateway, which accepts only bearer tokens.
-//
-// The API manages Zitadel's organizations, users, role assignments and
-// branding as the app's own service account admin-app, never with the
-// admin's token. It gets short-lived access tokens with the account's JWT
-// profile key (ZITADEL_KEY_FILE).
+// Command admin keeps OIDC tokens on the server; the browser holds only an encrypted cookie. Its
+// route bypasses the API Gateway, which accepts only bearer tokens.
 package main
 
 import (
@@ -76,8 +67,7 @@ func bootstrapServices(ctx context.Context, cfg core.Config, log *slog.Logger) (
 	}
 
 	authService := auth.NewService(provider, cookies, cfg.PublicURL, cfg.ClientID, log)
-	// The issuer client also reaches the Zitadel APIs and the token
-	// endpoint: same host, same in-cluster dial address.
+	// The issuer client also reaches the Zitadel APIs and the token endpoint: same host, same dial address.
 	key, err := zitadel.LoadKey("ZITADEL_KEY_FILE", cfg.ZitadelKeyFile)
 	if err != nil {
 		return nil, nil, nil, nil, err
@@ -87,8 +77,7 @@ func bootstrapServices(ctx context.Context, cfg core.Config, log *slog.Logger) (
 		return nil, nil, nil, nil, err
 	}
 	apiService := newAPIService(ctx, cfg, authService, tokens, issuerClient, log)
-	// Both service accounts are checked for credentials they should not
-	// have (a PAT, a second key, a long key); a finding is an ERROR event.
+	// A PAT, a second key or a long-lived key is logged as an ERROR event.
 	drift := &zitadel.DriftCheck{
 		Client: zitadel.NewClient(cfg.ZitadelURL, tokens, issuerClient),
 		Accounts: []zitadel.Account{
@@ -104,12 +93,8 @@ func bootstrapServices(ctx context.Context, cfg core.Config, log *slog.Logger) (
 	return authService, apiService, uiService, healthService, nil
 }
 
-// driftInterval is how often the service accounts' credentials are checked.
 const driftInterval = 5 * time.Minute
 
-// newAPIService builds the API with one Zitadel client, the admin app's
-// account, for every route; the platform branding uses it too (HAMSP-36).
-// Tenant Management gets the app's machine token from the issuer.
 func newAPIService(ctx context.Context, cfg core.Config, sessions core.SessionReader, tokens zitadel.Tokens, httpClient *http.Client, log *slog.Logger) *api.Service {
 	client := zitadel.NewClient(cfg.ZitadelURL, tokens, httpClient)
 	svc := api.NewService(sessions, client, client, cfg.AdminRole, cfg.PublicURL, log)
@@ -129,6 +114,5 @@ func newAPIService(ctx context.Context, cfg core.Config, sessions core.SessionRe
 	return svc
 }
 
-// tenantsTimeout is above Tenant Management's own limit for a deletion,
-// which waits for the namespace to go.
+// Above Tenant Management's own limit for a deletion, which waits for the namespace to go.
 const tenantsTimeout = 4 * time.Minute

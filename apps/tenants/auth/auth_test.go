@@ -48,7 +48,6 @@ func sign(t *testing.T, key jose.JSONWebKey, claims map[string]any) string {
 	return tok
 }
 
-// newTestVerifier serves the public part of key as the issuer's JWKS.
 func newTestVerifier(t *testing.T, key jose.JSONWebKey) *Verifier {
 	t.Helper()
 	jwks := jose.JSONWebKeySet{Keys: []jose.JSONWebKey{key.Public()}}

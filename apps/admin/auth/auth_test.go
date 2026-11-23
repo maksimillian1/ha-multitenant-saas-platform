@@ -21,7 +21,6 @@ const (
 	endSession = "http://zitadel.test/oidc/v1/end_session"
 )
 
-// fakeProvider is the part of the relying party that LogoutHandler uses.
 type fakeProvider struct{ rp.RelyingParty }
 
 func (fakeProvider) GetEndSessionEndpoint() string { return endSession }
@@ -30,7 +29,6 @@ func newTestService(key string) *Service {
 	return NewService(fakeProvider{}, NewCookies(key), "http://admin.test", "client", slog.New(slog.NewTextHandler(io.Discard, nil)))
 }
 
-// withSession returns a request carrying the cookie that s set for session.
 func withSession(t *testing.T, s *Service, session core.Session) *http.Request {
 	t.Helper()
 	rec := httptest.NewRecorder()
@@ -54,7 +52,7 @@ func TestSessionRoundTrip(t *testing.T) {
 }
 
 func TestSessionCookieCannotBeForged(t *testing.T) {
-	// A cookie made with another key, as an attacker without SESSION_KEY would.
+	// Made with another key, as an attacker without SESSION_KEY would.
 	r := withSession(t, newTestService(strings.Repeat("x", 32)), core.Session{
 		Subject: "1", Roles: []string{"super-admin"}, Expires: time.Now().Add(time.Hour),
 	})

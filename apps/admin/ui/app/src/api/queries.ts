@@ -21,9 +21,8 @@ export type OrgListParams = NonNullable<operations['listOrgs']['parameters']['qu
 export type UserListParams = NonNullable<operations['listUsers']['parameters']['query']>
 export type ProjectListParams = NonNullable<operations['listProjects']['parameters']['query']>
 
-// PAGE_SIZE is the page size of every list; the API allows up to 100.
+// The API allows up to 100.
 export const PAGE_SIZE = 20
-// MAX_OPTIONS is how many organizations or projects a picker offers.
 export const MAX_OPTIONS = 100
 
 // Query keys start with the resource, so a change can refresh what it touches.
@@ -98,8 +97,7 @@ export const projectAuthorizationsQuery = (projectId: string) =>
       unwrap(api.GET('/api/projects/{projectId}/authorizations', { params: { path: { projectId } }, signal })),
   })
 
-// Tenants come from Tenant Management; the list has no paging (a few
-// thousand tenants at most).
+// No paging: a few thousand tenants at most.
 export const tenantsQuery = (includeDeleted: boolean) =>
   queryOptions({
     queryKey: ['tenants', 'list', { includeDeleted }],
@@ -113,8 +111,6 @@ export const tenantQuery = (tenantId: string) =>
     queryFn: ({ signal }) => unwrap(api.GET('/api/tenants/{tenantId}', { params: { path: { tenantId } }, signal })),
   })
 
-// failedTenant is the tenant in the answer of a failed tenant change: the
-// change stopped at a step and the tenant is as the failure left it.
 export function failedTenant(error: unknown): Tenant | undefined {
   if (error instanceof ApiError && error.body && typeof error.body === 'object' && 'tenant' in error.body) {
     return (error.body as { tenant?: Tenant }).tenant
@@ -122,10 +118,7 @@ export function failedTenant(error: unknown): Tenant | undefined {
   return undefined
 }
 
-// useChange runs a change against the API. On success it refreshes every
-// cached query (a rename shows up in lists, a new user in the counts) and
-// shows the success text; on failure it shows the server's message, unless
-// the caller handles errors itself (forms show them in place).
+// Refreshes every cached query: a rename shows up in lists, a new user in the counts.
 export function useChange<TVars, TData>(
   change: (vars: TVars) => Promise<TData>,
   options: {
@@ -160,13 +153,10 @@ export type ThemeMode = Schemas['ThemeMode']
 
 export const brandingAssets: BrandingAssetName[] = ['logo', 'logo-dark', 'icon', 'icon-dark', 'font']
 
-// MAX_ASSET_SIZE is Zitadel's limit for a logo, icon or font; the API
-// refuses larger files too (413).
+// Zitadel's limit; the API refuses larger files too (413).
 export const MAX_ASSET_SIZE = 512 * 1024
 
-// BrandingScope is whose branding a page edits: an organization's, or the
-// platform's (the instance's), which every organization without its own
-// inherits.
+// The platform branding is inherited by every organization without its own.
 export type BrandingScope = { orgId: string } | 'platform'
 
 const scopeKey = (scope: BrandingScope) => (scope === 'platform' ? 'platform' : scope.orgId)
@@ -180,16 +170,14 @@ export const brandingQuery = (scope: BrandingScope) =>
         : unwrap(api.GET('/api/orgs/{orgId}/branding', { params: { path: { orgId: scope.orgId } }, signal })),
   })
 
-// platformBrandingQuery is what the layout applies to the admin app itself.
-// It is not retried: without it the app keeps its built-in look.
+// Not retried: without it the app keeps its built-in look.
 export const platformBrandingQuery = queryOptions({
   ...brandingQuery('platform'),
   retry: false,
   staleTime: 5 * 60_000,
 })
 
-// assetUrl is where the BFF serves an asset of the active version or of the
-// draft; stamp changes the URL after an upload, so the browser loads it again.
+// stamp changes the URL after an upload, so the browser loads it again.
 export function assetUrl(scope: BrandingScope, asset: BrandingAssetName, version: 'active' | 'draft', stamp?: number) {
   const base = scope === 'platform' ? '/api/platform/branding' : `/api/orgs/${encodeURIComponent(scope.orgId)}/branding`
   const query = new URLSearchParams({ version })
@@ -199,10 +187,8 @@ export function assetUrl(scope: BrandingScope, asset: BrandingAssetName, version
   return `${base}/assets/${asset}?${query}`
 }
 
-// brandingCalls are the changes of one scope's branding.
 export function brandingCalls(scope: BrandingScope) {
-  // openapi-fetch sends FormData as it is, with the browser's multipart
-  // boundary; the schema types the part as a string.
+  // openapi-fetch sends FormData as is; the schema types the part as a string.
   const fileBody = (file: File) => {
     const form = new FormData()
     form.append('file', file)

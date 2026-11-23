@@ -6,7 +6,6 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 
-// PageHeader is the title row of a page, with its actions on the right.
 export function PageHeader({
   title,
   description,
@@ -32,7 +31,6 @@ export function PageHeader({
   )
 }
 
-// DetailList shows label and value pairs.
 export function DetailList({ items }: { items: Array<{ label: string; value: ReactNode }> }) {
   return (
     <dl className="grid grid-cols-[minmax(7rem,auto)_1fr] gap-x-4 gap-y-3 text-sm">
@@ -50,8 +48,6 @@ export function Mono({ children }: { children: ReactNode }) {
   return <code className="font-mono text-xs break-all">{children}</code>
 }
 
-// QueryView renders a query's data, or a skeleton while it loads and an
-// error with a retry button when it fails.
 export function QueryView<T>({
   query,
   children,

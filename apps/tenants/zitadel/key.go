@@ -9,10 +9,7 @@ import (
 	"os"
 )
 
-// Key is a JWT profile key of a Zitadel machine user, in the JSON form
-// Zitadel issues it ({"type":"serviceaccount","keyId":...,"key":...,"userId":...}).
-// The private key signs the assertions the client exchanges for access
-// tokens; it is never sent.
+// The private key signs assertions for access tokens; it is never sent.
 type Key struct {
 	Type   string `json:"type"`
 	KeyID  string `json:"keyId"`
@@ -20,8 +17,7 @@ type Key struct {
 	UserID string `json:"userId"`
 }
 
-// LoadKey reads the key file at path. setting names where the path came
-// from (ZITADEL_KEY_FILE) for the error. Errors never contain the key.
+// Errors never contain the key.
 func LoadKey(setting, path string) (Key, error) {
 	if path == "" {
 		return Key{}, fmt.Errorf("%s is not set", setting)
@@ -41,7 +37,7 @@ func LoadKey(setting, path string) (Key, error) {
 	return k, nil
 }
 
-// ParseKey parses and checks a key file. Errors never contain the key.
+// Errors never contain the key.
 func ParseKey(data []byte) (Key, error) {
 	var k Key
 	if err := json.Unmarshal(data, &k); err != nil {

@@ -8,7 +8,6 @@ import (
 	"testing"
 )
 
-// contractExamples are the examples of docs/contracts/tenant-states/record.v1.json.
 func contractExamples(t *testing.T) []json.RawMessage {
 	t.Helper()
 	_, file, _, _ := runtime.Caller(0)
@@ -25,10 +24,7 @@ func contractExamples(t *testing.T) []json.RawMessage {
 	return schema.Examples
 }
 
-// The Gateway reads every example of the contract, in order: the latest state
-// wins, suspended, deleting and deleted block, other states pass, and a state
-// it does not know keeps the tenant's earlier one.
-//
+// An unknown state keeps the tenant's earlier one.
 // Verifies: gateway-auth AC-2; tenant-management T-02
 // Verifies: kafka-client-auth T-02
 func TestContractExamples(t *testing.T) {
@@ -41,10 +37,10 @@ func TestContractExamples(t *testing.T) {
 		s.apply(e)
 	}
 	for tenant, want := range map[string]bool{
-		"396438053259838069": true,  // active, then suspended
-		"396438053259838070": true,  // deleting
-		"396438053259838071": true,  // deleted
-		"396438053259838072": false, // provisioning
+		"396438053259838069": true,
+		"396438053259838070": true,
+		"396438053259838071": true,
+		"396438053259838072": false,
 	} {
 		if got := s.Blocked(tenant); got != want {
 			t.Errorf("%s: blocked %v, want %v", tenant, got, want)

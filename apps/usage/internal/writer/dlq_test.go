@@ -17,8 +17,6 @@ import (
 	"github.com/maksimillian1/ha-multitenant-saas-platform/apps/usage/internal/kafka"
 )
 
-// fakeDLQ keeps what the writer sends to the DLQ and can fail like a DLQ
-// topic that Kafka does not confirm.
 type fakeDLQ struct {
 	mu       sync.Mutex
 	got      []kafka.Poison
@@ -47,8 +45,6 @@ func (d *fakeDLQ) values() [][]byte {
 	return out
 }
 
-// waitForDLQ waits until exactly want records are in the DLQ and checks the
-// count stays there.
 func waitForDLQ(t *testing.T, d *fakeDLQ, want int, within time.Duration) [][]byte {
 	t.Helper()
 	deadline := time.Now().Add(within)
@@ -63,8 +59,6 @@ func waitForDLQ(t *testing.T, d *fakeDLQ, want int, within time.Duration) [][]by
 	return got
 }
 
-// produceRaw writes values to the usage topic as they are, bypassing
-// UsageWriteAPI, the way a buggy or outdated producer would.
 func (p *pipeline) produceRaw(key string, values ...[]byte) {
 	p.t.Helper()
 	client, err := kgo.NewClient(kgo.SeedBrokers(p.brokers...), kgo.DefaultProduceTopic(topic))
@@ -110,10 +104,7 @@ func containsAll(t *testing.T, got [][]byte, want ...[]byte) {
 	}
 }
 
-// A record that does not decode goes to the DLQ with its bytes unchanged, and
-// the records after it on the partition are stored. With the old skip the
-// record is not in the DLQ and this test fails (T-12 canary).
-//
+// With the old skip this test fails (T-12 canary).
 // Verifies: usage-writer AC-1; T-12
 func TestUndecodableRecordGoesToDLQ(t *testing.T) {
 	p := newPipeline(t)
@@ -123,9 +114,9 @@ func TestUndecodableRecordGoesToDLQ(t *testing.T) {
 	noTenant := newEvent("tenant-a")
 	noTenant.TenantID = ""
 	poison := [][]byte{
-		[]byte(`{"schema_version":1,"event_id":`),                // bad JSON
-		rawEvent(t, noTenant, core.SchemaVersion),                // tenant_id missing
-		rawEvent(t, newEvent("tenant-a"), core.SchemaVersion+98), // newer than this writer
+		[]byte(`{"schema_version":1,"event_id":`),
+		rawEvent(t, noTenant, core.SchemaVersion),
+		rawEvent(t, newEvent("tenant-a"), core.SchemaVersion+98),
 	}
 	p.produceRaw("tenant-a", poison...)
 	after := []core.Event{newEvent("tenant-a"), newEvent("tenant-b")}
@@ -137,9 +128,6 @@ func TestUndecodableRecordGoesToDLQ(t *testing.T) {
 	containsAll(t, waitForDLQ(t, dlq, len(poison), 10*time.Second), poison...)
 }
 
-// A record that decodes but breaks the contract (quantity 0) goes to the DLQ
-// before the database; the rest of the same fetch is stored.
-//
 // Verifies: usage-writer AC-2
 func TestInvalidEventGoesToDLQBeforeStore(t *testing.T) {
 	p := newPipeline(t)
@@ -149,8 +137,7 @@ func TestInvalidEventGoesToDLQBeforeStore(t *testing.T) {
 
 	bad := newEvent("tenant-a")
 	bad.Quantity = 0
-	// Older than UsageWriteAPI's 7-day window: the writer checks the contract
-	// without the window, so a late event is still stored.
+	// Older than UsageWriteAPI's 7-day window, still stored.
 	late := newEvent("tenant-a")
 	late.Time = time.Now().Add(-10 * 24 * time.Hour).UTC()
 	good := newEvent("tenant-b")
@@ -163,9 +150,6 @@ func TestInvalidEventGoesToDLQBeforeStore(t *testing.T) {
 	}
 }
 
-// While the DLQ cannot be written, no offset is committed: after a restart
-// with a working DLQ the poison record is there and the good one stored once.
-//
 // Verifies: usage-writer AC-5
 func TestFailedDLQWriteCommitsNoOffset(t *testing.T) {
 	p := newPipeline(t)
@@ -191,7 +175,6 @@ func TestFailedDLQWriteCommitsNoOffset(t *testing.T) {
 	p.waitForCount([]core.Event{good}, 1, 20*time.Second)
 }
 
-// recordingStore remembers every event ID the writer asked it to store.
 type recordingStore struct {
 	next core.EventWriter
 	mu   sync.Mutex
@@ -216,12 +199,7 @@ func (s *recordingStore) saw(id string) bool {
 	return s.ids[id]
 }
 
-// A record that passes the contract but that the database rejects as bad data
-// (here a NUL in attributes: valid JSON, invalid jsonb, SQLSTATE 22P05) is
-// found by splitting the batch; it goes to the DLQ and every other event of
-// the batch, of both tenants, is stored once. Without the split the whole
-// batch is retried forever and this test fails (T-12 canary).
-//
+// NUL in attributes: valid JSON, invalid jsonb (22P05). Without the split the batch retries forever.
 // Verifies: usage-writer AC-3; T-01; T-12
 func TestDatabasePoisonIsIsolatedByBisection(t *testing.T) {
 	p := newPipeline(t)
@@ -239,7 +217,7 @@ func TestDatabasePoisonIsIsolatedByBisection(t *testing.T) {
 			values = append(values, rawEvent(t, bad, core.SchemaVersion))
 		}
 	}
-	// One key, so all records are on one partition and arrive in one fetch.
+	// One key, so all records arrive in one fetch.
 	p.produceRaw("mixed", values...)
 	p.startWriter(p.st, dlq, nil)
 

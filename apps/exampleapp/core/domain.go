@@ -7,13 +7,12 @@ import (
 	"time"
 )
 
-// TenantHeader carries the tenant. The API Gateway sets it from the validated
-// JWT and never takes it from the client (docs/contracts/gateway-headers.md).
+// The API Gateway sets it from the JWT, never from the client (docs/contracts/gateway-headers.md).
 const TenantHeader = "x-tenant-id"
 
 var TenantRe = regexp.MustCompile(`^[A-Za-z0-9_-]{1,64}$`)
 
-// ErrNotFound is returned when the item does not exist or belongs to another tenant.
+// Also returned for another tenant's item, so IDs are not probed.
 var ErrNotFound = errors.New("item not found")
 
 type Item struct {
@@ -23,7 +22,6 @@ type Item struct {
 	CreatedAt time.Time `json:"created_at"`
 }
 
-// ItemStore keeps items per tenant. Every call sees only tenantID's items.
 type ItemStore interface {
 	Create(ctx context.Context, tenantID, name string) (Item, error)
 	List(ctx context.Context, tenantID string) ([]Item, error)

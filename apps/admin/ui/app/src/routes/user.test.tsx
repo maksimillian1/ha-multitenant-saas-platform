@@ -75,7 +75,6 @@ describe('user page', () => {
     await user.clear(within(dialog).getByLabelText('Repeat the password'))
     await user.type(within(dialog).getByLabelText('Repeat the password'), 'Secret1')
     await user.click(within(dialog).getByRole('button', { name: 'Set password' }))
-    // Zitadel's password policy decides; its answer shows in the dialog.
     expect(await within(dialog).findByText('Password must contain a symbol (COMMA-ZBlk2)')).toBeInTheDocument()
     expect(api.sent('POST', '/api/users/ann/password')[0].body).toEqual({ password: 'Secret1', change_required: true })
   })
@@ -132,7 +131,6 @@ describe('user page', () => {
     for (const name of ['Lock', 'Deactivate', 'Delete']) {
       expect(screen.getByRole('button', { name })).toBeDisabled()
     }
-    // Nor change their own role assignments.
     expect(await screen.findByRole('button', { name: 'Edit roles in platform-admin' })).toBeDisabled()
     expect(screen.getByRole('button', { name: 'Remove the role assignment in platform-admin' })).toBeDisabled()
   })

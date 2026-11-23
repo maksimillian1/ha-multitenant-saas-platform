@@ -5,21 +5,19 @@ import (
 	"time"
 )
 
-// Credential kinds of a machine user.
 const (
 	CredentialKey                 = "key"
 	CredentialPersonalAccessToken = "personal_access_token"
 )
 
-// Credential is a key or a personal access token of a machine user, without
-// its secret, which Zitadel never returns after creation.
+// Zitadel never returns the secret after creation.
 type Credential struct {
 	Kind    string
 	ID      string
 	Expires time.Time // zero: never
 }
 
-// maxCredentials bounds one listing; a machine user of ours has one key.
+// A machine user of ours has one key.
 const maxCredentials = 100
 
 type userIDFilter struct {
@@ -33,8 +31,6 @@ type credentialList struct {
 	} `json:"result"`
 }
 
-// ListCredentials returns the keys and the personal access tokens of a
-// machine user (user.v2 ListKeys and ListPersonalAccessTokens).
 func (c *Client) ListCredentials(ctx context.Context, userID string) ([]Credential, error) {
 	req := struct {
 		Pagination *pagination    `json:"pagination"`
@@ -63,8 +59,7 @@ func (c *Client) ListCredentials(ctx context.Context, userID string) ([]Credenti
 	return out, nil
 }
 
-// UserIDByName returns the ID of the user with exactly this user name in any
-// organization, or "" when there is none.
+// "" when there is none.
 func (c *Client) UserIDByName(ctx context.Context, userName string) (string, error) {
 	req := struct {
 		Query   *pagination `json:"query"`

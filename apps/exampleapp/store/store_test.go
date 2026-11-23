@@ -15,9 +15,7 @@ import (
 	"github.com/maksimillian1/ha-multitenant-saas-platform/apps/exampleapp/core"
 )
 
-// These tests need a PostgreSQL superuser DSN in TEST_DATABASE_URL, e.g.
-// postgres://postgres:postgres@localhost:5432/postgres?sslmode=disable.
-// CI sets it (.github/workflows/exampleapp.yml); locally they are skipped without it.
+// Needs a superuser DSN in TEST_DATABASE_URL; skipped without it.
 
 const (
 	ownerRole = "exampleapp_owner"
@@ -41,8 +39,6 @@ func dsnFor(t *testing.T, base, user, db string) string {
 	return u.String()
 }
 
-// newTestDB creates the two roles like the CNPG cluster does and a fresh
-// database owned by the owner role, then applies the migrations as the owner.
 func newTestDB(t *testing.T) testDB {
 	t.Helper()
 	base := os.Getenv("TEST_DATABASE_URL")
@@ -96,7 +92,6 @@ func openStore(t *testing.T, db testDB) *Postgres {
 	return st
 }
 
-// AC-10: the migrations leave no multi-tenant table without enabled and forced RLS.
 func TestMigrationsLeaveNoUnprotectedTables(t *testing.T) {
 	db := newTestDB(t)
 	ctx := context.Background()
@@ -112,8 +107,6 @@ func TestMigrationsLeaveNoUnprotectedTables(t *testing.T) {
 	}
 }
 
-// AC-10 negative fixture: the check reports a table without RLS and a table
-// with RLS enabled but not forced.
 func TestUnprotectedTablesFlagsTableWithoutRLS(t *testing.T) {
 	db := newTestDB(t)
 	ctx := context.Background()
@@ -134,8 +127,7 @@ func TestUnprotectedTablesFlagsTableWithoutRLS(t *testing.T) {
 	}
 }
 
-// AC-7 (schema part): items has RLS enabled and forced, and the app role does
-// not own it. The role attributes of the real cluster are checked by the e2e tests.
+// Role attributes of the real cluster are checked by the e2e tests.
 func TestItemsTableHasForcedRLSAndForeignOwner(t *testing.T) {
 	db := newTestDB(t)
 	var enabled, forced bool
@@ -154,7 +146,6 @@ func TestItemsTableHasForcedRLSAndForeignOwner(t *testing.T) {
 	}
 }
 
-// AC-8: without app.current_tenant_id the app role sees no rows and cannot insert.
 func TestNoTenantContextFailsClosed(t *testing.T) {
 	db := newTestDB(t)
 	ctx := context.Background()
@@ -180,7 +171,6 @@ func TestNoTenantContextFailsClosed(t *testing.T) {
 	}
 }
 
-// QS-01 at the database level: tenant B cannot read, change or delete A's item.
 func TestStoreIsolatesTenants(t *testing.T) {
 	st := openStore(t, newTestDB(t))
 	ctx := context.Background()

@@ -1,6 +1,3 @@
-// Package items serves the ExampleApp items API. The tenant comes only from
-// the x-tenant-id header, which the API Gateway sets from the validated JWT
-// and never takes from the client (docs/contracts/gateway-headers.md).
 package items
 
 import (
@@ -28,7 +25,7 @@ func NewService(store core.ItemStore, log *slog.Logger) *Service {
 }
 
 type itemRequest struct {
-	// Only the name is read from the body. Any tenant_id field is ignored.
+	// Any tenant_id field in the body is ignored.
 	Name string `json:"name"`
 }
 
@@ -119,8 +116,7 @@ func (s *Service) DeleteHandler(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
-// tenant rejects a request without a well-formed tenant header. With the
-// Gateway in front this never happens; it guards against a misconfigured route.
+// Never happens behind the Gateway; guards against a misconfigured route.
 func tenant(w http.ResponseWriter, r *http.Request) (string, bool) {
 	tenantID := r.Header.Get(core.TenantHeader)
 	if !core.TenantRe.MatchString(tenantID) {
@@ -143,7 +139,7 @@ func decodeName(w http.ResponseWriter, r *http.Request) (string, bool) {
 	return req.Name, true
 }
 
-// itemID answers 404 for a malformed ID, the same as for another tenant's ID.
+// 404 for a malformed ID, the same as for another tenant's ID.
 func itemID(w http.ResponseWriter, r *http.Request) (string, bool) {
 	id := r.PathValue("id")
 	if !uuidRe.MatchString(id) {

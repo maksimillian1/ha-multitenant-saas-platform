@@ -1,19 +1,5 @@
-// Package zitadel is the admin app's client for the Zitadel APIs it manages:
-// organizations, users, authorizations (role assignments) and projects.
-//
-// It calls the v2 services over the Connect protocol with JSON bodies, so it
-// needs no SDK and imports nothing from github.com/zitadel/zitadel (ADR-0003,
-// C-03). Messages and field names follow the protos of Zitadel v4.19.2
-// (proto/zitadel/{org,user,authorization,project}/v2). Zitadel encodes them
-// with protojson: field names in lowerCamelCase, 64-bit integers as strings,
-// enums by name, and fields with their default value left out.
-//
-// Branding (label policies and their assets) has no v2 write API in
-// v4.19.2, so branding.go calls the v1 REST gateway and the assets API.
-//
-// The client calls as the admin app's service account, with short-lived
-// access tokens it gets from the account's JWT profile key (KeyTokens), never
-// with the signed-in admin's token.
+// Package zitadel imports nothing from github.com/zitadel/zitadel (ADR-0003, C-03). Messages follow
+// the v4.19.2 protos in protojson: lowerCamelCase, 64-bit ints as strings, defaults left out.
 package zitadel
 
 import (
@@ -38,8 +24,7 @@ const (
 	projectService       = "zitadel.project.v2.ProjectService"
 )
 
-// Connect error codes (https://connectrpc.com/docs/protocol#error-codes)
-// that callers act on.
+// https://connectrpc.com/docs/protocol#error-codes
 const (
 	CodeInvalidArgument    = "invalid_argument"
 	CodeNotFound           = "not_found"
@@ -54,10 +39,8 @@ const (
 	CodeUnauthenticated    = "unauthenticated"
 )
 
-// maxAnswer bounds what the client reads from one answer of Zitadel.
 const maxAnswer = 4 << 20
 
-// Client calls Zitadel as the admin app's service account.
 type Client struct {
 	baseURL string
 	tokens  Tokens
@@ -67,18 +50,14 @@ type Client struct {
 	account *ServiceAccount
 }
 
-// NewClient returns a client for the Zitadel instance at baseURL (the
-// issuer). httpClient carries the requests; the admin app passes the issuer
-// client, which dials the in-cluster Service but keeps the public Host.
-// tokens gives the access token of every call.
+// The admin app passes the issuer client, which dials the in-cluster Service but keeps the public Host.
 func NewClient(baseURL string, tokens Tokens, httpClient *http.Client) *Client {
 	return &Client{baseURL: strings.TrimSuffix(baseURL, "/"), tokens: tokens, http: httpClient}
 }
 
-// Error is an error answer of Zitadel, with its Connect code and message.
 type Error struct {
-	Status  int    // HTTP status of the answer
-	Code    string // Connect code, such as not_found
+	Status  int
+	Code    string
 	Message string
 }
 
@@ -86,7 +65,6 @@ func (e *Error) Error() string {
 	return fmt.Sprintf("zitadel: %s: %s", e.Code, e.Message)
 }
 
-// HasCode reports whether err is an error answer of Zitadel with the code.
 func HasCode(err error, code string) bool {
 	var zerr *Error
 	return errors.As(err, &zerr) && zerr.Code == code
@@ -96,8 +74,6 @@ func notFound(what string) error {
 	return &Error{Status: http.StatusNotFound, Code: CodeNotFound, Message: what + " not found"}
 }
 
-// call sends one unary Connect request, POST /<service>/<method> with the
-// request message as JSON, and decodes the answer into resp.
 func (c *Client) call(ctx context.Context, service, method string, req, resp any) error {
 	body, err := json.Marshal(req)
 	if err != nil {
@@ -130,9 +106,7 @@ func (c *Client) do(req *http.Request, resp any) error {
 	return nil
 }
 
-// send makes the request with the client's access token and reads the whole
-// answer. When Zitadel answers 401, the token is dropped and the request is
-// sent once more with a new one (a token revoked or expired early).
+// On 401 (revoked, or expired early) the token is dropped and the request is sent once more.
 func (c *Client) send(req *http.Request) (*http.Response, []byte, error) {
 	res, data, token, err := c.sendWithToken(req)
 	if err != nil || res.StatusCode != http.StatusUnauthorized {
@@ -172,14 +146,11 @@ func (c *Client) sendWithToken(req *http.Request) (*http.Response, []byte, strin
 	return res, data, token, nil
 }
 
-// grpcCodes names the numeric gRPC codes of the v1 REST gateway's errors.
 var grpcCodes = []string{"ok", "canceled", "unknown", CodeInvalidArgument, CodeDeadlineExceeded, CodeNotFound,
 	CodeAlreadyExists, CodePermissionDenied, "resource_exhausted", CodeFailedPrecondition, CodeAborted,
 	CodeOutOfRange, CodeUnimplemented, "internal", CodeUnavailable, "data_loss", CodeUnauthenticated}
 
-// parseError reads a Connect error ({"code": "not_found", "message": ...}),
-// or a gRPC gateway error with a numeric code. Without either, the code comes
-// from the HTTP status as the Connect protocol defines it.
+// Without a code in the body, it comes from the HTTP status as the Connect protocol defines.
 func parseError(status int, body []byte) error {
 	var answer struct {
 		Code    json.RawMessage `json:"code"`
@@ -198,7 +169,7 @@ func parseError(status int, body []byte) error {
 	return &Error{Status: status, Code: codeFromStatus(status), Message: http.StatusText(status)}
 }
 
-// codeFromStatus is https://connectrpc.com/docs/protocol#http-to-error-code.
+// https://connectrpc.com/docs/protocol#http-to-error-code
 func codeFromStatus(status int) string {
 	switch status {
 	case http.StatusBadRequest:
@@ -216,8 +187,7 @@ func codeFromStatus(status int) string {
 	}
 }
 
-// Uint64 is a protojson 64-bit integer, which is a JSON string but may also
-// be a number.
+// protojson writes it as a JSON string but may also use a number.
 type Uint64 uint64
 
 func (u *Uint64) UnmarshalJSON(b []byte) error {
@@ -232,9 +202,7 @@ func (u *Uint64) UnmarshalJSON(b []byte) error {
 	return nil
 }
 
-// Details are object.v2.Details of organizations and users (and the v1
-// ObjectDetails, which have the same JSON names). ResourceOwner is the ID of
-// the organization the object belongs to.
+// The v1 ObjectDetails have the same JSON names.
 type Details struct {
 	Sequence      Uint64    `json:"sequence"`
 	CreationDate  time.Time `json:"creationDate"`
@@ -242,14 +210,12 @@ type Details struct {
 	ResourceOwner string    `json:"resourceOwner"`
 }
 
-// Page selects up to Limit items after the first Offset items of a list.
 type Page struct {
 	Offset int
 	Limit  int
 }
 
-// pagination is object.v2.ListQuery and filter.v2.PaginationRequest, which
-// have the same fields.
+// object.v2.ListQuery and filter.v2.PaginationRequest have the same fields.
 type pagination struct {
 	Offset uint64 `json:"offset,omitempty"`
 	Limit  uint32 `json:"limit,omitempty"`
@@ -260,8 +226,6 @@ func (p Page) ascending() *pagination {
 	return &pagination{Offset: uint64(max(p.Offset, 0)), Limit: uint32(min(max(p.Limit, 0), math.MaxUint32)), Asc: true}
 }
 
-// Text query methods: object.v2.TextQueryMethod (org and user v2) and
-// filter.v2.TextFilterMethod (project and authorization v2).
 const (
 	textContainsIgnoreCase   = "TEXT_QUERY_METHOD_CONTAINS_IGNORE_CASE"
 	textEquals               = "TEXT_QUERY_METHOD_EQUALS"
@@ -276,15 +240,12 @@ type idsFilter struct {
 	IDs []string `json:"ids"`
 }
 
-// ServiceAccount is the Zitadel user the client calls as.
 type ServiceAccount struct {
 	UserID         string
 	OrganizationID string
 }
 
-// ServiceAccount returns the user of the client's token, from the v1 auth
-// API (GET /auth/v1/users/me, which has no v2 equivalent). The answer is
-// kept; a failed lookup is tried again on the next call.
+// GET /auth/v1/users/me has no v2 equivalent. A failed lookup is retried on the next call.
 func (c *Client) ServiceAccount(ctx context.Context) (ServiceAccount, error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()

@@ -1,6 +1,5 @@
 # Components of the usage module and the imports allowed between them.
-# c4sync draws these components (docs/architecture/c4/generated/); the
-# allowed edges are refined in HAMSP-70.
+# c4sync draws these components (docs/architecture/c4/generated/).
 version: 3
 workdir: .
 allow:

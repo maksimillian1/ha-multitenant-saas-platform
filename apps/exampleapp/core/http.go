@@ -29,8 +29,7 @@ func (s *statusRecorder) WriteHeader(code int) {
 	s.ResponseWriter.WriteHeader(code)
 }
 
-// AccessLog logs every request that reaches ExampleApp, probes excepted. The
-// e2e tests use it to prove that rejected requests never get here.
+// The e2e tests use it to prove that rejected requests never get here.
 func AccessLog(next http.Handler, log *slog.Logger) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/healthz" || r.URL.Path == "/readyz" {
@@ -46,8 +45,7 @@ func AccessLog(next http.Handler, log *slog.Logger) http.Handler {
 	})
 }
 
-// Serve runs h on addr until ctx is done, then returns once the requests in
-// flight are finished or 10 seconds have passed.
+// Serve waits up to 10 seconds for requests in flight after ctx is done.
 func Serve(ctx context.Context, log *slog.Logger, addr string, h http.Handler) error {
 	srv := &http.Server{Addr: addr, Handler: h, ReadHeaderTimeout: 5 * time.Second}
 	drained := make(chan struct{})

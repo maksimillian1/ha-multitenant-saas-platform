@@ -14,7 +14,6 @@ import (
 
 const dlqTopic = "usage-events-dlq"
 
-// dlqRecords reads every record of the DLQ topic.
 func (p *pipeline) dlqRecords(want int) []*kgo.Record {
 	p.t.Helper()
 	c, err := kgo.NewClient(kgo.SeedBrokers(p.brokers...), kgo.ConsumeTopics(dlqTopic),
@@ -45,10 +44,6 @@ func (p *pipeline) replay(r *kgo.Record) int {
 	return n
 }
 
-// writer replay puts a DLQ record back on the usage topic with the same key
-// and value and the header replayed-from=dlq; the writer stores it once, under
-// its own tenant, and a second replay adds no row.
-//
 // Verifies: usage-writer AC-7; T-01; QS-06
 func TestReplayStoresOnceAndTwiceIsNoop(t *testing.T) {
 	p := newPipeline(t)
@@ -58,7 +53,7 @@ func TestReplayStoresOnceAndTwiceIsNoop(t *testing.T) {
 	}
 	t.Cleanup(dlq.Close)
 
-	// An event of tenant-b that went to the DLQ, for a cause fixed since.
+	// Sent to the DLQ for a cause fixed since.
 	e := newEvent("tenant-b")
 	value := rawEvent(t, e, core.SchemaVersion)
 	src := &kgo.Record{Topic: topic, Partition: 1, Offset: 7, Key: []byte(e.TenantID), Value: value, Timestamp: time.Now()}
@@ -103,7 +98,6 @@ func headerOf(r *kgo.Record, key string) (string, bool) {
 	return "", false
 }
 
-// topicRecords reads the usage topic and returns the records keep accepts.
 func (p *pipeline) topicRecords(keep func(*kgo.Record) bool) []*kgo.Record {
 	p.t.Helper()
 	c, err := kgo.NewClient(kgo.SeedBrokers(p.brokers...), kgo.ConsumeTopics(topic),

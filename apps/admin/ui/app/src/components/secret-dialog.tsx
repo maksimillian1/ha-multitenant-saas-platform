@@ -43,8 +43,7 @@ function CopyField({ label, value }: { label: string; value: string }) {
   )
 }
 
-// SecretDialog shows a new client secret. Zitadel cannot show it again, so
-// the dialog says so and only closes when the admin is done.
+// Zitadel cannot show the secret again, so the dialog closes only when the admin is done.
 export function SecretDialog({ secret, onClose }: { secret?: Schemas['MachineSecret']; onClose: () => void }) {
   return (
     <Dialog open={secret !== undefined} onOpenChange={(open) => !open && onClose()}>

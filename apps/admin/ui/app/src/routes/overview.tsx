@@ -27,7 +27,6 @@ const columns = column.columns([
   }),
 ])
 
-// statLink is the focus and hover style of a link around a StatCard.
 const statLink = 'group rounded-xl focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none'
 
 function StatCard({ label, value, icon: Icon }: { label: string; value: number; icon: LucideIcon }) {

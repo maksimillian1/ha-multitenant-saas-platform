@@ -14,17 +14,13 @@ import { formatDateTime } from '@/lib/format'
 
 const route = getRouteApi('/tenants/$tenantId')
 
-// The provisioning steps in their order (ADR-0012); deletion runs them
-// backwards.
+// Deletion runs them backwards (ADR-0012).
 const steps: Array<{ part: TenantPart; label: (id: string) => string }> = [
   { part: 'organization', label: () => 'Zitadel organization' },
   { part: 'admin', label: () => 'First admin, invited by email with ORG_OWNER' },
   { part: 'namespace', label: (id) => `Namespace tenant-${id} with its quota and network policy` },
 ]
 
-// useTenantChange runs one change of the tenant. Tenant Management answers
-// a failed step with the tenant as the failure left it, which the page
-// shows at once; the toast says what failed.
 function useTenantChange(tenantId: string, call: () => Promise<Tenant>, success: string, onSuccess?: () => Promise<void>) {
   const queryClient = useQueryClient()
   const key = tenantQuery(tenantId).queryKey

@@ -6,7 +6,6 @@ import { Button } from '@/components/ui/button'
 import { Card, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
 
-// RoutePending is the whole screen before the signed-in admin is known.
 export function RoutePending() {
   return (
     <div className="mx-auto flex max-w-5xl flex-col gap-6 px-4 py-8">
@@ -19,7 +18,6 @@ export function RoutePending() {
   )
 }
 
-// PagePending fills the content area while a page loads.
 export function PagePending() {
   return (
     <div className="flex flex-col gap-6" aria-busy="true">
@@ -30,7 +28,6 @@ export function PagePending() {
   )
 }
 
-// RouteError is the whole screen when the signed-in admin cannot be loaded.
 export function RouteError({ error }: ErrorComponentProps) {
   if (error instanceof ApiError && error.status === 403) {
     return <AccessDenied />
@@ -42,7 +39,6 @@ export function RouteError({ error }: ErrorComponentProps) {
   )
 }
 
-// PageError replaces a page whose data cannot be loaded; the layout stays.
 export function PageError({ error }: ErrorComponentProps) {
   if (error instanceof ApiError && error.status === 404) {
     return (
@@ -79,8 +75,7 @@ function ErrorAlert({ error }: { error: unknown }) {
   )
 }
 
-// The API answers 403 to a signed-in user without the admin role. Signing out
-// lets them sign in with another account.
+// Signing out lets a user without the admin role sign in with another account.
 function AccessDenied() {
   return (
     <div className="flex min-h-svh items-center justify-center bg-muted/40 px-4">

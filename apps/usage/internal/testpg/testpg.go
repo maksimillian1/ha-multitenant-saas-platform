@@ -1,8 +1,5 @@
-// Package testpg gives tests a fresh, migrated usage database. It needs a
-// superuser DSN of a PostgreSQL server with TimescaleDB (TSL) in
-// TEST_DATABASE_URL, e.g. postgres://postgres:postgres@localhost:5432/postgres?sslmode=disable
-// against timescale/timescaledb:2.27.2-pg18. CI sets it
-// (.github/workflows/usage.yml); locally the tests are skipped without it.
+// Package testpg needs a superuser DSN of PostgreSQL with TimescaleDB (TSL) in TEST_DATABASE_URL;
+// without it the tests are skipped.
 package testpg
 
 import (
@@ -21,13 +18,13 @@ import (
 const (
 	OwnerRole  = "usage_owner"
 	WriterRole = "usage_writer"
-	ReaderRole = "usage_reader" // NOLOGIN here; tests use SET ROLE
+	ReaderRole = "usage_reader"
 	password   = "test-only-password"
 )
 
 type DB struct {
 	Name      string
-	Super     *pgx.Conn // superuser on this database; bypasses RLS
+	Super     *pgx.Conn // bypasses RLS
 	Owner     *pgx.Conn
 	WriterDSN string
 }
@@ -45,9 +42,6 @@ func dsnFor(t testing.TB, base, user, db string) string {
 	return u.String()
 }
 
-// New creates the roles and a fresh database with the timescaledb extension,
-// like the usage cluster's managed roles and Database resource do, and applies
-// the migrations as the owner.
 func New(t testing.TB) DB {
 	t.Helper()
 	base := os.Getenv("TEST_DATABASE_URL")
@@ -92,16 +86,10 @@ func New(t testing.TB) DB {
 	return DB{Name: name, Super: super, Owner: owner, WriterDSN: dsnFor(t, base, WriterRole, name)}
 }
 
-// rolesLock is the advisory lock key that serializes setupRoles across test
-// processes ("usage" in hex). All callers connect to the database of
-// TEST_DATABASE_URL, so they share one advisory lock space.
+// "usage" in hex; all callers share the advisory lock space of TEST_DATABASE_URL.
 const rolesLock = 0x7573616765
 
-// setupRoles creates the shared roles and sets their passwords. The roles are
-// cluster-wide, and go test runs the store and writer packages in parallel
-// against one server: two ALTER ROLE on the same role at the same time fail
-// with "tuple concurrently updated", and two CREATE ROLE with a duplicate key
-// (HAMSP-32). The transaction-level advisory lock runs one setup at a time.
+// Roles are cluster-wide and packages test in parallel: concurrent ALTER/CREATE ROLE fail without the lock.
 func setupRoles(ctx context.Context, admin *pgx.Conn) error {
 	return pgx.BeginFunc(ctx, admin, func(tx pgx.Tx) error {
 		if _, err := tx.Exec(ctx, "SELECT pg_advisory_xact_lock($1)", rolesLock); err != nil {
@@ -124,7 +112,6 @@ func setupRoles(ctx context.Context, admin *pgx.Conn) error {
 	})
 }
 
-// Count returns the stored rows with the given event IDs, as the superuser.
 func (db DB) Count(t testing.TB, ids []string) int {
 	t.Helper()
 	var n int
@@ -135,8 +122,6 @@ func (db DB) Count(t testing.TB, ids []string) int {
 	return n
 }
 
-// CountTenant returns the stored rows with the given event IDs whose
-// tenant_id is tenant, as the superuser.
 func (db DB) CountTenant(t testing.TB, tenant string, ids []string) int {
 	t.Helper()
 	var n int
@@ -147,15 +132,11 @@ func (db DB) CountTenant(t testing.TB, tenant string, ids []string) int {
 	return n
 }
 
-// pauseJobs unschedules the policies the migrations created, so only the tests
-// run them (CALL run_job runs an unscheduled job too). Otherwise the background
-// scheduler may start a policy while a test runs the same one, and a second
-// refresh of a continuous aggregate fails with 55P03 (HAMSP-32). A run the
-// scheduler started before the jobs were paused is waited for.
+// Otherwise the scheduler may run a policy a test runs too, and a second refresh fails with 55P03.
 func pauseJobs(t testing.TB, super *pgx.Conn) {
 	t.Helper()
 	ctx := context.Background()
-	// Jobs below 1000 are TimescaleDB's own (telemetry, job history).
+	// Jobs below 1000 are TimescaleDB's own.
 	if _, err := super.Exec(ctx,
 		"SELECT alter_job(job_id, scheduled => false) FROM timescaledb_information.jobs WHERE job_id >= 1000"); err != nil {
 		t.Fatalf("pause jobs: %v", err)

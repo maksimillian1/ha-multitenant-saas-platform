@@ -32,8 +32,7 @@ export function createQueryClient() {
   })
 }
 
-// Search parameters of the list pages. Anything unexpected is dropped, so a
-// hand-edited URL cannot send the API a value it rejects.
+// Anything unexpected is dropped, so a hand-edited URL cannot send the API a value it rejects.
 const text = (value: unknown) => (typeof value === 'string' && value.trim() ? value.trim() : undefined)
 const offset = (value: unknown) => {
   const n = Number(value)
@@ -51,7 +50,6 @@ const orgState = oneOf(...orgStates)
 const userType = oneOf(...userTypes)
 const userState = oneOf(...userStates)
 
-// Every search parameter is optional, so links need not name them.
 export type OrgsSearch = { q?: string; state?: (typeof orgStates)[number]; offset?: number }
 export type UsersSearch = {
   q?: string
@@ -66,8 +64,7 @@ export const orgTabs = ['overview', 'branding'] as const
 export type OrgSearch = { tab?: (typeof orgTabs)[number] }
 const orgTab = oneOf(...orgTabs)
 
-// Every page needs the signed-in admin (the header shows it), so the root
-// route loads it before rendering.
+// The header shows the admin on every page, so the root route loads it first.
 const rootRoute = createRootRouteWithContext<{ queryClient: QueryClient }>()({
   loader: ({ context }) => context.queryClient.ensureQueryData(meQuery),
   component: RootLayout,
@@ -174,8 +171,6 @@ export const routeTree = rootRoute.addChildren([
   platformBrandingRoute,
 ])
 
-// createAppRouter builds the router; tests pass their own query client and
-// a memory history.
 export function createAppRouter(queryClient: QueryClient, history?: RouterHistory) {
   return createRouter({
     routeTree,
@@ -184,8 +179,7 @@ export function createAppRouter(queryClient: QueryClient, history?: RouterHistor
     defaultPreload: 'intent',
     // The loader data lives in the TanStack Query cache.
     defaultPreloadStaleTime: 0,
-    // Pages render inside the layout; the root route has its own full-page
-    // pending and error screens.
+    // The root route has its own full-page pending and error screens.
     defaultPendingComponent: PagePending,
     defaultErrorComponent: PageError,
   })

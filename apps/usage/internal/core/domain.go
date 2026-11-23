@@ -1,8 +1,4 @@
-// Package core holds the usage event as UsageWriteAPI accepts it and as it
-// travels through Kafka (docs/contracts/usage-event), the interfaces
-// between the pipeline's parts, and the configuration. It is linked into every
-// binary, so it imports nothing but the standard library and uuid
-// (.golangci.yml).
+// Package core is linked into every binary: stdlib and uuid only (.golangci.yml).
 package core
 
 import (
@@ -17,8 +13,6 @@ import (
 	"github.com/google/uuid"
 )
 
-// Metrics a sender may report. Agent tokens and egress are added with their
-// senders.
 var Metrics = map[string]bool{
 	"api_calls": true,
 }
@@ -41,21 +35,15 @@ type Event struct {
 	Attributes json.RawMessage `json:"attributes,omitempty"`
 }
 
-// SchemaVersion is the version of the Kafka record
-// (docs/contracts/usage-event/schemas/kafka-record.vN.json). UsageWriteAPI
-// sets it; Usage Writer reads every version it declares in participants.json,
-// so a new version is added to writer before writeapi writes it (ADR-0010).
-// The HTTP contract is versioned by its path, /v1/events, on its own.
+// Usage Writer must declare a new version before writeapi writes it (ADR-0010).
 const SchemaVersion = 1
 
-// Record is the value of one Kafka record. A record without schema_version was
-// produced before versions existed and is version 1.
+// A record without schema_version predates versions and is version 1.
 type Record struct {
 	SchemaVersion int `json:"schema_version"`
 	Event
 }
 
-// Validate checks one event against the contract at time now.
 func (e Event) Validate(now time.Time) error {
 	if err := e.ValidateContent(); err != nil {
 		return err
@@ -66,10 +54,7 @@ func (e Event) Validate(now time.Time) error {
 	return nil
 }
 
-// ValidateContent checks one event against the contract without the event_time
-// window. Usage Writer uses it: an event that UsageWriteAPI accepted, or that
-// is replayed from the DLQ, may be older than the window by the time it is
-// stored, and is still stored.
+// ValidateContent skips the event_time window: accepted or replayed events may be old by store time.
 func (e Event) ValidateContent() error {
 	switch {
 	case e.ID == "":
@@ -100,7 +85,6 @@ func (e Event) ValidateContent() error {
 	return nil
 }
 
-// ValidateBatch rejects the whole batch if any event is invalid.
 func ValidateBatch(events []Event, now time.Time) error {
 	if len(events) == 0 {
 		return errors.New("no events")
@@ -116,22 +100,16 @@ func ValidateBatch(events []Event, now time.Time) error {
 	return nil
 }
 
-// Producer writes events to Kafka and returns only once all of them are
-// confirmed, or with an error.
 type Producer interface {
 	Produce(ctx context.Context, events []Event) error
 	Ping(ctx context.Context) error
 }
 
-// ErrBadData marks a Write error caused by the events, not by the database:
-// the same batch will fail again however often it is retried (HAMSP-30).
+// ErrBadData marks an error that will repeat on every retry of the same batch.
 var ErrBadData = errors.New("the database rejected the events as bad data")
 
 // EventWriter stores usage events once (ADR-0007).
 type EventWriter interface {
-	// Write stores a batch in one transaction and returns the events that were
-	// new. Events stored before, in this batch or an earlier one, are skipped.
-	// An error that wraps ErrBadData means an event of the batch can never be
-	// stored; any other error may pass.
+	// Write returns only the new events; an ErrBadData error means a retry cannot succeed.
 	Write(ctx context.Context, events []Event) ([]Event, error)
 }

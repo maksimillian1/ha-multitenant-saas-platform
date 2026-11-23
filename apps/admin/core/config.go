@@ -14,18 +14,12 @@ type Config struct {
 	PublicURL      string
 	SessionKey     string
 	AdminRole      string
-	// ZitadelURL is where the Zitadel APIs are; the issuer by default.
+	// The issuer by default.
 	ZitadelURL string
-	// ZitadelKeyFile is the JWT profile key file of the admin app's service
-	// account admin-app (instance roles IAM_ORG_MANAGER and
-	// IAM_BRANDING_MANAGER, HAMSP-36). The app gets short-lived access tokens
-	// with it.
+	// Instance roles IAM_ORG_MANAGER and IAM_BRANDING_MANAGER.
 	ZitadelKeyFile string
 
-	// Tenant Management (ADR-0012): its URL, and the client credentials of
-	// the machine user whose token has the role tenant-manager in the
-	// project whose ID is TenantsAudience. Without TENANTS_URL the tenant
-	// routes answer 503.
+	// Without TENANTS_URL the tenant routes answer 503.
 	TenantsURL          string
 	TenantsAudience     string
 	TenantsClientID     string

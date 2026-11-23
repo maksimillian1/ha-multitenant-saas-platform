@@ -7,12 +7,9 @@ import (
 	"github.com/google/uuid"
 )
 
-// TenantHeader carries the caller's tenant to the services
-// (docs/contracts/gateway-headers.md).
+// docs/contracts/gateway-headers.md
 const TenantHeader = "x-tenant-id"
 
-// UsageEvent is one usage event as UsageWriteAPI accepts it
-// (docs/contracts/usage-event).
 type UsageEvent struct {
 	ID         string         `json:"event_id"`
 	Time       time.Time      `json:"event_time"`
@@ -22,7 +19,6 @@ type UsageEvent struct {
 	Attributes map[string]any `json:"attributes,omitempty"`
 }
 
-// APICallEvent is the usage event of one request served for a tenant.
 func APICallEvent(tenant string, start time.Time, method, path string, status int, duration time.Duration, reqBytes, respBytes int64) UsageEvent {
 	return UsageEvent{
 		ID: uuid.Must(uuid.NewV7()).String(), Time: start.UTC(), TenantID: tenant, Metric: "api_calls", Quantity: 1,
@@ -33,12 +29,10 @@ func APICallEvent(tenant string, start time.Time, method, path string, status in
 	}
 }
 
-// Authenticator returns the tenant of a valid access token.
 type Authenticator interface {
 	Tenant(ctx context.Context, token string) (string, error)
 }
 
-// UsageReporter takes the usage event of every request served for a tenant.
 // Report must not block.
 type UsageReporter interface {
 	Report(UsageEvent)

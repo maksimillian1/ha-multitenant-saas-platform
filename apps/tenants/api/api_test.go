@@ -21,8 +21,7 @@ import (
 	"github.com/maksimillian1/ha-multitenant-saas-platform/apps/tenants/store/storetest"
 )
 
-// Tokens of the fake checker. The token checks themselves are tested in
-// package auth against real JWTs.
+// Token checks against real JWTs are tested in package auth.
 const (
 	tokenManager = "manager-token"
 	tokenNoRole  = "no-role-token"
@@ -42,7 +41,6 @@ func (fakeChecker) Check(_ context.Context, token string) (auth.Caller, error) {
 	}
 }
 
-// syncBuffer is a log sink the handlers and the test can share.
 type syncBuffer struct {
 	mu  sync.Mutex
 	buf bytes.Buffer
@@ -200,7 +198,6 @@ func TestEveryRouteRequiresTenantManager(t *testing.T) {
 		t.Fatal("a refused create wrote a row")
 	}
 
-	// And with the role, every route is reachable.
 	for _, rt := range routes(a.ID) {
 		r := e.do(t, rt.method, rt.path, tokenManager, rt.body)
 		if r.status == http.StatusUnauthorized || r.status == http.StatusForbidden {
@@ -240,7 +237,6 @@ func TestMutationsAreLogged(t *testing.T) {
 		t.Fatalf("logged actions = %v", actions)
 	}
 
-	// A change without the acting admin is refused before anything happens.
 	req, _ := http.NewRequest(http.MethodPost, e.srv.URL+"/tenants", strings.NewReader(`{"name":"globex","admin_email":"it@globex.example"}`))
 	req.Header.Set("Authorization", "Bearer "+tokenManager)
 	res, err := e.srv.Client().Do(req)
@@ -281,7 +277,6 @@ func TestErrorAnswers(t *testing.T) {
 		}
 	}
 
-	// A failing dependency: 502 with the tenant; a hanging one: 504.
 	e.deps.FailNext["DeactivateOrganization"] = 1
 	r := e.do(t, http.MethodPost, "/tenants/"+a.ID+"/suspend", tokenManager, "")
 	if body := r.errorBody(t); r.status != http.StatusBadGateway || body.Tenant == nil ||
@@ -296,7 +291,6 @@ func TestErrorAnswers(t *testing.T) {
 		t.Fatalf("timed out suspend: %d %s", r.status, r.body)
 	}
 
-	// Zitadel holds a foreign organization with the name: 409 with the tenant.
 	e.deps.FailNext["CreateOrganization"] = 1
 	e.deps.FailWith = core.ErrForeign
 	r = e.do(t, http.MethodPost, "/tenants", tokenManager, `{"name":"globex","admin_email":"it@globex.example"}`)
