@@ -1,5 +1,6 @@
 feature: usage-writer
 title: Usage Writer consumes usage events, drops duplicates and writes them in batches
+stage: alpha
 critical: true
 code:
   - apps/usage/internal/writer/**
@@ -17,30 +18,37 @@ acceptance:
     text: "A record that does not decode (bad JSON, missing event_id, tenant_id or event_time, schema_version newer than the writer) goes to the DLQ topic with its key and value byte for byte and the headers dlq-reason, dlq-source (topic/partition/offset), dlq-time and dlq-original-timestamp (the Kafka timestamp of the original record). The DLQ record's own Kafka timestamp is the time of the DLQ write, so the 7-day retention counts from there. The next records of the partition are written."
     level: integration
     planned: apps/usage/internal/writer/dlq_test.go:TestUndecodableRecordGoesToDLQ, apps/usage/internal/writer/contract_test.go:TestSendsNewerVersionToDLQ, apps/usage/internal/kafka/dlq_test.go:TestDLQRecordKeepsBytesAndAddsHeaders, apps/usage/internal/kafka/dlq_test.go:TestDLQSendWritesToDLQTopic
+    verified: [apps/usage/internal/writer/dlq_test.go:TestUndecodableRecordGoesToDLQ, apps/usage/internal/writer/contract_test.go:TestSendsNewerVersionToDLQ, apps/usage/internal/kafka/dlq_test.go:TestDLQRecordKeepsBytesAndAddsHeaders, apps/usage/internal/kafka/dlq_test.go:TestDLQSendWritesToDLQTopic]
   AC-2:
     text: "A record that fails core.Validate without the time window (for example quantity <= 0) goes to the DLQ before the database. The other records of the same fetch are written."
     level: integration
     planned: apps/usage/internal/writer/dlq_test.go:TestInvalidEventGoesToDLQBeforeStore
+    verified: [apps/usage/internal/writer/dlq_test.go:TestInvalidEventGoesToDLQBeforeStore]
   AC-3:
     text: "When the database returns an error of SQLSTATE class 22 or 23, the batch is split in halves until the bad record is found. That record goes to the DLQ; every other event of the batch is stored exactly once."
     level: integration
     planned: apps/usage/internal/writer/dlq_test.go:TestDatabasePoisonIsIsolatedByBisection, apps/usage/internal/store/store_test.go:TestBadDataIsMarkedAndOutageIsNot
+    verified: [apps/usage/internal/writer/dlq_test.go:TestDatabasePoisonIsIsolatedByBisection, apps/usage/internal/store/store_test.go:TestBadDataIsMarkedAndOutageIsNot]
   AC-4:
     text: "A transient database error (connection lost) sends nothing to the DLQ: the partition stops and retries. After the database is back every event is stored exactly once (QS-09)."
     level: integration
     planned: apps/usage/internal/writer/writer_test.go:TestDatabaseOutageLosesNothing, apps/usage/internal/store/store_test.go:TestBadDataIsMarkedAndOutageIsNot
+    verified: [apps/usage/internal/writer/writer_test.go:TestDatabaseOutageLosesNothing, apps/usage/internal/store/store_test.go:TestBadDataIsMarkedAndOutageIsNot]
   AC-5:
     text: "When writing to the DLQ fails, the offset is not committed and the event is not lost."
     level: integration
     planned: apps/usage/internal/writer/dlq_test.go:TestFailedDLQWriteCommitsNoOffset
+    verified: [apps/usage/internal/writer/dlq_test.go:TestFailedDLQWriteCommitsNoOffset]
   AC-6:
     text: "Usage Writer exports a counter of records sent to the DLQ, and an alert rule fires when it is above 0."
     level: unit
     planned: "apps/usage/internal/writer/metrics_test.go:TestDLQCounterAndAlertRule; the rule itself: promtool test rules prototype/monitoring/usage-writer.rules.test.yaml (CI step in usage.yml)"
+    verified: [apps/usage/internal/writer/metrics_test.go:TestDLQCounterAndAlertRule]
   AC-7:
     text: "writer replay runs as its own Job and logs in as the KafkaUser usage-replay. It sends the chosen DLQ records to the main topic with the value unchanged and the header replayed-from=dlq. The event is stored once; replaying it again adds no second row."
     level: integration
     planned: apps/usage/internal/writer/replay_test.go:TestReplayStoresOnceAndTwiceIsNoop
+    verified: [apps/usage/internal/writer/replay_test.go:TestReplayStoresOnceAndTwiceIsNoop]
   AC-8:
     text: "The DLQ topic has a retention of 7 days, set in its GitOps KafkaTopic manifest."
     level: manual
@@ -49,6 +57,7 @@ acceptance:
     text: "Kafka ACLs: usage-writer can write to usage-events-dlq and still cannot write to usage-events; usage-replay can read usage-events-dlq and write to usage-events, and cannot read usage-events or write to usage-events-dlq; usage-writeapi cannot read or write usage-events-dlq."
     level: e2e
     planned: prototype/e2e/kafka_auth_test.go:TestDLQAndReplayUsersACLs
+    verified: [prototype/e2e/kafka_auth_test.go:TestDLQAndReplayUsersACLs]
 
 checklist:
   T-01:
@@ -56,35 +65,57 @@ checklist:
       applies — a DLQ'd and then replayed event of tenant A is stored under tenant A only, in a
       mixed batch with tenant B; bisection never moves an event to another tenant's write;
       Kafka → Usage Writer → usage store (RLS on)
+    verified: [apps/usage/internal/writer/dlq_test.go:TestDatabasePoisonIsIsolatedByBisection, apps/usage/internal/writer/replay_test.go:TestReplayStoresOnceAndTwiceIsNoop]
   T-02:
     planned: >-
       applies — the DLQ record (original value + headers dlq-reason, dlq-source, dlq-time, dlq-original-timestamp) and the
       replayed-from header go into docs/contracts/usage-event/README.md; writer and replay pass
       the existing usage-event examples; Usage Writer → Kafka
+    verified: [apps/usage/internal/kafka/dlq_test.go:TestDLQRecordKeepsBytesAndAddsHeaders]
   T-04:
     planned: >-
       applies (critical) — writer replay is a new action with its own KafkaUser usage-replay;
       the ACLs of usage-writer, usage-replay and usage-writeapi are checked in both directions on
       kind (AC-9); the kafka-client-auth ACL tests stay green; Usage Writer, replay Job → Kafka
+    verified: [prototype/e2e/kafka_auth_test.go:TestDLQAndReplayUsersACLs]
   T-08:
     planned: does not apply — no migration
+    verified: n/a — no migration in the diff
   T-11:
     planned: >-
       applies (critical) — kafka.Decode parses records a buggy producer can write; the fuzz target
       apps/usage/internal/writer/decode_fuzz_test.go:FuzzDecode checks that every input either
       decodes into a valid event or goes to the DLQ unchanged, never panics; CI runs it for 30s
+    verified: [apps/usage/internal/writer/decode_fuzz_test.go:FuzzDecode]
   T-12:
     planned: >-
       applies (critical) — the DLQ is a control against usage loss: the AC-1 and AC-3 tests are
       shown to fail when the DLQ write is replaced by the old skip and by the old whole-batch retry
 
+    verified: [apps/usage/internal/writer/dlq_test.go:TestUndecodableRecordGoesToDLQ, apps/usage/internal/writer/dlq_test.go:TestDatabasePoisonIsIsolatedByBisection]
 quality_scenarios:
   touched: [QS-06, QS-09]
   tests:
     QS-06:
       planned: apps/usage/internal/writer/replay_test.go:TestReplayStoresOnceAndTwiceIsNoop
+      verified: [apps/usage/internal/writer/replay_test.go:TestReplayStoresOnceAndTwiceIsNoop]
     QS-09:
       planned: apps/usage/internal/writer/writer_test.go:TestDatabaseOutageLosesNothing
+      verified: [apps/usage/internal/writer/writer_test.go:TestDatabaseOutageLosesNothing]
+  recommended_runs: [QS-09 on EKS, k6 on UsageWriteAPI with the usage store down 5 minutes (Chaos Mesh), DLQ count stays 0]
 
 gates:
+  G-01: {status: n/a, by: verify, date: 2026-11-23, note: no release flag}
+  G-02: {status: pass, by: owner, date: 2026-11-23, commit: c9170c4, note: "AC-1 to AC-7 and AC-9 pass by verify; AC-8 (DLQ retention 7 days on kind) checked by hand and confirmed by the owner in chat"}
+  G-03: {status: n/a, by: verify, date: 2026-11-23, note: "no schema changes; the DLQ headers are documented in docs/contracts/usage-event/README.md under the approved plan, and the contract tests pass"}
+  G-04: {status: pass, by: verify, date: 2026-11-23, level: basic, commit: c9170c4}
+  G-05: {status: not-checked, by: verify, date: 2026-11-23, note: "QS-06 and QS-09 pass in-process; QS-09 load and chaos run on EKS recommended, not run"}
   G-07: {status: pass, by: owner, date: 2026-11-18, note: "alpha plan approved in chat, including the Kafka auth changes (AC-7, AC-9, T-04)"}
+
+runs:
+  - date: 2026-11-23
+    commit: c9170c4
+    stage_checked: alpha
+    verdict: ready
+    failed: []
+    not_checked: [G-05]
