@@ -31,7 +31,7 @@ func poisonRecord() *kgo.Record {
 	}
 }
 
-// Verifies: usage-writer AC-1
+// Verifies: usage-writer AC-1; T-02
 func TestDLQRecordKeepsBytesAndAddsHeaders(t *testing.T) {
 	src := poisonRecord()
 	now := time.Date(2026, 11, 22, 12, 0, 0, 0, time.UTC)
