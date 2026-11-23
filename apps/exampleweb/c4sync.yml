@@ -1,0 +1,8 @@
+# C4 metadata for the tenant web page of ExampleApp. Only the code workspace is
+# generated: it is the first piece of the tenantWeb container.
+name: ExampleWeb
+identifierPrefix: exampleweb
+output:
+  code: ../../docs/architecture/c4/generated/exampleweb.code.dsl
+detectors:
+  http: true
