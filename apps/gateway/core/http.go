@@ -29,7 +29,7 @@ func (s *statusRecorder) WriteHeader(code int) {
 	s.ResponseWriter.WriteHeader(code)
 }
 
-// Unwrap lets ReverseProxy flush and hijack (SSE, WebSocket) through the recorder.
+// Lets ReverseProxy flush and hijack (SSE, WebSocket) through the recorder.
 func (s *statusRecorder) Unwrap() http.ResponseWriter { return s.ResponseWriter }
 
 func AccessLog(next http.Handler, log *slog.Logger) http.Handler {
@@ -43,8 +43,7 @@ func AccessLog(next http.Handler, log *slog.Logger) http.Handler {
 	})
 }
 
-// Serve runs h on addr until ctx is done, then returns once the requests in
-// flight are finished or 10 seconds have passed.
+// Serve waits up to 10 seconds for requests in flight after ctx is done.
 func Serve(ctx context.Context, log *slog.Logger, addr string, h http.Handler) error {
 	srv := &http.Server{Addr: addr, Handler: h, ReadHeaderTimeout: 5 * time.Second}
 	drained := make(chan struct{})

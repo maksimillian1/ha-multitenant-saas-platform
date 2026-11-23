@@ -3,13 +3,10 @@ import { useEffect } from 'react'
 import { assetUrl, platformBrandingQuery, type Branding } from '@/api/queries'
 import { useTheme } from '@/lib/theme'
 
-// The admin app takes its primary color, logo and icon from the published
-// platform branding (HAMSP-37). Without it (Zitadel down, the call refused,
-// nothing set) the app keeps its built-in look from index.css.
+// Without published platform branding the app keeps its built-in look from index.css.
 
 const hex = /^#[0-9a-fA-F]{6}$/
 
-// foreground is black or white, whichever reads better on the color.
 function foreground(color: string) {
   const [r, g, b] = [1, 3, 5].map((i) => {
     const c = parseInt(color.slice(i, i + 2), 16) / 255
@@ -24,9 +21,7 @@ function variables(color: string) {
   return `--primary: ${color}; --primary-foreground: ${fg}; --ring: ${color}; --sidebar-primary: ${color}; --sidebar-primary-foreground: ${fg};`
 }
 
-// brandCss overrides the primary color of the light and the dark theme; a
-// color that is not #rrggbb is left out, so nothing else can get into the
-// style sheet.
+// A color that is not #rrggbb is dropped, so nothing else can get into the style sheet.
 export function brandCss(active: Branding | undefined) {
   if (!active) {
     return ''
@@ -45,8 +40,6 @@ function isDark(theme: string) {
 
 export type Brand = { logo?: string; icon?: string }
 
-// useBrand applies the platform branding to the page and returns the URLs of
-// its logo and icon for the current theme.
 export function useBrand(): Brand {
   const { data, dataUpdatedAt } = useQuery(platformBrandingQuery)
   const theme = useTheme()

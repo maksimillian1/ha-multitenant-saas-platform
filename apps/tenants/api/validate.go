@@ -18,22 +18,18 @@ const (
 	maxEmailLen  = 254
 )
 
-// CreateRequest is the body of POST /tenants.
 type CreateRequest struct {
 	Name       string `json:"name"`
 	AdminEmail string `json:"admin_email"`
 }
 
-// InputError is a request the service refuses with 400.
 type InputError struct{ Msg string }
 
 func (e *InputError) Error() string { return e.Msg }
 
 func invalid(format string, a ...any) error { return &InputError{Msg: fmt.Sprintf(format, a...)} }
 
-// DecodeCreate reads and checks a create request: one JSON object with known
-// fields only, a name of 1–100 characters without control characters (spaces
-// around it are trimmed) and a plain email address.
+// Only known fields; the name is trimmed, 1–100 characters without control characters.
 func DecodeCreate(r io.Reader) (CreateRequest, error) {
 	data, err := io.ReadAll(io.LimitReader(r, maxBody+1))
 	if err != nil {
@@ -71,8 +67,7 @@ func DecodeCreate(r io.Reader) (CreateRequest, error) {
 	return req, nil
 }
 
-// validEmail accepts a bare address (local@domain), as Zitadel does, and no
-// display name, comments or brackets.
+// Bare local@domain only, as Zitadel accepts: no display name, comments or brackets.
 func validEmail(s string) bool {
 	if s == "" || len(s) > maxEmailLen || strings.ContainsFunc(s, unicode.IsSpace) {
 		return false

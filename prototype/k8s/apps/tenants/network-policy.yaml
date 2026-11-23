@@ -1,4 +1,4 @@
-# Only the admin app may reach Tenant Management (HAMSP-51 AC-10). The token
+# Only the admin app may reach Tenant Management. The token
 # check stays: this policy is the second layer, not the only one. Kubelet
 # probes come from the host and are allowed by Cilium's default.
 apiVersion: cilium.io/v2

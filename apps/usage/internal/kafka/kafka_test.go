@@ -6,7 +6,6 @@ import (
 	"github.com/twmb/franz-go/pkg/kgo"
 )
 
-// AC-5 (integration): the producer waits for all in-sync replicas and is idempotent.
 func TestProducerRequiresAllISRAndIdempotence(t *testing.T) {
 	p, err := NewProducer([]string{"127.0.0.1:1"}, "usage-events")
 	if err != nil {

@@ -5,8 +5,6 @@ import (
 	"time"
 )
 
-// Project is a project.v2 Project. Granted projects carry the organization
-// they are granted to.
 type Project struct {
 	ID                      string       `json:"projectId"`
 	OrganizationID          string       `json:"organizationId"`
@@ -21,7 +19,6 @@ type Project struct {
 	GrantedOrganizationName string       `json:"grantedOrganizationName"`
 }
 
-// ProjectState is project.v2.ProjectState.
 type ProjectState string
 
 const (
@@ -29,17 +26,15 @@ const (
 	ProjectInactive ProjectState = "PROJECT_STATE_INACTIVE"
 )
 
-// ProjectRole is project.v2.ProjectRole.
 type ProjectRole struct {
 	Key         string `json:"key"`
 	DisplayName string `json:"displayName"`
 	Group       string `json:"group"`
 }
 
-// ProjectFilter narrows ListProjects; set fields must all match.
 type ProjectFilter struct {
-	Name           string // part of the name, in any case
-	OrganizationID string // owned by this organization
+	Name           string // part of the name, any case
+	OrganizationID string
 }
 
 type ProjectList struct {
@@ -47,7 +42,6 @@ type ProjectList struct {
 	Projects []Project
 }
 
-// ListProjects returns projects sorted by name.
 func (c *Client) ListProjects(ctx context.Context, f ProjectFilter, p Page) (ProjectList, error) {
 	type nameFilter struct {
 		ProjectName string `json:"projectName"`
@@ -101,7 +95,6 @@ func (c *Client) GetProject(ctx context.Context, id string) (Project, error) {
 	return resp.Project, nil
 }
 
-// ListProjectRoles returns the project's roles sorted by key.
 func (c *Client) ListProjectRoles(ctx context.Context, projectID string, p Page) ([]ProjectRole, error) {
 	req := struct {
 		ProjectID     string      `json:"projectId"`

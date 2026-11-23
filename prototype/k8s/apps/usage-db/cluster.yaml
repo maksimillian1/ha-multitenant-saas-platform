@@ -44,7 +44,7 @@ metadata:
 spec:
   instances: 3
   # The system image still carries the Barman Cloud tools for the in-tree
-  # backup (HAMSP-29). images/timescaledb must match its Debian release.
+  # backup. images/timescaledb must match its Debian release.
   imageName: ghcr.io/cloudnative-pg/postgresql:18.6-system-trixie
   storage:
     size: 10Gi
@@ -66,8 +66,8 @@ spec:
         inherit: false
         passwordSecret:
           name: usage-writer
-      # Reads the tenant views; Metering Query Service gets a login with
-      # HAMSP-9.
+      # Reads the tenant views; no login until Metering Query
+      # Service exists.
       - name: usage_reader
         ensure: present
         login: false

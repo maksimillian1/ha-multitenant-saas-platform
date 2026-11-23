@@ -1,5 +1,5 @@
 #!/bin/bash
-# HAMSP-25 AC-12: measures the usage tiers on the kind usage cluster. Creates
+# Measures the usage tiers on the kind usage cluster. Creates
 # the scratch database usage_bench next to usage, applies the usage
 # migrations, runs usage_tiers.sql and drops the database again (KEEP=1 keeps
 # it). The numbers go into ADR-0008.

@@ -236,8 +236,6 @@ func (s *Service) removeUserSecret(w http.ResponseWriter, r *http.Request, _ cor
 
 type userActionFunc func(ctx context.Context, userID string) error
 
-// guardedUserAction runs an action that could lock the admin or the app
-// out, after checkUserChange.
 func (s *Service) guardedUserAction(w http.ResponseWriter, r *http.Request, admin core.Session, verb string, action userActionFunc) {
 	if err := s.checkUserChange(r.Context(), admin, r.PathValue("userId"), verb); err != nil {
 		s.fail(w, r, err)
@@ -254,8 +252,7 @@ func (s *Service) userAction(w http.ResponseWriter, r *http.Request, action user
 	noContent(w)
 }
 
-// generateUserSecret replaces a machine user's client secret and returns
-// the client credentials; the username is the client ID.
+// The username is the client ID.
 func (s *Service) generateUserSecret(w http.ResponseWriter, r *http.Request, _ core.Session) {
 	id := r.PathValue("userId")
 	u, err := s.Zitadel.GetUser(r.Context(), id)

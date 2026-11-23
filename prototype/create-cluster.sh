@@ -129,7 +129,7 @@ for app in "${APPS[@]}"; do
 done
 
 # ── 5b. Kafka cluster CA ──────────────────────────────────────────────────────
-# Our own CA for usage-kafka (HAMSP-31). Its key stays out of Git: the script
+# Our own CA for usage-kafka. Its key stays out of Git: the script
 # keeps it in prototype/.kafka-ca/ and loads it as Secrets before ArgoCD
 # creates the Kafka cluster.
 "${SCRIPT_DIR}/kafka-ca.sh"

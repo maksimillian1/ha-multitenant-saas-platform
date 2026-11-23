@@ -1,6 +1,6 @@
 name: c4
 
-# C4 diagrams generated from the Go code (HAMSP-79, tools/c4sync/README.md).
+# C4 diagrams generated from the Go code (tools/c4sync/README.md).
 # check: the committed diagrams match the code, every package belongs to a
 #        component, the go-arch-lint rules hold, and the Mermaid in
 #        docs/architecture/c4/README.md matches workspace.dsl.
@@ -11,7 +11,7 @@ name: c4
 on:
   # Every pull request, without a paths filter: GitHub applies the filter to the
   # whole PR diff, so a PR whose structural change was reverted would not run
-  # and would keep a stale comment (HAMSP-84).
+  # and would keep a stale comment.
   pull_request:
   push:
     branches: [master]

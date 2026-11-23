@@ -24,7 +24,7 @@ usage_writeapi_kafka = component "Kafka client" "Produces and consumes usage eve
     properties {
         "go.packages" "internal/kafka"
         "topic.consumes" "? (in NewConsumer)"
-        "topic.produces" "? (in NewProducer)"
+        "topic.produces" "? (in NewDLQ), ? (in NewProducer)"
     }
 }
 usage_writeapi_writeapi = component "Write API" "Accepts usage events over HTTP, validates them, acks once they are in Kafka." "Go, net/http" "c4sync" {
@@ -43,4 +43,4 @@ usage_writeapi_writeapi -> usage_writeapi_core "Uses" "Go import" "c4sync"
 usage_writeapi_writeapi -> usage_writeapi_httpx "Uses" "Go import" "c4sync"
 usage_writeapi_kafka -> hamsp.kafka "Uses" "franz-go" "c4sync"
 usage_writeapi_kafka -> hamsp.kafka "Consumes topics: ? (in NewConsumer)" "" "c4sync"
-usage_writeapi_kafka -> hamsp.kafka "Produces topics: ? (in NewProducer)" "" "c4sync"
+usage_writeapi_kafka -> hamsp.kafka "Produces topics: ? (in NewDLQ), ? (in NewProducer)" "" "c4sync"

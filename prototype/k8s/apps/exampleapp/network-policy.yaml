@@ -1,5 +1,5 @@
 # Only the API Gateway may reach ExampleApp, because ExampleApp trusts the
-# x-tenant-id header (HAMSP-5 AC-6). Kubelet probes come from the host and are
+# x-tenant-id header. Kubelet probes come from the host and are
 # allowed by Cilium's default.
 apiVersion: cilium.io/v2
 kind: CiliumNetworkPolicy

@@ -12,37 +12,27 @@ type Config struct {
 	DatabaseURL        string // application role (serve)
 	MigrateDatabaseURL string // owner role (migrate)
 
-	// Issuer is Zitadel's public issuer URL; IssuerDialAddr, when set, is
-	// where connections to it go inside the cluster.
+	// IssuerDialAddr: the public issuer name does not resolve inside the cluster.
 	Issuer         string
 	IssuerDialAddr string
-	// Audience is the ID of the tenant-management project: callers' tokens
-	// must be issued for it and carry its role tenant-manager.
-	Audience string
-	// ZitadelKeyFile is the path of the JWT profile key of the service's own
-	// Zitadel machine user (instance role IAM_ORG_MANAGER). The service
-	// exchanges it for short-lived access tokens; it has no long-lived token.
+	Audience       string
+	// Exchanged for short-lived access tokens; the service holds no long-lived token.
 	ZitadelKeyFile string
 
-	// KubeAPI is the Kubernetes API server; empty means the in-cluster one.
-	KubeAPI string
-	// Quota is the ResourceQuota of every tenant namespace.
+	// Empty means in-cluster.
+	KubeAPI     string
 	QuotaCPU    string
 	QuotaMemory string
 	QuotaPods   string
 
-	// StepTimeout bounds one call to Zitadel or Kubernetes.
 	StepTimeout time.Duration
 
-	// KafkaBrokers and TenantStates: where every tenant's state is published
-	// for the API Gateway (ADR-0012, item 5).
-	KafkaBrokers []string
-	TenantStates string
-	// KafkaUsername and KafkaPassword: the SCRAM login of the tenants KafkaUser (HAMSP-31).
+	// ADR-0012, item 5.
+	KafkaBrokers  []string
+	TenantStates  string
 	KafkaUsername string
 	KafkaPassword string
-	// KafkaCAFile: the usage-kafka cluster CA the client trusts (HAMSP-31).
-	KafkaCAFile string
+	KafkaCAFile   string
 }
 
 func GetEnv(key, defaultVal string) string {

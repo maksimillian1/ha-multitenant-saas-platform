@@ -1,6 +1,4 @@
-// Package migrations is the schema of the usage database (ADR-0008): the SQL
-// files and the runner that applies them as the owner role. Only cmd/migrate
-// links it, so neither writeapi nor writer can change the schema.
+// Package migrations is linked only by cmd/migrate, so writeapi and writer cannot change the schema.
 package migrations
 
 import (
@@ -19,13 +17,9 @@ import (
 //go:embed *.sql
 var files embed.FS
 
-// migrationLockID serialises concurrent migration runs (pg_advisory_xact_lock).
 const migrationLockID = 5_000_011
 
-// RequireTimescaleDB fails unless the TimescaleDB extension is installed in the
-// database with its Timescale License features (ADR-0008). CNPG's Database
-// resource creates the extension; the migrations need its columnstore and
-// continuous aggregates, which the Apache 2 edition does not have.
+// The migrations need columnstore and continuous aggregates, missing in the Apache 2 edition (ADR-0008).
 func RequireTimescaleDB(ctx context.Context, conn *pgx.Conn) error {
 	var version, license string
 	err := conn.QueryRow(ctx, `SELECT extversion, current_setting('timescaledb.license')
@@ -42,9 +36,7 @@ func RequireTimescaleDB(ctx context.Context, conn *pgx.Conn) error {
 	return nil
 }
 
-// Migrate applies the embedded migrations in file name order. Each file runs in
-// its own transaction and is recorded in schema_migrations. It must run as the
-// owner role of the database, not as Usage Writer's role.
+// Migrate must run as the database owner role, not as Usage Writer's role.
 func Migrate(ctx context.Context, conn *pgx.Conn) error {
 	if err := RequireTimescaleDB(ctx, conn); err != nil {
 		return err
@@ -94,14 +86,8 @@ func Migrate(ctx context.Context, conn *pgx.Conn) error {
 	return nil
 }
 
-// UnprotectedTables returns every relation with a tenant_id column, chunks and
-// partitions included, that an application role could use to reach another
-// tenant's rows. An empty result means tenant isolation holds.
-//
-// The usage database cannot use RLS everywhere (ADR-0008), so a table passes
-// if it has RLS enabled and forced, or if nobody but its owner has a privilege
-// on it. A view passes if nobody but its owner has a privilege on it, or if it
-// is a security_barrier view that filters by app.current_tenant_id.
+// RLS is not usable everywhere here (ADR-0008): a relation passes if RLS is forced or only its owner
+// has privileges; a view also passes as a security_barrier view filtering by app.current_tenant_id.
 func UnprotectedTables(ctx context.Context, conn *pgx.Conn) ([]string, error) {
 	rows, err := conn.Query(ctx, `
 		SELECT n.nspname || '.' || c.relname
@@ -122,8 +108,7 @@ func UnprotectedTables(ctx context.Context, conn *pgx.Conn) ([]string, error) {
 	return pgx.CollectRows(rows, pgx.RowTo[string])
 }
 
-// Connect retries until ctx is done, because on a fresh cluster the database
-// may still be starting when the migration job runs.
+// On a fresh cluster the database may still be starting when the migration job runs.
 func Connect(ctx context.Context, log *slog.Logger, dsn string) (*pgx.Conn, error) {
 	for {
 		conn, err := pgx.Connect(ctx, dsn)

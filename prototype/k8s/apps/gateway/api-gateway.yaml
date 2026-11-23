@@ -34,7 +34,7 @@ spec:
             - name: ISSUER_DIAL_ADDR
               value: zitadel.zitadel.svc:8080
             # Zitadel project ID of the platform API, the audience every token
-            # must carry (HAMSP-22). Zitadel generates the ID, so
+            # must carry. Zitadel generates the ID, so
             # prototype/bootstrap-tenants.sh creates the project and writes this
             # ConfigMap; until then the pods wait in CreateContainerConfigError.
             - name: AUDIENCE
@@ -45,10 +45,10 @@ spec:
                 configMapKeyRef: {name: api-gateway-audience, key: zitadel_admin_org}
             - name: ROUTES
               value: /items=http://exampleapp.exampleapp.svc:8080
-            # Suspended tenants are read from the topic tenant-states (HAMSP-52).
+            # Suspended tenants are read from the topic tenant-states.
             - name: KAFKA_BROKERS
               value: usage-kafka-kafka-bootstrap.kafka.svc:9093
-            # HAMSP-31: TLS with the cluster CA and a
+            # TLS with the cluster CA and a
             # SCRAM login as KafkaUser api-gateway.
             - name: KAFKA_CA_FILE
               value: /etc/kafka-ca/ca.crt
@@ -56,7 +56,7 @@ spec:
               valueFrom: {secretKeyRef: {name: api-gateway-kafka, key: KAFKA_USERNAME}}
             - name: KAFKA_PASSWORD
               valueFrom: {secretKeyRef: {name: api-gateway-kafka, key: KAFKA_PASSWORD}}
-            # Every API call becomes a usage event (HAMSP-26).
+            # Every API call becomes a usage event.
             - name: USAGE_URL
               value: http://usage-writeapi.usage.svc:8080/v1/events
           volumeMounts:

@@ -3,14 +3,8 @@
 # are generated from this file; change it first, then run `go generate ./...`
 # and `npm run gen:api` in ui/app.
 #
-# Every route needs a session with the admin role. State-changing requests
-# (POST, PUT, PATCH, DELETE) also need the header `X-Requested-With: XMLHttpRequest`
-# and must come from the app's own origin (CSRF). The data comes from Zitadel,
-# which the app calls with its own service account (HAMSP-34); the platform
-# branding routes use a second one with instance rights (HAMSP-37). Tenants
-# come from Tenant Management (ADR-0012, HAMSP-51), which the app calls with
-# its machine token and the admin's user ID; organizations are created and
-# deleted only as tenants.
+# State-changing requests need `X-Requested-With: XMLHttpRequest` and the app's
+# own origin (CSRF). Organizations are created and deleted only as tenants (ADR-0012).
 openapi: 3.0.3
 info:
   title: Admin API

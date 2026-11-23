@@ -12,7 +12,7 @@ import (
 	"github.com/maksimillian1/ha-multitenant-saas-platform/apps/usage/internal/core"
 )
 
-// jsonValue decodes b keeping numbers exact, so 2^53 + 1 stays itself.
+// Numbers stay exact, so 2^53 + 1 is not rounded.
 func jsonValue(t *testing.T, b []byte) any {
 	t.Helper()
 	dec := json.NewDecoder(bytes.NewReader(b))
@@ -24,9 +24,7 @@ func jsonValue(t *testing.T, b []byte) any {
 	return v
 }
 
-// UsageWriteAPI writes exactly the Kafka version it declares, and the record
-// of the HTTP example's first event is the Kafka example. A new SchemaVersion
-// without a declaration and a schema with examples fails here.
+// The record of the HTTP example's first event is the Kafka example.
 // Verifies: kafka-client-auth T-02
 func TestEncodeWritesTheProducedVersion(t *testing.T) {
 	want := fmt.Sprintf("v%d", core.SchemaVersion)

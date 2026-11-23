@@ -14,7 +14,7 @@ on:
 jobs:
   test:
     # Applies all migrations to a clean PostgreSQL and fails if any table with a
-    # tenant_id column lacks enabled and forced RLS (QS-01, HAMSP-5 AC-10).
+    # tenant_id column lacks enabled and forced RLS (QS-01).
     runs-on: ubuntu-latest
     services:
       postgres:

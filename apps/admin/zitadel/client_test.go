@@ -12,9 +12,7 @@ import (
 	"time"
 )
 
-// fakeZitadel answers every request with the canned body for its path and
-// records what it got. The expected request bodies in these tests are the
-// protojson form of the v4.19.2 messages (proto/zitadel/*/v2).
+// Expected bodies are the protojson form of the v4.19.2 messages.
 type fakeZitadel struct {
 	t        *testing.T
 	answers  map[string]string // path → 200 body
@@ -89,8 +87,6 @@ func TestClientSendsConnectJSONWithToken(t *testing.T) {
 	}
 }
 
-// TestRequestBodies checks the path and the JSON body of every call against
-// the v4.19.2 protos.
 func TestRequestBodies(t *testing.T) {
 	ctx := context.Background()
 	const org = "/zitadel.org.v2.OrganizationService/"
@@ -222,9 +218,6 @@ func TestRequestBodies(t *testing.T) {
 	}
 }
 
-// TestDecodesProtoJSON reads answers as protojson writes them: 64-bit
-// integers as strings, enums by name, timestamps in RFC 3339 and fields
-// with default values left out.
 func TestDecodesProtoJSON(t *testing.T) {
 	_, c := newFake(t, map[string]string{
 		"/zitadel.org.v2.OrganizationService/ListOrganizations": `{

@@ -22,8 +22,7 @@ func (s *Service) createAuthorization(w http.ResponseWriter, r *http.Request, _ 
 	}
 	orgID := stringValue(body.OrgId)
 	if orgID == "" {
-		// The roles are given on behalf of the organization that owns the
-		// project.
+		// The roles are given on behalf of the organization that owns the project.
 		project, err := s.Zitadel.GetProject(r.Context(), body.ProjectId)
 		if err != nil {
 			s.fail(w, r, err)

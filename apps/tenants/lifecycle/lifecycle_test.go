@@ -184,7 +184,6 @@ func TestSuspendResume(t *testing.T) {
 		t.Fatalf("after resume: %+v, %v", a, err)
 	}
 
-	// A failed deactivation leaves the tenant active, with the error.
 	deps.FailNext["DeactivateOrganization"] = 1
 	a, err = s.Suspend(ctx, a.ID, "admin-1")
 	assertStepErr(t, err)
@@ -192,7 +191,6 @@ func TestSuspendResume(t *testing.T) {
 		t.Fatalf("after a failed suspend: %+v", a)
 	}
 
-	// A second request on the same tenant while the first is in a step.
 	s.StepTimeout = 10 * time.Second
 	deps.ResetCalls()
 	release := make(chan struct{})
@@ -236,7 +234,6 @@ func TestDeleteLeavesTombstoneAndOtherTenants(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// A failing step leaves the tenant in deleting; a retry finishes it.
 	deps.FailNext["DeleteOrganization"] = 1
 	a, err := s.Delete(ctx, a.ID, "admin-2")
 	assertStepErr(t, err)
@@ -277,8 +274,7 @@ func TestDeleteLeavesTombstoneAndOtherTenants(t *testing.T) {
 // Verifies: tenant-management AC-7, AC-3; T-05
 func TestDeleteStuckProvisioningRemovesUnrecordedParts(t *testing.T) {
 	s, deps := newService(t)
-	// The organization is created but its answer is lost: the row does not
-	// record it, yet it exists.
+	// Created but the answer is lost: the row does not record it, yet it exists.
 	deps.FailNext["CreateOrganization"] = 1
 	deps.LostAnswer["CreateOrganization"] = true
 	a, err := s.Create(ctx, "acme", "boss@acme.test", "admin-1")

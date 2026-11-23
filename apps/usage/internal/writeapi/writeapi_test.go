@@ -62,7 +62,6 @@ func post(t *testing.T, s *Service, body any) *httptest.ResponseRecorder {
 	return w
 }
 
-// AC-5: 202 only after the producer confirmed the whole batch.
 func TestAcceptsOnlyAfterKafkaConfirms(t *testing.T) {
 	p := &fakeProducer{}
 	w := post(t, NewService(p, quiet), map[string]any{"events": []any{ev("a"), ev("b")}})
@@ -74,15 +73,12 @@ func TestAcceptsOnlyAfterKafkaConfirms(t *testing.T) {
 	}
 }
 
-// AC-5: when Kafka does not confirm, the answer is 503.
 func TestKafkaFailureIs503(t *testing.T) {
 	p := &fakeProducer{err: errors.New("NOT_ENOUGH_REPLICAS")}
 	if w := post(t, NewService(p, quiet), map[string]any{"events": []any{ev("a")}}); w.Code != http.StatusServiceUnavailable {
 		t.Fatalf("status %d, want 503", w.Code)
 	}
 
-	// The real producer against a broker that does not exist fails within its
-	// delivery timeout instead of hanging.
 	k, err := kafka.NewProducer([]string{"127.0.0.1:1"}, "usage-events", kgo.RecordDeliveryTimeout(time.Second))
 	if err != nil {
 		t.Fatal(err)
@@ -93,7 +89,6 @@ func TestKafkaFailureIs503(t *testing.T) {
 	}
 }
 
-// AC-6: an invalid batch is rejected with 400 and nothing reaches Kafka.
 func TestInvalidBatchIsRejectedWhole(t *testing.T) {
 	bad := ev("a")
 	delete(bad, "event_id")
@@ -123,7 +118,6 @@ func TestInvalidBatchIsRejectedWhole(t *testing.T) {
 	}
 }
 
-// A 202 means the events are in the topic, keyed by tenant_id.
 func TestAcceptedEventsAreInKafka(t *testing.T) {
 	cluster, err := kfake.NewCluster(kfake.NumBrokers(3), kfake.SeedTopics(3, "usage-events"))
 	if err != nil {

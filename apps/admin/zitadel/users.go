@@ -5,7 +5,6 @@ import (
 	"time"
 )
 
-// User is a user.v2 User: a human or a machine (service account).
 // Details.ResourceOwner is the user's organization.
 type User struct {
 	UserID             string       `json:"userId"`
@@ -18,7 +17,6 @@ type User struct {
 	Machine            *MachineUser `json:"machine"`
 }
 
-// HumanUser holds the fields of user.v2.HumanUser that the admin app shows.
 type HumanUser struct {
 	Profile struct {
 		GivenName   string `json:"givenName"`
@@ -38,7 +36,6 @@ type HumanUser struct {
 	PasswordChanged        time.Time `json:"passwordChanged"`
 }
 
-// MachineUser is user.v2.MachineUser.
 type MachineUser struct {
 	Name            string          `json:"name"`
 	Description     string          `json:"description"`
@@ -46,7 +43,6 @@ type MachineUser struct {
 	AccessTokenType AccessTokenType `json:"accessTokenType"`
 }
 
-// UserState is user.v2.UserState.
 type UserState string
 
 const (
@@ -57,7 +53,6 @@ const (
 	UserInitial  UserState = "USER_STATE_INITIAL"
 )
 
-// UserType is user.v2.Type, used to filter users.
 type UserType string
 
 const (
@@ -65,8 +60,7 @@ const (
 	TypeMachine UserType = "TYPE_MACHINE"
 )
 
-// AccessTokenType is user.v2.AccessTokenType. protojson leaves out the
-// default, so an empty value means bearer.
+// protojson leaves out the default, so empty means bearer.
 type AccessTokenType string
 
 const (
@@ -74,10 +68,8 @@ const (
 	AccessTokenJWT    AccessTokenType = "ACCESS_TOKEN_TYPE_JWT"
 )
 
-// UserFilter narrows ListUsers. Zero fields match every user; set fields
-// must all match.
 type UserFilter struct {
-	Search         string // part of the username, display name or email, in any case
+	Search         string // username, display name or email, any case
 	OrganizationID string
 	Type           UserType
 	State          UserState
@@ -88,7 +80,7 @@ type UserList struct {
 	Users []User
 }
 
-// userQuery is user.v2.SearchQuery, a oneof: exactly one field is set.
+// A oneof: exactly one field is set.
 type userQuery struct {
 	OrQuery             *orQuery     `json:"orQuery,omitempty"`
 	UserNameQuery       *userText    `json:"userNameQuery,omitempty"`
@@ -124,8 +116,6 @@ type emailText struct {
 	Method       string `json:"method"`
 }
 
-// ListUsers returns the users of every organization the service account may
-// read, sorted by username.
 func (c *Client) ListUsers(ctx context.Context, f UserFilter, p Page) (UserList, error) {
 	req := struct {
 		Query         *pagination `json:"query"`
@@ -181,9 +171,7 @@ func (c *Client) GetUser(ctx context.Context, id string) (User, error) {
 	return resp.User, nil
 }
 
-// NewHumanUser is a person who signs in. Without a password the user stays
-// in the initial state until they set one. Without EmailVerified Zitadel
-// sends a verification code, if it can send email.
+// Without a password the user stays initial; without EmailVerified Zitadel sends a code.
 type NewHumanUser struct {
 	OrganizationID         string
 	Username               string // optional: Zitadel uses the email
@@ -196,7 +184,6 @@ type NewHumanUser struct {
 	PasswordChangeRequired bool
 }
 
-// NewMachineUser is a service account, such as a tenant's API client.
 type NewMachineUser struct {
 	OrganizationID  string
 	Username        string
@@ -212,8 +199,7 @@ type profile struct {
 	DisplayName *string `json:"displayName,omitempty"`
 }
 
-// email is user.v2.SetHumanEmail. Without IsVerified the verification oneof
-// is unset, and Zitadel sends a code.
+// Without IsVerified the oneof is unset, and Zitadel sends a code.
 type email struct {
 	Email      string `json:"email"`
 	IsVerified *bool  `json:"isVerified,omitempty"`
@@ -249,7 +235,6 @@ type createUserRequest struct {
 	Machine *machine `json:"machine,omitempty"`
 }
 
-// CreateHumanUser creates the user with user.v2 CreateUser and returns its ID.
 func (c *Client) CreateHumanUser(ctx context.Context, u NewHumanUser) (string, error) {
 	req := createUserRequest{OrganizationID: u.OrganizationID, Username: u.Username}
 	req.Human = &struct {
@@ -266,8 +251,6 @@ func (c *Client) CreateHumanUser(ctx context.Context, u NewHumanUser) (string, e
 	return c.createUser(ctx, req)
 }
 
-// CreateMachineUser creates the service account with user.v2 CreateUser and
-// returns its ID.
 func (c *Client) CreateMachineUser(ctx context.Context, u NewMachineUser) (string, error) {
 	req := createUserRequest{OrganizationID: u.OrganizationID, Username: u.Username, Machine: &machine{
 		Name: &u.Name, Description: optional(u.Description), AccessTokenType: u.AccessTokenType,
@@ -285,8 +268,7 @@ func (c *Client) createUser(ctx context.Context, req createUserRequest) (string,
 	return resp.ID, nil
 }
 
-// UserUpdate changes the set fields; nil fields stay as they are. Human
-// fields apply to humans only, machine fields to machines only.
+// nil fields stay as they are.
 type UserUpdate struct {
 	Username *string
 	Human    *HumanUpdate
@@ -322,7 +304,6 @@ type updateUserRequest struct {
 	Machine  *machine     `json:"machine,omitempty"`
 }
 
-// UpdateUser changes a user with user.v2 UpdateUser.
 func (c *Client) UpdateUser(ctx context.Context, id string, u UserUpdate) error {
 	req := updateUserRequest{UserID: id, Username: u.Username}
 	if h := u.Human; h != nil {
@@ -340,8 +321,7 @@ func (c *Client) UpdateUser(ctx context.Context, id string, u UserUpdate) error 
 	return c.call(ctx, userService, "UpdateUser", req, nil)
 }
 
-// SetPassword sets a human user's password without the current one, as an
-// administrator may (UpdateUser; the SetPassword method is deprecated).
+// UpdateUser, since the SetPassword method is deprecated.
 func (c *Client) SetPassword(ctx context.Context, id, newPassword string, changeRequired bool) error {
 	req := updateUserRequest{UserID: id, Human: &humanUpdate{Password: &struct {
 		Password password `json:"password"`
@@ -369,8 +349,7 @@ func (c *Client) DeleteUser(ctx context.Context, id string) error {
 	return c.call(ctx, userService, "DeleteUser", userRequest{UserID: id}, nil)
 }
 
-// AddSecret generates a new client secret for a machine user, replacing the
-// old one, and returns it. Zitadel cannot show it again.
+// Zitadel cannot show the secret again.
 func (c *Client) AddSecret(ctx context.Context, id string) (string, error) {
 	var resp struct {
 		ClientSecret string `json:"clientSecret"`
@@ -389,7 +368,7 @@ type userRequest struct {
 	UserID string `json:"userId"`
 }
 
-// optional is nil for "", so protojson leaves an optional field unset.
+// nil for "", so protojson leaves an optional field unset.
 func optional(s string) *string {
 	if s == "" {
 		return nil

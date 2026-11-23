@@ -13,7 +13,7 @@ on:
 
 jobs:
   test:
-    # Tenant Management (HAMSP-51, ADR-0012): the store tests apply the
+    # Tenant Management (ADR-0012): the store tests apply the
     # migrations to a clean PostgreSQL and check the RLS guardrail with its
     # platform-table list; the other tests run against fake Zitadel and
     # Kubernetes APIs.

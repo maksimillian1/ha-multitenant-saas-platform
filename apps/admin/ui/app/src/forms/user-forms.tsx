@@ -11,8 +11,7 @@ import { CheckboxField, SelectField, TextareaField, TextField } from './fields'
 import { FormDialog } from './form-dialog'
 import { email, optionalText, password, requiredText } from './schemas'
 
-// OrgSelect offers the first organizations by name; it mounts only while
-// its dialog is open, so the list loads only then.
+// Mounts only while its dialog is open, so the list loads only then.
 function OrgSelect<T extends FieldValues>({ control, name }: { control: Control<T>; name: FieldPath<T> }) {
   const orgs = useQuery(orgsQuery({ limit: MAX_OPTIONS }))
   return (
@@ -200,7 +199,6 @@ const editTrigger = (
   </Button>
 )
 
-// EditUserDialog sends only the fields that changed.
 export function EditUserDialog({ user }: { user: User }) {
   return user.human ? <EditHumanDialog user={user} human={user.human} /> : <EditMachineDialog user={user} />
 }

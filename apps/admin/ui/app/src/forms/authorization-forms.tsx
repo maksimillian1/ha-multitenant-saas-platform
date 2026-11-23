@@ -25,7 +25,6 @@ const roleKeys = z.array(z.string()).min(1, 'Choose at least one role')
 const addSchema = z.object({ project_id: z.string().min(1, 'Required'), role_keys: roleKeys })
 type AddValues = z.infer<typeof addSchema>
 
-// RoleChoices lists the roles of a project as checkboxes.
 function RoleChoices<T extends { role_keys: string[] }>({
   form,
   projectId,
@@ -59,8 +58,7 @@ function RoleChoices<T extends { role_keys: string[] }>({
   )
 }
 
-// AddAuthorizationFields mounts only while the dialog is open, so the
-// projects load only then.
+// Mounts only while the dialog is open, so the projects load only then.
 function AddAuthorizationFields({ form }: { form: UseFormReturn<AddValues> }) {
   const projects = useQuery(projectsQuery({ limit: MAX_OPTIONS }))
   const projectId = useWatch({ control: form.control, name: 'project_id' })

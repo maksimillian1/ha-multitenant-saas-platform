@@ -1,9 +1,5 @@
-// Package api is the JSON API that the SPA calls. Every handler requires a
-// session with the admin role, and state-changing handlers also pass a CSRF
-// check; the types come from ../openapi.yaml. The data lives in Zitadel,
-// which the API calls with the admin app's service account (HAMSP-34), and
-// the tenants in Tenant Management (ADR-0012). Organizations are created and
-// deleted only as tenants, so the API has no route that does it in Zitadel.
+// Package api calls Zitadel with the app's service account, never the admin's token. Organizations
+// are created and deleted only as tenants (ADR-0012), so no route does it in Zitadel.
 package api
 
 //go:generate go run github.com/oapi-codegen/oapi-codegen/v2/cmd/oapi-codegen@v2.8.1 -config oapi-codegen.yaml ../openapi.yaml
@@ -19,7 +15,6 @@ import (
 	"github.com/maksimillian1/ha-multitenant-saas-platform/apps/admin/zitadel"
 )
 
-// Zitadel is what the API needs from Zitadel; *zitadel.Client implements it.
 type Zitadel interface {
 	ServiceAccount(ctx context.Context) (zitadel.ServiceAccount, error)
 
@@ -54,7 +49,7 @@ type Zitadel interface {
 	GetProject(ctx context.Context, id string) (zitadel.Project, error)
 	ListProjectRoles(ctx context.Context, projectID string, p zitadel.Page) ([]zitadel.ProjectRole, error)
 
-	// Organization branding (HAMSP-37); the instance's goes through Platform.
+	// The instance's branding goes through Platform.
 	BrandingClient
 	CreateOrgBranding(ctx context.Context, orgID string, settings zitadel.BrandingSettings) error
 	ResetOrgBranding(ctx context.Context, orgID string) error
@@ -66,18 +61,14 @@ type Service struct {
 	Sessions core.SessionReader
 	Zitadel  Zitadel
 	Platform PlatformZitadel
-	// Tenants is Tenant Management; nil when TENANTS_URL is not set, and
-	// then the tenant routes answer 503.
+	// nil when TENANTS_URL is not set; the tenant routes then answer 503.
 	Tenants   Tenants
 	AdminRole string
 	Log       *slog.Logger
 	csrf      *http.CrossOriginProtection
 }
 
-// NewService returns the API. platform is the Zitadel client for the
-// platform branding; since HAMSP-36 it is the same admin-app client as
-// zitadel. publicURL is the
-// app's own origin, which state-changing requests must come from.
+// publicURL is the origin state-changing requests must come from.
 func NewService(sessions core.SessionReader, zitadel Zitadel, platform PlatformZitadel, adminRole, publicURL string, log *slog.Logger) *Service {
 	csrf := http.NewCrossOriginProtection()
 	if u, err := url.Parse(publicURL); err == nil && u.Scheme != "" && u.Host != "" {
@@ -88,7 +79,6 @@ func NewService(sessions core.SessionReader, zitadel Zitadel, platform PlatformZ
 	return &Service{Sessions: sessions, Zitadel: zitadel, Platform: platform, AdminRole: adminRole, Log: log, csrf: csrf}
 }
 
-// Register adds the API's routes to mux.
 func (s *Service) Register(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/me", s.MeHandler)
 	mux.HandleFunc("GET /api/overview", s.read(s.overview))
@@ -144,16 +134,13 @@ func (s *Service) MeHandler(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// NotFoundHandler answers unknown /api/ paths, which would otherwise get the
-// SPA's index.html.
+// Otherwise unknown /api/ paths would get the SPA's index.html.
 func (s *Service) NotFoundHandler(w http.ResponseWriter, r *http.Request) {
 	core.WriteError(w, http.StatusNotFound, "not found")
 }
 
-// handler is an API handler for a signed-in admin.
 type handler func(w http.ResponseWriter, r *http.Request, admin core.Session)
 
-// read serves h to admins.
 func (s *Service) read(h handler) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if admin, ok := s.admin(w, r); ok {
@@ -162,8 +149,7 @@ func (s *Service) read(h handler) http.HandlerFunc {
 	}
 }
 
-// change serves h to admins whose request passes the CSRF check, and writes
-// every change to the log: who, which route, which target, which status.
+// Every change is logged: who, which route, which target, which status.
 func (s *Service) change(h handler) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		admin, ok := s.admin(w, r)
@@ -182,8 +168,7 @@ func (s *Service) change(h handler) http.HandlerFunc {
 	}
 }
 
-// admin returns the session of an admin, or writes 401 or 403. The SPA sends
-// the browser to the login on 401.
+// The SPA sends the browser to the login on 401.
 func (s *Service) admin(w http.ResponseWriter, r *http.Request) (core.Session, bool) {
 	w.Header().Set("Cache-Control", "no-store")
 	session, ok := s.Sessions.Session(r)
@@ -199,7 +184,6 @@ func (s *Service) admin(w http.ResponseWriter, r *http.Request) (core.Session, b
 	return session, true
 }
 
-// auditWriter keeps the status and the target of a change for the log.
 type auditWriter struct {
 	http.ResponseWriter
 	status int
@@ -211,8 +195,7 @@ func (a *auditWriter) WriteHeader(code int) {
 	a.ResponseWriter.WriteHeader(code)
 }
 
-// pathTarget is the ID of the resource a route changes; "instance" for the
-// platform branding.
+// "instance" for the platform branding.
 func pathTarget(r *http.Request) string {
 	for _, name := range []string{"authorizationId", "userId", "orgId", "tenantId"} {
 		if id := r.PathValue(name); id != "" {
@@ -225,8 +208,7 @@ func pathTarget(r *http.Request) string {
 	return ""
 }
 
-// created answers 201 with the ID of the new resource, which also becomes
-// the target in the change log.
+// The ID also becomes the target in the change log.
 func created(w http.ResponseWriter, id string) {
 	if a, ok := w.(*auditWriter); ok {
 		a.target = id

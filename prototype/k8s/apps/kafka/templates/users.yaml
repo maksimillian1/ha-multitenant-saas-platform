@@ -1,5 +1,5 @@
-# One KafkaUser per Kafka client (HAMSP-31): UsageWriteAPI, Usage Writer,
-# Tenant Management and the API Gateway. usage migrate has none: it needs no
+# One KafkaUser per Kafka client: UsageWriteAPI, Usage Writer,
+# writer replay, Tenant Management and the API Gateway. usage migrate has none: it needs no
 # Kafka. Local kind prototype passwords only; the same values are in
 # the Secrets of each client's namespace, because a Strimzi user lives in the
 # Kafka namespace and the pods read their password in the usage namespace.
@@ -43,7 +43,8 @@ spec:
       - resource: {type: cluster}
         operations: [IdempotentWrite]
 ---
-# Usage Writer: read usage-events with its own consumer group only.
+# Usage Writer: read usage-events with its own consumer group only, and write
+# poison records to usage-events-dlq.
 apiVersion: kafka.strimzi.io/v1
 kind: KafkaUser
 metadata:
@@ -65,6 +66,45 @@ spec:
         operations: [Read, Describe]
       - resource: {type: group, name: usage-writer, patternType: literal}
         operations: [Read]
+      - resource: {type: topic, name: usage-events-dlq, patternType: literal}
+        operations: [Write, Describe]
+      - resource: {type: cluster}
+        operations: [IdempotentWrite]
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: usage-replay-kafka-password
+type: Opaque
+stringData:
+  password: dev-usage-replay-kafka # gitleaks:allow
+---
+# writer replay: read usage-events-dlq without a consumer group and
+# write the chosen records back to usage-events. It cannot read usage-events
+# or write usage-events-dlq.
+apiVersion: kafka.strimzi.io/v1
+kind: KafkaUser
+metadata:
+  name: usage-replay
+  labels:
+    strimzi.io/cluster: usage-kafka
+  annotations:
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
+spec:
+  authentication:
+    type: scram-sha-512
+    password:
+      valueFrom:
+        secretKeyRef: {name: usage-replay-kafka-password, key: password}
+  authorization:
+    type: simple
+    acls:
+      - resource: {type: topic, name: usage-events-dlq, patternType: literal}
+        operations: [Read, Describe]
+      - resource: {type: topic, name: usage-events, patternType: literal}
+        operations: [Write, Describe]
+      - resource: {type: cluster}
+        operations: [IdempotentWrite]
 ---
 apiVersion: v1
 kind: Secret
@@ -82,7 +122,7 @@ type: Opaque
 stringData:
   password: dev-api-gateway-kafka # gitleaks:allow
 ---
-# Tenant Management: publishes every tenant's state to tenant-states (HAMSP-52).
+# Tenant Management: publishes every tenant's state to tenant-states.
 apiVersion: kafka.strimzi.io/v1
 kind: KafkaUser
 metadata:
@@ -105,7 +145,7 @@ spec:
       - resource: {type: cluster}
         operations: [IdempotentWrite]
 ---
-# API Gateway: reads tenant-states without a consumer group (HAMSP-52), so it
+# API Gateway: reads tenant-states without a consumer group, so it
 # needs no group ACL.
 apiVersion: kafka.strimzi.io/v1
 kind: KafkaUser

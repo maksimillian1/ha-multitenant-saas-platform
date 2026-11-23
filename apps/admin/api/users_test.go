@@ -80,7 +80,6 @@ func TestCreateHumanUser(t *testing.T) {
 		t.Fatalf("created %+v with %+v, want %+v", made, e.z.newHuman, want)
 	}
 
-	// The optional fields can be left out.
 	expect(t, e.do("POST", "/api/users/human", HumanUserCreate{OrgId: "org-a", GivenName: "Cy", FamilyName: "Oh", Email: "cy@example.test"}),
 		http.StatusCreated, &made)
 	if e.z.newHuman != (zitadel.NewHumanUser{OrganizationID: "org-a", GivenName: "Cy", FamilyName: "Oh", Email: "cy@example.test"}) {
@@ -137,7 +136,6 @@ func TestUpdateUser(t *testing.T) {
 		t.Fatalf("update = %+v / %+v", e.z.update, h)
 	}
 
-	// A machine's description may be cleared.
 	expect(t, e.do("PATCH", "/api/users/ci", UserUpdate{Username: ptr("ci-renamed"), Machine: &MachineUserUpdate{Description: ptr("")}}),
 		http.StatusNoContent, nil)
 	if m := e.z.update.Machine; m == nil || *m.Description != "" || m.Name != nil || *e.z.update.Username != "ci-renamed" {

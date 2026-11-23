@@ -25,8 +25,6 @@ func example(t *testing.T, name string) []byte {
 	return raw
 }
 
-// fakeTM is Zitadel's token endpoint and Tenant Management in one server.
-// It answers each Tenant Management path with the body set for it.
 type fakeTM struct {
 	mu       sync.Mutex
 	tokens   int
@@ -84,10 +82,6 @@ func (f *fakeTM) serve(w http.ResponseWriter, r *http.Request) {
 	_, _ = w.Write(a.body)
 }
 
-// TestClientSendsTokenAndAdmin: every call carries the machine token, which
-// is fetched once and reused, and every change names the admin. The
-// answers are the contract's examples.
-//
 // Verifies: tenant-management AC-14; T-02
 func TestClientSendsTokenAndAdmin(t *testing.T) {
 	f, c := newFake(t)

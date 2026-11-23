@@ -1,4 +1,4 @@
-# Pre-commit checks (HAMSP-40). CI runs the same linters: .github/workflows/lint.yml
+# Pre-commit checks. CI runs the same linters: .github/workflows/lint.yml
 # for Go and gitleaks, .github/workflows/admin.yml for the SPA.
 #
 # Install once per clone: brew install lefthook golangci-lint gitleaks && lefthook install

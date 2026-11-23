@@ -1,6 +1,4 @@
-// Package writeapi is UsageWriteAPI (docs/contracts/usage-event): it
-// validates a batch of usage events and answers 202 only after Kafka confirmed
-// every event (ADR-0005).
+// Package writeapi answers 202 only after Kafka confirmed every event (ADR-0005).
 package writeapi
 
 import (
@@ -32,9 +30,7 @@ type batch struct {
 	Events []core.Event `json:"events"`
 }
 
-// Register adds the endpoint of every HTTP contract version this service reads
-// (docs/contracts/usage-event/participants.json). A new version is served next
-// to the old ones until no sender uses the old one.
+// An old version is served until no sender uses it.
 func (s *Service) Register(mux *http.ServeMux) {
 	mux.HandleFunc("POST /v1/events", s.EventsHandler)
 }

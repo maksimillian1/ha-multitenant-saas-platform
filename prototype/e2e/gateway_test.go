@@ -98,7 +98,7 @@ func TestGatewayRejectsInvalidTokens(t *testing.T) {
 	}
 }
 
-// HAMSP-22: a valid Zitadel token that is not issued for the platform API (no
+// A valid Zitadel token that is not issued for the platform API (no
 // project audience) gets 401 at the gateway and never reaches ExampleApp.
 func TestGatewayRejectsTokenWithoutPlatformAudience(t *testing.T) {
 	valid := token(t, tenA)

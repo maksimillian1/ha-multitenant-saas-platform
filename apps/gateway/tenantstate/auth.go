@@ -11,11 +11,8 @@ import (
 	"github.com/twmb/franz-go/pkg/sasl/scram"
 )
 
-// ClientAuth is how this binary connects to Kafka (HAMSP-31, feature
-// kafka-client-auth): TLS that trusts only the cluster CA in caFile, and a
-// SCRAM-SHA-512 login as its own KafkaUser. Without a CA file and a username
-// it returns no options, for tests against kfake. SCRAM runs only over TLS,
-// so a username without a CA file is an error.
+// ClientAuth returns no options without a CA file and username (tests against kfake).
+// SCRAM runs only over TLS, so a username without a CA file is an error.
 func ClientAuth(caFile, username, password string) ([]kgo.Opt, error) {
 	if caFile == "" && username == "" {
 		return nil, nil
@@ -31,8 +28,7 @@ func ClientAuth(caFile, username, password string) ([]kgo.Opt, error) {
 	if !pool.AppendCertsFromPEM(pem) {
 		return nil, fmt.Errorf("KAFKA_CA_FILE %s holds no PEM certificate", caFile)
 	}
-	// kgo sets ServerName to the broker it dials, so the broker certificate
-	// is checked against its own name.
+	// kgo sets ServerName per broker, so each certificate is checked against its own name.
 	opts := []kgo.Opt{kgo.DialTLSConfig(&tls.Config{MinVersion: tls.VersionTLS12, RootCAs: pool})}
 	if username == "" {
 		return opts, nil

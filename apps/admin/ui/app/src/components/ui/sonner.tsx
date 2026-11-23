@@ -1,8 +1,7 @@
 import { Toaster as Sonner, type ToasterProps } from "sonner"
 import { CircleCheckIcon, InfoIcon, TriangleAlertIcon, OctagonXIcon, Loader2Icon } from "lucide-react"
 
-// The app follows the system theme (main.tsx), and so does sonner with
-// theme="system"; the shadcn template's next-themes is not needed.
+// The app follows the system theme (main.tsx), so next-themes from the shadcn template is not needed.
 const Toaster = ({ ...props }: ToasterProps) => {
   return (
     <Sonner

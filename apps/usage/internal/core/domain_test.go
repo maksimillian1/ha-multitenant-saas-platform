@@ -17,7 +17,6 @@ func valid() Event {
 	}
 }
 
-// AC-6: an event that breaks the contract is rejected.
 func TestValidate(t *testing.T) {
 	if err := valid().Validate(now); err != nil {
 		t.Fatalf("valid event rejected: %v", err)

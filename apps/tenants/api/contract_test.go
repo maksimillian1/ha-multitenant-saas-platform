@@ -8,11 +8,9 @@ import (
 	"testing"
 )
 
-// The Tenant Management contract (docs/contracts/tenants).
 const examples = "../../../docs/contracts/tenants/examples/"
 
-// shape is the JSON kind of every field, objects recursively, so a renamed,
-// missing, extra or retyped field changes it while the values do not matter.
+// Only kinds, so a renamed, missing, extra or retyped field changes the shape while values do not.
 func shape(v any) any {
 	switch v := v.(type) {
 	case map[string]any:

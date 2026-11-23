@@ -1,0 +1,20 @@
+# Alert rules of Usage Writer (feature usage-writer, AC-6), in the
+# plain Prometheus rules format. Not synced by ArgoCD: the cluster has no
+# Prometheus and no PrometheusRule CRD yet, so this file is inert until a
+# monitoring stack exists. promtool tests it: usage-writer.rules.test.yaml.
+groups:
+  - name: usage-writer
+    rules:
+      # A record in the DLQ is usage that is not stored and not billed. The
+      # DLQ keeps it for 7 days; after that it is lost. Any new DLQ record
+      # fires, and the alert stays for an hour so a short scrape gap does not
+      # hide it.
+      - alert: UsageWriterDeadLetters
+        expr: increase(usage_writer_records_dead_lettered_total[1h]) > 0
+        labels:
+          severity: page
+        annotations:
+          summary: Usage Writer sent {{ $value | humanize }} records to usage-events-dlq in the last hour.
+          description: >-
+            Read the dlq-reason header of the records in usage-events-dlq, fix the cause, then put them
+            back with writer replay within 7 days (docs/contracts/usage-event, "Dead-letter topic").

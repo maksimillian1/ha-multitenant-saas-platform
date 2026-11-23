@@ -14,10 +14,8 @@ import { Field, FieldDescription, FieldLabel } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
 import { Spinner } from '@/components/ui/spinner'
 
-// ConfirmButton asks before it runs an action. With confirmText the admin
-// must type that text first, for actions that cannot be undone. The dialog
-// stays open while the action runs and closes when it succeeds; a failure
-// is reported by the action itself (a toast).
+// confirmText makes the admin type it first, for actions that cannot be undone. Failures are
+// reported by the action itself.
 export function ConfirmButton({
   label,
   icon,
@@ -40,7 +38,6 @@ export function ConfirmButton({
   destructive?: boolean
   disabled?: boolean
   disabledReason?: string
-  // iconOnly shows just the icon, with the label for screen readers.
   iconOnly?: boolean
   onConfirm: () => Promise<unknown>
 }) {

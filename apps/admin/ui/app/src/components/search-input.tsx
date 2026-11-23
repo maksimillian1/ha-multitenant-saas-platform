@@ -2,8 +2,7 @@ import { Search } from 'lucide-react'
 import { useEffect, useEffectEvent, useRef, useState } from 'react'
 import { Input } from '@/components/ui/input'
 
-// SearchInput reports what the admin types after a short pause, so a list
-// does not reload on every key.
+// Debounced, so a list does not reload on every key.
 export function SearchInput({
   value,
   onSearch,

@@ -1,8 +1,7 @@
 import createClient from 'openapi-fetch'
 import type { paths } from './schema'
 
-// ApiError is a non-2xx answer of the Go API, with its {"error": "..."} text
-// and the whole body (a failed tenant change also returns the tenant).
+// A failed tenant change also returns the tenant in the body.
 export class ApiError extends Error {
   readonly status: number
   readonly body: unknown
@@ -14,12 +13,8 @@ export class ApiError extends Error {
   }
 }
 
-// The session is an HttpOnly cookie of the Go server, so requests carry no
-// token. Types come from apps/admin/openapi.yaml (npm run gen:api).
-//
-// X-Requested-With is the CSRF check of state-changing routes: a cross-site
-// page cannot send it without a CORS preflight, which the server refuses.
-// fetch is looked up on every call, so tests can replace it.
+// X-Requested-With is the CSRF check: cross-site pages cannot send it without a refused preflight.
+// fetch is looked up per call so tests can replace it.
 export const api = createClient<paths>({
   baseUrl: window.location.origin,
   credentials: 'same-origin',
@@ -27,13 +22,12 @@ export const api = createClient<paths>({
   fetch: (request) => globalThis.fetch(request),
 })
 
-// navigation leaves the SPA; tests replace it.
+// Tests replace it.
 export const navigation = {
   toLogin: () => window.location.assign('/auth/login'),
 }
 
-// 401 means the session has ended: the Go server starts a new sign-in. The
-// request never settles, so no error screen shows while the browser leaves.
+// The request never settles, so no error screen shows while the browser leaves for sign-in.
 api.use({
   onResponse({ response }) {
     if (response.status === 401) {
@@ -45,8 +39,6 @@ api.use({
 
 type Result<T> = { data?: T; error?: unknown; response: Response }
 
-// unwrap returns the data of a successful call, or throws ApiError with the
-// server's message.
 export async function unwrap<T>(call: Promise<Result<T>>): Promise<T> {
   const { data, error, response } = await call
   if (!response.ok) {
@@ -62,7 +54,6 @@ function errorMessage(error: unknown, response: Response) {
   return `${response.status} ${response.statusText}`.trim()
 }
 
-// message is what the UI shows for any error.
 export function message(error: unknown) {
   return error instanceof Error ? error.message : String(error)
 }

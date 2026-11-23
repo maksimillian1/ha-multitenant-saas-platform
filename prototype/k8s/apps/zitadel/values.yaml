@@ -1,5 +1,5 @@
 # Zitadel for the local kind prototype (ADR-0003): own namespace, own database
-# in the CNPG cluster, no code changes. Not a production config (HAMSP-5 out of scope).
+# in the CNPG cluster, no code changes. Not a production config.
 zitadel:
   replicaCount: 1
   zitadel:
@@ -12,7 +12,7 @@ zitadel:
       # switched off here: Helm does not apply a null from this umbrella chart
       # to the subchart's default, and the chart's schema rejects anything but
       # an object. bootstrap-tenants.sh deletes the token and its Secret and
-      # replaces the key with a 30-day key on every run (HAMSP-36).
+      # replaces the key with a 30-day key on every run.
       #
       # Zitadel's own role mappings, copied from its defaults because a list in
       # the config replaces the default list as a whole, plus our role
@@ -584,7 +584,7 @@ zitadel:
               - "user.grant.read"
               - "user.membership.read"
 
-          # Ours (HAMSP-36): the admin app changes the platform branding with this
+          # Ours: the admin app changes the platform branding with this
           # role instead of IAM_OWNER. Zitadel has no permission for the label
           # policy alone, so it covers every instance policy.
           - Role: "IAM_BRANDING_MANAGER"

@@ -2,7 +2,6 @@ import tailwindcss from '@tailwindcss/vite'
 import react from '@vitejs/plugin-react'
 import { defineConfig } from 'vite'
 
-// The Go server serves the built files from dist (../ui.go). In development,
 // `npm run dev` proxies the API and the OIDC routes to the Go server.
 export default defineConfig({
   plugins: [react(), tailwindcss()],
@@ -12,8 +11,7 @@ export default defineConfig({
   build: {
     rolldownOptions: {
       output: {
-        // Libraries change less often than the pages, so they get their own
-        // long-cached chunks (ui.go serves assets/ as immutable).
+        // ui.go serves assets/ as immutable, so libraries get their own long-cached chunks.
         codeSplitting: {
           groups: [
             { name: 'react', test: /node_modules[\\/](react|react-dom|scheduler)[\\/]/, priority: 2 },

@@ -13,7 +13,6 @@ import (
 	"github.com/maksimillian1/ha-multitenant-saas-platform/apps/exampleapp/core"
 )
 
-// fakeStore records the tenant of every call and keeps items per tenant.
 type fakeStore struct {
 	items   map[string]core.Item
 	tenants []string

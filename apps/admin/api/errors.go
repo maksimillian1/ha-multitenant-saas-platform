@@ -10,9 +10,7 @@ import (
 	"github.com/maksimillian1/ha-multitenant-saas-platform/apps/admin/zitadel"
 )
 
-// fail answers for a refused change or a failed call to Zitadel. Errors the
-// admin can act on keep Zitadel's message (it says what is wrong with the
-// input or the state); every other error is logged and answered without
+// Only messages the admin can act on keep Zitadel's text; others are logged and answered without
 // details of Zitadel or the service account.
 func (s *Service) fail(w http.ResponseWriter, r *http.Request, err error) {
 	ctx := r.Context()

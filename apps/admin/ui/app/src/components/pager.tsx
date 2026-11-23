@@ -2,7 +2,6 @@ import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Spinner } from '@/components/ui/spinner'
 
-// Pager moves through a list page by page: "21–40 of 57".
 export function Pager({
   offset,
   limit,

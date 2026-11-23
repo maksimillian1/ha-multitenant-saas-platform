@@ -1,6 +1,6 @@
 name: lint
 
-# The pre-commit checks of lefthook.yml, run again in CI (HAMSP-40).
+# The pre-commit checks of lefthook.yml, run again in CI.
 # The SPA's oxlint and tsc run in admin.yml.
 
 on:
@@ -61,7 +61,7 @@ jobs:
 
   hooks:
     # The guardrails themselves: each check refuses the bad change it is for
-    # (tools/hooktest/test.sh, HAMSP-40 AC-1..AC-7 and AC-9).
+    # (tools/hooktest/test.sh).
     runs-on: ubuntu-latest
     env:
       GITLEAKS_VERSION: 8.30.1

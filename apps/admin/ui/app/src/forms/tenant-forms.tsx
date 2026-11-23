@@ -20,9 +20,7 @@ type TenantValues = z.infer<typeof tenantSchema>
 
 const empty: TenantValues = { name: '', admin_email: '' }
 
-// CreateTenantDialog creates a tenant: Tenant Management runs every step in
-// the request. When a step fails, the tenant exists in provisioning; the
-// dialog closes and the tenant's page shows the step, the error and Retry.
+// A failed step leaves the tenant in provisioning; its page shows the step, the error and Retry.
 export function CreateTenantDialog() {
   const navigate = useNavigate()
   const queryClient = useQueryClient()

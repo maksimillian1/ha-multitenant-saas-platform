@@ -12,7 +12,9 @@ Independent releases are a non-goal: the three images share the git SHA and roll
 
 ## Kafka access
 
-Each binary that uses Kafka is its own KafkaUser (HAMSP-31, [kafka-client-auth](../../docs/features/kafka-client-auth.yaml)): it connects to the TLS listener `usage-kafka-kafka-bootstrap.kafka.svc:9093`, trusts only the cluster CA and logs in with SCRAM-SHA-512. ACLs give `usage-writeapi` produce on `usage-events` and `usage-writer` read on `usage-events` with its group `usage-writer`; migrate has no Kafka login. The network policy on the brokers stays as a second layer.
+Each binary that uses Kafka is its own KafkaUser (HAMSP-31, [kafka-client-auth](../../docs/features/kafka-client-auth.yaml)): it connects to the TLS listener `usage-kafka-kafka-bootstrap.kafka.svc:9093`, trusts only the cluster CA and logs in with SCRAM-SHA-512. ACLs give `usage-writeapi` produce on `usage-events`, `usage-writer` read on `usage-events` with its group `usage-writer` and produce on `usage-events-dlq`, and `usage-replay` read on `usage-events-dlq` and produce on `usage-events`; migrate has no Kafka login.
+
+Records the writer cannot store go to `usage-events-dlq` (HAMSP-30, [contract](../../docs/contracts/usage-event/README.md#dead-letter-topic)); `usage_writer_records_dead_lettered_total` on `/metrics` counts them and `prototype/monitoring/usage-writer.rules.yaml` alerts on it. `writer replay -partition P -from A -to B` puts them back on `usage-events` after the cause is fixed; it runs as the Job in `prototype/usage-replay-job.yaml`, as `usage-replay`, within the DLQ's 7-day retention. The network policy on the brokers stays as a second layer.
 
 The clients read `KAFKA_BROKERS`, `KAFKA_CA_FILE`, `KAFKA_USERNAME` and `KAFKA_PASSWORD` (`internal/kafka/auth.go`). A login without a CA file is refused at start: SCRAM runs only over TLS. With none of them set, the client connects without TLS and login, which the tests against kfake use. The CA on kind comes from `prototype/kafka-ca.sh` (`prototype/README.md`, "Kafka cluster CA").
 

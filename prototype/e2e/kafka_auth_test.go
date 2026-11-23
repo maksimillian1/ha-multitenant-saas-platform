@@ -1,6 +1,6 @@
 package e2e
 
-// Kafka client authentication and ACLs (HAMSP-31, feature kafka-client-auth).
+// Kafka client authentication and ACLs (feature kafka-client-auth).
 // The checks run the Kafka CLI of the Strimzi image in a pod that carries an
 // allowed pod label, so the network policy lets it through and only the login
 // and the ACLs decide.
@@ -523,4 +523,53 @@ func settled(ctx context.Context) bool {
 		}
 	}
 	return true
+}
+
+// TestDLQAndReplayUsersACLs checks the Kafka access of the Usage Writer DLQ:
+// usage-writer may write usage-events-dlq but still not
+// usage-events; usage-replay moves records from usage-events-dlq to
+// usage-events and nothing else; usage-writeapi cannot touch the DLQ.
+//
+// Verifies: usage-writer AC-9; T-04
+func TestDLQAndReplayUsersACLs(t *testing.T) {
+	writer := kafkaUser(t, "usage-writer-kafka")
+	replay := kafkaUser(t, "usage-replay-kafka")
+	writeapi := kafkaUser(t, "usage-writeapi-kafka")
+	_, dlqRecord := usageRecord(t, "/e2e/kafka-auth/dlq")
+	id, replayed := usageRecord(t, "/e2e/kafka-auth/replay")
+	// The producers that must be refused are not idempotent, so the topic ACL
+	// is what refuses them (see TestWriterUserOnlyConsumesWithItsGroup).
+	noIdem := " --producer-property enable.idempotence=false"
+	out := runKafkaSteps(t,
+		kafkaStep{name: "writer-dlq", login: writer, cmd: produceCmd("usage-events-dlq"), stdin: dlqRecord},
+		kafkaStep{name: "writer-main", login: writer, cmd: produceCmd("usage-events") + noIdem, stdin: dlqRecord},
+		kafkaStep{name: "replay-read-dlq", login: replay, cmd: readAnyPartitionCmd("usage-events-dlq", 6)},
+		kafkaStep{name: "replay-main", login: replay, cmd: produceCmd("usage-events"), stdin: replayed},
+		kafkaStep{name: "replay-read-main", login: replay, cmd: readCmd("usage-events")},
+		kafkaStep{name: "replay-write-dlq", login: replay, cmd: produceCmd("usage-events-dlq") + noIdem, stdin: dlqRecord},
+		kafkaStep{name: "writeapi-read-dlq", login: writeapi, cmd: readCmd("usage-events-dlq")},
+		kafkaStep{name: "writeapi-write-dlq", login: writeapi, cmd: produceCmd("usage-events-dlq") + noIdem, stdin: dlqRecord},
+	)
+	mustNotContain(t, out["writer-dlq"], "ERROR", "usage-writer produces to usage-events-dlq")
+	mustContain(t, out["writer-main"], "TopicAuthorizationException", "usage-writer produces to usage-events")
+	mustContain(t, out["replay-read-dlq"], "Processed a total of 1 messages", "usage-replay reads usage-events-dlq")
+	mustNotContain(t, out["replay-read-dlq"], "AuthorizationException", "usage-replay reads usage-events-dlq")
+	mustNotContain(t, out["replay-main"], "ERROR", "usage-replay produces to usage-events")
+	mustContain(t, out["replay-read-main"], "TopicAuthorizationException", "usage-replay reads usage-events")
+	mustContain(t, out["replay-write-dlq"], "TopicAuthorizationException", "usage-replay produces to usage-events-dlq")
+	mustContain(t, out["writeapi-read-dlq"], "TopicAuthorizationException", "usage-writeapi reads usage-events-dlq")
+	mustContain(t, out["writeapi-write-dlq"], "TopicAuthorizationException", "usage-writeapi produces to usage-events-dlq")
+	waitForStoredIDs(t, []string{id}, 2*time.Minute)
+}
+
+// readAnyPartitionCmd reads one record from each of the topic's partitions
+// without a consumer group, so a record keyed by tenant is found wherever it
+// landed.
+func readAnyPartitionCmd(topic string, partitions int) string {
+	cmd := ""
+	for p := range partitions {
+		cmd += kafkaBin + "/kafka-console-consumer.sh --bootstrap-server " + kafkaTLS + " --topic " + topic +
+			" --partition " + strconv.Itoa(p) + " --offset earliest --max-messages 1 --timeout-ms 5000 --consumer.config $C; "
+	}
+	return cmd
 }

@@ -1,6 +1,4 @@
-// Package auth signs the super admin in with Zitadel: OIDC authorization code
-// flow with PKCE, then an encrypted session cookie. The page itself decides
-// who may see it (packages api and ui); auth only says who is signed in.
+// Package auth only says who is signed in; packages api and ui decide who may see what.
 package auth
 
 import (
@@ -45,16 +43,13 @@ func NewService(provider rp.RelyingParty, cookies *httphelper.CookieHandler, pub
 	return &Service{Provider: provider, Cookies: cookies, PublicURL: publicURL, ClientID: clientID, Log: log, now: time.Now}
 }
 
-// NewCookies encrypts and signs the state, PKCE and session cookies with keys
-// derived from sessionKey. The cookies are not Secure: the prototype runs on
-// plain HTTP.
+// Not Secure: the prototype runs on plain HTTP.
 func NewCookies(sessionKey string) *httphelper.CookieHandler {
 	hashKey := sha256.Sum256([]byte("hash:" + sessionKey))
 	encryptKey := sha256.Sum256([]byte("encrypt:" + sessionKey))
 	return httphelper.NewCookieHandler(hashKey[:], encryptKey[:], httphelper.WithUnsecure())
 }
 
-// NewProvider discovers the issuer and retries until ctx is done, because
 // Zitadel may still be starting when the app does.
 func NewProvider(ctx context.Context, log *slog.Logger, cfg core.Config, client *http.Client, cookies *httphelper.CookieHandler) (rp.RelyingParty, error) {
 	for {
@@ -93,7 +88,6 @@ func (s *Service) signIn(w http.ResponseWriter, r *http.Request, tokens *oidc.To
 	http.Redirect(w, r, "/", http.StatusFound)
 }
 
-// LogoutHandler ends the session here and at Zitadel, then comes back to /.
 func (s *Service) LogoutHandler(w http.ResponseWriter, r *http.Request) {
 	s.Cookies.DeleteCookie(w, sessionCookie)
 	target := "/"
@@ -104,7 +98,6 @@ func (s *Service) LogoutHandler(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, target, http.StatusFound)
 }
 
-// Session returns the session of r if its cookie is intact and not expired.
 func (s *Service) Session(r *http.Request) (core.Session, bool) {
 	raw, err := s.Cookies.CheckCookie(r, sessionCookie)
 	if err != nil {
@@ -125,7 +118,6 @@ func (s *Service) setSession(w http.ResponseWriter, session core.Session) error 
 	return s.Cookies.SetCookie(w, sessionCookie, string(raw))
 }
 
-// SessionFromClaims is the session of a verified ID token.
 func SessionFromClaims(claims *oidc.IDTokenClaims, now time.Time) core.Session {
 	name := claims.Name
 	if name == "" {
@@ -156,9 +148,7 @@ func randomState() string {
 	return hex.EncodeToString(b)
 }
 
-// NewIssuerClient talks to Zitadel. With dialAddr set, connections to the
-// issuer's host go to dialAddr instead: inside the cluster the public issuer
-// name does not resolve, but Zitadel must still see it as the Host header.
+// Inside the cluster the public issuer name does not resolve, but Zitadel must still see it as Host.
 func NewIssuerClient(issuer, dialAddr string) (*http.Client, error) {
 	u, err := url.Parse(issuer)
 	if err != nil {

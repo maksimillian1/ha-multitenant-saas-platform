@@ -21,13 +21,11 @@ import (
 	"time"
 )
 
-// staticTokens is a fixed access token for tests of the API calls.
 type staticTokens string
 
 func (s staticTokens) Token(context.Context) (string, error) { return string(s), nil }
 func (staticTokens) Invalidate(string)                       {}
 
-// testKey is a JWT profile key made for one test.
 func testKey(t *testing.T) (Key, *rsa.PrivateKey) {
 	t.Helper()
 	priv, err := rsa.GenerateKey(rand.Reader, 2048)
@@ -38,20 +36,18 @@ func testKey(t *testing.T) (Key, *rsa.PrivateKey) {
 	return Key{Type: "serviceaccount", KeyID: "key-1", Key: string(pemKey), UserID: "user-admin-app"}, priv
 }
 
-// tokenZitadel is a Zitadel with a token endpoint that checks the JWT bearer
-// grant and an API that accepts only the tokens it issued and still allows.
 type tokenZitadel struct {
 	t       *testing.T
 	pub     *rsa.PublicKey
 	secrets []string // what must never appear in a request
-	expires int      // expires_in of every token, seconds
+	expires int      // seconds
 
 	mu        sync.Mutex
 	issued    int
 	accepted  map[string]bool
 	refuseAll bool // refuse every token, also new ones
 	apiCalls  int
-	apiBodies []string // the body of every API call
+	apiBodies []string
 }
 
 func (z *tokenZitadel) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -99,7 +95,6 @@ func (z *tokenZitadel) token(w http.ResponseWriter, body string) {
 	_ = json.NewEncoder(w).Encode(map[string]any{"access_token": tok, "token_type": "Bearer", "expires_in": z.expires})
 }
 
-// checkAssertion verifies the RS256 signature and the claims of the JWT.
 func (z *tokenZitadel) checkAssertion(jwt string) error {
 	parts := strings.Split(jwt, ".")
 	if len(parts) != 3 {
@@ -193,8 +188,7 @@ func TestTokenRenewedBeforeExpiry(t *testing.T) {
 	if z.issued != 1 {
 		t.Fatalf("tokens issued after two calls = %d, want 1 (reused)", z.issued)
 	}
-	// Shortly before the expiry the next call gets a new token first; the
-	// old one is no longer accepted, as if it had expired.
+	// The old token is no longer accepted, as if it had expired.
 	now = now.Add(time.Hour - renewBefore + time.Second)
 	z.mu.Lock()
 	z.accepted["access-1"] = false
@@ -208,9 +202,6 @@ func TestTokenRenewedBeforeExpiry(t *testing.T) {
 	}
 }
 
-// A short-lived token (the prototype's live 60 s) is reused too, and renewed
-// when a quarter of its life is left.
-//
 // Verifies: admin-zitadel AC-2
 func TestShortTokenRenewedBeforeExpiry(t *testing.T) {
 	z, c, tokens := newTokenZitadel(t, 60)
@@ -285,9 +276,6 @@ func TestUnauthenticatedRetriesOnceWithNewToken(t *testing.T) {
 	})
 }
 
-// A broken answer of the token endpoint is an error for the caller, and no
-// API call is made with it.
-//
 // Verifies: admin-zitadel T-02
 func TestBrokenTokenAnswerIsAnError(t *testing.T) {
 	for name, answer := range map[string]struct {
