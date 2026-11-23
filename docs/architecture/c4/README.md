@@ -222,7 +222,7 @@ graph LR
     68-- "<div>Uses</div><div style='font-size: 70%'>[Go import]</div>" -->66
     67-- "<div>Uses</div><div style='font-size: 70%'>[franz-go]</div>" -->18
     67-- "<div>Consumes topics: ? (in<br />NewConsumer)</div><div style='font-size: 70%'></div>" -->18
-    67-- "<div>Produces topics: ? (in<br />NewProducer)</div><div style='font-size: 70%'></div>" -->18
+    67-- "<div>Produces topics: ? (in<br />NewDLQ), ? (in NewProducer)</div><div style='font-size: 70%'></div>" -->18
 
   end
 ```
@@ -265,8 +265,9 @@ graph LR
     end
 
     84-- "<div>Consumes topics: ? (in<br />NewConsumer)</div><div style='font-size: 70%'></div>" -->18
-    84-- "<div>Produces topics: ? (in<br />NewProducer)</div><div style='font-size: 70%'></div>" -->18
+    84-- "<div>Produces topics: ? (in<br />NewDLQ), ? (in NewProducer)</div><div style='font-size: 70%'></div>" -->18
     85-- "<div>Calls functions:<br />write_usage_events()</div><div style='font-size: 70%'></div>" -->19
+    86-- "<div>Produces topics: ? (in<br />Replay)</div><div style='font-size: 70%'></div>" -->18
     80-- "<div>Uses</div><div style='font-size: 70%'>[Go import]</div>" -->81
     80-- "<div>Uses</div><div style='font-size: 70%'>[Go import]</div>" -->82
     80-- "<div>Uses</div><div style='font-size: 70%'>[Go import]</div>" -->83
@@ -299,32 +300,32 @@ graph LR
       subgraph 10 ["ExampleApp"]
         style 10 fill:#ffffff,stroke:#3e6e4d,color:#3e6e4d
 
-        103["<div style='font-weight: bold'>Core</div><div style='font-size: 70%; margin-top: 0px'>[Component]</div><div style='font-size: 80%; margin-top:10px'>Tenant context, errors,<br />configuration.</div>"]
-        style 103 fill:#85bbf0,stroke:#5d82a8,color:#000000
-        104["<div style='font-weight: bold'>Health</div><div style='font-size: 70%; margin-top: 0px'>[Component]</div><div style='font-size: 80%; margin-top:10px'>Liveness and readiness<br />endpoints.</div>"]
+        104["<div style='font-weight: bold'>Core</div><div style='font-size: 70%; margin-top: 0px'>[Component]</div><div style='font-size: 80%; margin-top:10px'>Tenant context, errors,<br />configuration.</div>"]
         style 104 fill:#85bbf0,stroke:#5d82a8,color:#000000
-        105["<div style='font-weight: bold'>Items API</div><div style='font-size: 70%; margin-top: 0px'>[Component: Go, net/http]</div><div style='font-size: 80%; margin-top:10px'>CRUD for a tenant's items<br />over HTTP.</div>"]
+        105["<div style='font-weight: bold'>Health</div><div style='font-size: 70%; margin-top: 0px'>[Component]</div><div style='font-size: 80%; margin-top:10px'>Liveness and readiness<br />endpoints.</div>"]
         style 105 fill:#85bbf0,stroke:#5d82a8,color:#000000
-        106["<div style='font-weight: bold'>main</div><div style='font-size: 70%; margin-top: 0px'>[Component: Go]</div><div style='font-size: 80%; margin-top:10px'>Reads the configuration,<br />wires the components and runs<br />the server.</div>"]
+        106["<div style='font-weight: bold'>Items API</div><div style='font-size: 70%; margin-top: 0px'>[Component: Go, net/http]</div><div style='font-size: 80%; margin-top:10px'>CRUD for a tenant's items<br />over HTTP.</div>"]
         style 106 fill:#85bbf0,stroke:#5d82a8,color:#000000
-        107["<div style='font-weight: bold'>Store</div><div style='font-size: 70%; margin-top: 0px'>[Component: pgx]</div><div style='font-size: 80%; margin-top:10px'>Reads and writes items as the<br />tenant, under RLS.</div>"]
+        107["<div style='font-weight: bold'>main</div><div style='font-size: 70%; margin-top: 0px'>[Component: Go]</div><div style='font-size: 80%; margin-top:10px'>Reads the configuration,<br />wires the components and runs<br />the server.</div>"]
         style 107 fill:#85bbf0,stroke:#5d82a8,color:#000000
+        108["<div style='font-weight: bold'>Store</div><div style='font-size: 70%; margin-top: 0px'>[Component: pgx]</div><div style='font-size: 80%; margin-top:10px'>Reads and writes items as the<br />tenant, under RLS.</div>"]
+        style 108 fill:#85bbf0,stroke:#5d82a8,color:#000000
       end
 
       17[("<div style='font-weight: bold'>PostgreSQL</div><div style='font-size: 70%; margin-top: 0px'>[Container: CloudNativePG]</div><div style='font-size: 80%; margin-top:10px'>Tenant and application data<br />with RLS; separate database<br />for Zitadel (ADR-0002,<br />ADR-0003).</div>")]
       style 17 fill:#438dd5,stroke:#2e6295,color:#ffffff
     end
 
-    105-- "<div>Uses</div><div style='font-size: 70%'>[Go import]</div>" -->103
-    106-- "<div>Uses</div><div style='font-size: 70%'>[Go import]</div>" -->103
     106-- "<div>Uses</div><div style='font-size: 70%'>[Go import]</div>" -->104
-    106-- "<div>Uses</div><div style='font-size: 70%'>[Go import]</div>" -->105
-    106-- "<div>Uses</div><div style='font-size: 70%'>[Go import]</div>" -->107
-    107-- "<div>Uses</div><div style='font-size: 70%'>[Go import]</div>" -->103
-    107-- "<div>Uses</div><div style='font-size: 70%'>[pgx]</div>" -->17
-    107-- "<div>Defines tables:<br />schema_migrations</div><div style='font-size: 70%'></div>" -->17
-    107-- "<div>Reads tables: ? (in Migrate),<br />items, schema_migrations</div><div style='font-size: 70%'></div>" -->17
-    107-- "<div>Writes tables: items,<br />schema_migrations</div><div style='font-size: 70%'></div>" -->17
+    107-- "<div>Uses</div><div style='font-size: 70%'>[Go import]</div>" -->104
+    107-- "<div>Uses</div><div style='font-size: 70%'>[Go import]</div>" -->105
+    107-- "<div>Uses</div><div style='font-size: 70%'>[Go import]</div>" -->106
+    107-- "<div>Uses</div><div style='font-size: 70%'>[Go import]</div>" -->108
+    108-- "<div>Uses</div><div style='font-size: 70%'>[Go import]</div>" -->104
+    108-- "<div>Uses</div><div style='font-size: 70%'>[pgx]</div>" -->17
+    108-- "<div>Defines tables:<br />schema_migrations</div><div style='font-size: 70%'></div>" -->17
+    108-- "<div>Reads tables: ? (in Migrate),<br />items, schema_migrations</div><div style='font-size: 70%'></div>" -->17
+    108-- "<div>Writes tables: items,<br />schema_migrations</div><div style='font-size: 70%'></div>" -->17
 
   end
 ```
