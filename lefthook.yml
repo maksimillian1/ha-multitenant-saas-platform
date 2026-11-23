@@ -14,7 +14,7 @@ pre-commit:
       fail_text: "Not formatted. Run: golangci-lint fmt --config .golangci.yml <files>, then git add."
 
     # Lint findings on the lines changed since HEAD; old findings do not block.
-    # The four modules lint in parallel, hence --allow-parallel-runners.
+    # The modules lint in parallel, hence --allow-parallel-runners.
     - name: go-lint-gateway
       root: apps/gateway/
       glob: "*.go"
@@ -25,6 +25,10 @@ pre-commit:
       run: golangci-lint run --config ../../.golangci.yml --allow-parallel-runners --new-from-rev HEAD ./...
     - name: go-lint-exampleapp
       root: apps/exampleapp/
+      glob: "*.go"
+      run: golangci-lint run --config ../../.golangci.yml --allow-parallel-runners --new-from-rev HEAD ./...
+    - name: go-lint-exampleweb
+      root: apps/exampleweb/
       glob: "*.go"
       run: golangci-lint run --config ../../.golangci.yml --allow-parallel-runners --new-from-rev HEAD ./...
     - name: go-lint-tenants

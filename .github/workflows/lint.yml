@@ -23,7 +23,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        app: [gateway, admin, exampleapp, usage, tenants]
+        app: [gateway, admin, exampleapp, exampleweb, usage, tenants]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5

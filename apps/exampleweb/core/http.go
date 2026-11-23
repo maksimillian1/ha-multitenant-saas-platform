@@ -1,0 +1,53 @@
+package core
+
+import (
+	"context"
+	"errors"
+	"log/slog"
+	"net/http"
+	"time"
+)
+
+type statusRecorder struct {
+	http.ResponseWriter
+	status int
+}
+
+func (s *statusRecorder) WriteHeader(code int) {
+	s.status = code
+	s.ResponseWriter.WriteHeader(code)
+}
+
+func AccessLog(next http.Handler, log *slog.Logger) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/healthz" {
+			next.ServeHTTP(w, r)
+			return
+		}
+		start := time.Now()
+		rec := &statusRecorder{ResponseWriter: w, status: http.StatusOK}
+		next.ServeHTTP(rec, r)
+		log.InfoContext(r.Context(), "request",
+			"method", r.Method, "path", r.URL.Path, "status", rec.status,
+			"duration_ms", time.Since(start).Milliseconds())
+	})
+}
+
+// Serve waits up to 10 seconds for requests in flight after ctx is done.
+func Serve(ctx context.Context, log *slog.Logger, addr string, h http.Handler) error {
+	srv := &http.Server{Addr: addr, Handler: h, ReadHeaderTimeout: 5 * time.Second}
+	drained := make(chan struct{})
+	go func() {
+		defer close(drained)
+		<-ctx.Done()
+		shutdownCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 10*time.Second)
+		defer cancel()
+		_ = srv.Shutdown(shutdownCtx)
+	}()
+	log.Info("listening", "addr", srv.Addr)
+	if err := srv.ListenAndServe(); !errors.Is(err, http.ErrServerClosed) {
+		return err
+	}
+	<-drained
+	return nil
+}
