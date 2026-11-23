@@ -2,6 +2,7 @@
 usage_writer_cmd = component "main" "Reads the configuration, wires the components and runs the server." "Go" "c4sync" {
     properties {
         "go.packages" "cmd/writer"
+        "http.serves" "GET /metrics"
     }
 }
 usage_writer_core = component "Core" "Usage event model, validation, configuration." "" "c4sync" {
@@ -23,7 +24,7 @@ usage_writer_kafka = component "Kafka client" "Produces and consumes usage event
     properties {
         "go.packages" "internal/kafka"
         "topic.consumes" "? (in NewConsumer)"
-        "topic.produces" "? (in NewProducer)"
+        "topic.produces" "? (in NewDLQ), ? (in NewProducer)"
     }
 }
 usage_writer_store = component "Store" "Writes usage events to the usage store." "pgx" "c4sync" {
@@ -35,6 +36,7 @@ usage_writer_store = component "Store" "Writes usage events to the usage store."
 usage_writer_writer = component "Writer" "Consumes usage events, drops duplicates, writes batches." "Go" "c4sync" {
     properties {
         "go.packages" "internal/writer"
+        "topic.produces" "? (in Replay)"
     }
 }
 usage_writer_cmd -> usage_writer_core "Uses" "Go import" "c4sync"
@@ -51,5 +53,6 @@ usage_writer_kafka -> hamsp.kafka "Uses" "franz-go" "c4sync"
 usage_writer_store -> hamsp.usageStore "Uses" "pgx" "c4sync"
 usage_writer_writer -> hamsp.kafka "Uses" "franz-go" "c4sync"
 usage_writer_kafka -> hamsp.kafka "Consumes topics: ? (in NewConsumer)" "" "c4sync"
-usage_writer_kafka -> hamsp.kafka "Produces topics: ? (in NewProducer)" "" "c4sync"
+usage_writer_kafka -> hamsp.kafka "Produces topics: ? (in NewDLQ), ? (in NewProducer)" "" "c4sync"
 usage_writer_store -> hamsp.usageStore "Calls functions: write_usage_events()" "" "c4sync"
+usage_writer_writer -> hamsp.kafka "Produces topics: ? (in Replay)" "" "c4sync"
