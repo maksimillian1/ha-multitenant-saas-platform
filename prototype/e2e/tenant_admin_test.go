@@ -179,3 +179,59 @@ func TestOrgOwnerCannotChangeInstance(t *testing.T) {
 	denied(zitadelCall(t, owner, http.MethodPut, "/admin/v1/policies/label", map[string]any{"primaryColor": "#123456"}),
 		"change the instance label policy")
 }
+
+// consoleScope is what the test asks for on the Console's client: the user's
+// organization in the token and Zitadel's API in its audience.
+const consoleScope = "openid profile urn:zitadel:iam:user:resourceowner urn:zitadel:iam:org:project:id:zitadel:aud"
+
+// humanOrgOwner invites a human user into orgID, makes it ORG_OWNER, and signs it
+// in to the Console through Login V2.
+func humanOrgOwner(t *testing.T, iamAdmin, orgID string) string {
+	t.Helper()
+	userID, loginName, password := invitedHuman(t, iamAdmin, iamAdmin, orgID)
+	mustStatus(t, zitadelOrgCall(t, iamAdmin, orgID, http.MethodPost, "/management/v1/orgs/me/members",
+		map[string]any{"userId": userID, "roles": []string{"ORG_OWNER"}}), http.StatusOK, "make the human user ORG_OWNER")
+	return humanToken(t, iamAdmin, consoleClient(t), consoleScope, loginName, password)
+}
+
+// Verifies: tenant-self-admin AC-1
+func TestOrgOwnerLogsInThroughLoginV2(t *testing.T) {
+	iamAdmin := keyToken(t, loadServiceKey(t, iamAdminKeySecret, iamAdminKeyField))
+	owner := humanOrgOwner(t, iamAdmin, tenA.OrgID)
+
+	r := zitadelCall(t, owner, http.MethodPost, "/management/v1/orgs/me/members/_search", map[string]any{})
+	mustStatus(t, r, http.StatusOK, "read the members of its organization with the Console token")
+	_, _, _, claims := jwtParts(t, owner)
+	if claims[tenantClaim] != tenA.OrgID {
+		t.Errorf("Console token organization = %v, want tenant A %s", claims[tenantClaim], tenA.OrgID)
+	}
+}
+
+// Verifies: tenant-self-admin AC-2
+func TestOrgOwnerCreatesUserWithRole(t *testing.T) {
+	iamAdmin := keyToken(t, loadServiceKey(t, iamAdminKeySecret, iamAdminKeyField))
+	owner := humanOrgOwner(t, iamAdmin, tenA.OrgID)
+
+	r := zitadelCall(t, owner, http.MethodPost, "/management/v1/projects", map[string]any{"name": "e2e-project-" + randomID()})
+	mustStatus(t, r, http.StatusOK, "create a project as ORG_OWNER")
+	var project struct {
+		ID string `json:"id"`
+	}
+	r.decode(t, &project)
+	t.Cleanup(func() {
+		zitadelOrgCall(t, iamAdmin, tenA.OrgID, http.MethodDelete, "/management/v1/projects/"+project.ID, nil)
+	})
+	mustStatus(t, zitadelCall(t, owner, http.MethodPost, "/management/v1/projects/"+project.ID+"/roles",
+		map[string]string{"roleKey": "viewer", "displayName": "Viewer"}), http.StatusOK, "add a project role as ORG_OWNER")
+
+	userID, loginName, password := invitedHuman(t, iamAdmin, owner, tenA.OrgID)
+	mustStatus(t, zitadelCall(t, owner, http.MethodPost, "/management/v1/users/"+userID+"/grants",
+		map[string]any{"projectId": project.ID, "roleKeys": []string{"viewer"}}), http.StatusOK, "grant the role as ORG_OWNER")
+
+	scope := "openid urn:zitadel:iam:user:resourceowner urn:zitadel:iam:org:project:id:" + project.ID + ":aud urn:zitadel:iam:org:project:role:viewer"
+	tok := humanToken(t, iamAdmin, consoleClient(t), scope, loginName, password)
+	_, _, _, claims := jwtParts(t, tok)
+	if claims[tenantClaim] != tenA.OrgID {
+		t.Errorf("new user's token organization = %v, want tenant A %s", claims[tenantClaim], tenA.OrgID)
+	}
+}

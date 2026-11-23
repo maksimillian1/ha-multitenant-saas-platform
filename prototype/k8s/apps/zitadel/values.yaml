@@ -622,9 +622,19 @@ zitadel:
             Password: dev-zitadel
           Admin:
             Password: dev-postgres-superuser
-  # Machine users only; the separate Login UI is not needed.
+  # Login V2 signs humans in to the Console and to tenant apps. The chart
+  # authenticates it to Zitadel as a system API user with an X.509 key, no PAT.
   login:
-    enabled: false
+    enabled: true
+    gateway:
+      httpRoute:
+        enabled: true
+        parentRefs:
+          - name: public
+            namespace: gateway
+    resources:
+      requests: {cpu: 50m, memory: 128Mi}
+      limits: {memory: 256Mi}
   # zitadel.localtest.me on the public Gateway (prototype/k8s/apps/gateway).
   # Zitadel's own APIs do their own authentication, so this route skips the API Gateway.
   gateway:
