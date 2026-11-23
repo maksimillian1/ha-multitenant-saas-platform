@@ -58,7 +58,6 @@ func TestIntegration(t *testing.T) {
 		t.Fatalf("default organization = %q, %v", defaultOrg, err)
 	}
 
-	// Organization lifecycle.
 	orgID, err := c.AddOrganization(ctx, "it-org-"+suffix)
 	if err != nil {
 		t.Fatal(err)
@@ -80,7 +79,6 @@ func TestIntegration(t *testing.T) {
 	})
 	must(t, c.ActivateOrganization(ctx, orgID))
 
-	// A human user.
 	humanID, err := c.CreateHumanUser(ctx, NewHumanUser{OrganizationID: orgID, Username: "it-human-" + suffix,
 		GivenName: "Integration", FamilyName: "Test", Email: "it-" + suffix + "@example.test", EmailVerified: true,
 		Password: "Pw1!" + suffix, PasswordChangeRequired: true})
@@ -105,7 +103,6 @@ func TestIntegration(t *testing.T) {
 	eventually(t, func() bool { u, err := c.GetUser(ctx, humanID); return err == nil && u.State == UserInactive })
 	must(t, c.ReactivateUser(ctx, humanID))
 
-	// A machine user with a client secret.
 	machineID, err := c.CreateMachineUser(ctx, NewMachineUser{OrganizationID: orgID, Username: "it-machine-" + suffix,
 		Name: "Integration machine", AccessTokenType: AccessTokenJWT})
 	if err != nil {
