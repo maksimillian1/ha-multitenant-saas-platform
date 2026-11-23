@@ -39,3 +39,17 @@ These rules hold while you write code. Checks run at commit (`lefthook.yml`, and
    * `go test ./<touched packages>/...`; database tests need `TEST_DATABASE_URL` (`apps/usage/internal/testpg`), and a skipped test is not a pass;
    * `npm run lint && npm test` in `apps/admin/ui/app` when the SPA changed.
 6. **Never skip the hooks.** Do not use `git commit --no-verify` or `-n`. Fix the finding instead.
+
+## Code comments
+
+- Comment only WHY, never WHAT. If the code says it, don't repeat it.
+- Write a comment only if without it a competent developer would make
+  a mistake or "fix" something that isn't broken: business rules,
+  external constraints, workarounds (with links), hidden invariants,
+  ordering dependencies, origin of magic numbers, intentionally odd code.
+- One line where possible. No banners, no step narration, no "Note:"/"IMPORTANT:".
+- Never describe your changes in comments ("updated to…", "now uses…",
+  "fixed…") — that belongs in the commit message.
+- Docstrings only for public API, and only for behavior not obvious
+  from the signature (errors, side effects, edge cases).
+- Don't add or remove existing comments in code you're not changing.
