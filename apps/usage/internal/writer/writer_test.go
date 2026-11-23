@@ -215,7 +215,7 @@ func (f *failingStore) Write(ctx context.Context, events []core.Event) ([]core.E
 // AC-13 / QS-09 (in-process): while the database is down, UsageWriteAPI keeps
 // accepting events; once it is back, every accepted event is stored once.
 //
-// Verifies: usage-writer AC-4
+// Verifies: usage-writer AC-4; QS-09
 func TestDatabaseOutageLosesNothing(t *testing.T) {
 	p := newPipeline(t)
 	fs := &failingStore{next: p.st}
