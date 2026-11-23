@@ -21,7 +21,7 @@ func base() *model.Model {
 	}
 }
 
-// AC (HAMSP-78): identical models give an empty report.
+// Identical models give an empty report.
 // Verifies: c4-from-code AC-9
 func TestIdenticalModelsGiveEmptyReport(t *testing.T) {
 	r := Compare(base(), base(), nil)
@@ -35,7 +35,7 @@ func TestIdenticalModelsGiveEmptyReport(t *testing.T) {
 	}
 }
 
-// AC (HAMSP-78): models that differ by one relation give a report with exactly that relation.
+// Models that differ by one relation give a report with exactly that relation.
 // Verifies: c4-from-code AC-9
 func TestOneRelation(t *testing.T) {
 	head := base()
@@ -54,7 +54,7 @@ func TestOneRelation(t *testing.T) {
 	}
 }
 
-// AC (HAMSP-78): a change to an important component is listed before other changes.
+// A change to an important component is listed before other changes.
 // Verifies: c4-from-code AC-9
 func TestImportantFirst(t *testing.T) {
 	head := base()

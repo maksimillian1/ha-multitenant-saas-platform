@@ -1,4 +1,4 @@
-# Shared lint rules for every Go module under apps/ (HAMSP-40).
+# Shared lint rules for every Go module under apps/.
 # Run from a module directory with an explicit config, because golangci-lint
 # would otherwise pick up the nearest .golangci.yml (apps/usage has its own,
 # for the depguard boundaries):

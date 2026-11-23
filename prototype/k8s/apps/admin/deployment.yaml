@@ -1,9 +1,9 @@
 # Super admin app (apps/admin): pages for Zitadel's organizations, users,
 # role assignments and projects, shown only after a Zitadel sign-in by a user
-# with the super-admin role of the platform-admin project (HAMSP-34).
+# with the super-admin role of the platform-admin project.
 # prototype/bootstrap-tenants.sh creates the OIDC app and the Secret
 # admin-oidc, and the service account admin-app with its JWT profile key in
-# the Secret admin-zitadel (key.json, valid 30 days, HAMSP-36); until then the
+# the Secret admin-zitadel (key.json, valid 30 days); until then the
 # pods wait in CreateContainerConfigError.
 apiVersion: apps/v1
 kind: Deployment

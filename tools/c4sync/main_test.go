@@ -40,7 +40,7 @@ func build(t *testing.T, cfgPath string) *pipeline.Result {
 	return res
 }
 
-// AC (HAMSP-74, HAMSP-75): the fixture gives the golden files, and the same
+// The fixture gives the golden files, and the same
 // input always gives byte-identical output.
 // Verifies: c4-from-code AC-1
 func TestGenerateMatchesGolden(t *testing.T) {
@@ -68,7 +68,7 @@ func TestGenerateMatchesGolden(t *testing.T) {
 	}
 }
 
-// AC (HAMSP-74): the mapping comes from go-arch-lint; a package outside every
+// The mapping comes from go-arch-lint; a package outside every
 // component is listed as unmapped.
 // Verifies: c4-from-code AC-4
 func TestMappingAndUnmapped(t *testing.T) {
@@ -92,7 +92,7 @@ func TestMappingAndUnmapped(t *testing.T) {
 	}
 }
 
-// AC (HAMSP-75, HAMSP-76): what the extractor and the detectors find in the fixture.
+// What the extractor and the detectors find in the fixture.
 // Verifies: c4-from-code AC-5, AC-6, AC-7
 func TestModelFacts(t *testing.T) {
 	m := build(t, filepath.Join(testutil.Fixture(t), "c4sync.yml")).Model
@@ -165,7 +165,7 @@ func TestModelFacts(t *testing.T) {
 	}
 }
 
-// AC (HAMSP-77): on an unchanged fixture, check passes and prints nothing.
+// On an unchanged fixture, check passes and prints nothing.
 // Verifies: c4-from-code AC-8
 func TestCheckPassesOnFixture(t *testing.T) {
 	code, out, errOut := c4sync(t, "check", "-config", filepath.Join(testutil.Fixture(t), "c4sync.yml"))
@@ -174,7 +174,7 @@ func TestCheckPassesOnFixture(t *testing.T) {
 	}
 }
 
-// AC (HAMSP-77): a new import between two components, without regenerating,
+// A new import between two components, without regenerating,
 // fails as stale and shows the new relation; the import breaks a go-arch-lint
 // rule too, which is reported with file and line.
 // Verifies: c4-from-code AC-8
@@ -203,7 +203,7 @@ func TestCheckStaleAndRuleViolation(t *testing.T) {
 	}
 }
 
-// AC (HAMSP-77): only stale output gives exit code 2.
+// Only stale output gives exit code 2.
 // Verifies: c4-from-code AC-8
 func TestCheckOnlyStale(t *testing.T) {
 	dir := testutil.CopyFixture(t)
@@ -214,7 +214,7 @@ func TestCheckOnlyStale(t *testing.T) {
 	}
 }
 
-// AC (HAMSP-74, HAMSP-77): c4sync.yml metadata for a component that
+// C4sync.yml metadata for a component that
 // go-arch-lint does not define fails with the file and line.
 // Verifies: c4-from-code AC-3
 func TestUnknownComponentInConfig(t *testing.T) {
@@ -227,7 +227,7 @@ func TestUnknownComponentInConfig(t *testing.T) {
 	}
 }
 
-// AC (HAMSP-78): diff between two source trees reports the change, important
+// Diff between two source trees reports the change, important
 // components first, and writes a views workspace; identical trees report nothing.
 // Verifies: c4-from-code AC-9
 func TestDiff(t *testing.T) {
@@ -277,7 +277,7 @@ func TestDiff(t *testing.T) {
 	}
 }
 
-// AC (HAMSP-74, HAMSP-78): Structurizr accepts the C3 fragment inside the
+// Structurizr accepts the C3 fragment inside the
 // fixture workspace, the code workspace and a diff views workspace, and
 // exports them to Mermaid. Needs Java 21+ and STRUCTURIZR_WAR.
 // Verifies: c4-from-code AC-2
@@ -330,7 +330,7 @@ func TestDeclaredComponentWithoutPackages(t *testing.T) {
 	}
 }
 
-// AC (HAMSP-80): a module with several binaries gets one fragment per binary,
+// A module with several binaries gets one fragment per binary,
 // with only the components that binary imports.
 // Verifies: c4-from-code AC-10
 func TestContainers(t *testing.T) {
@@ -364,7 +364,7 @@ func TestContainers(t *testing.T) {
 	}
 }
 
-// AC (HAMSP-80): a main package that does not exist is an error.
+// A main package that does not exist is an error.
 // Verifies: c4-from-code AC-10
 func TestContainerMainNotFound(t *testing.T) {
 	dir := testutil.CopyFixture(t)

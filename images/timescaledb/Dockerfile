@@ -1,4 +1,4 @@
-# TimescaleDB extension image for the usage cluster (ADR-0008, HAMSP-25).
+# TimescaleDB extension image for the usage cluster (ADR-0008).
 #
 # CNPG mounts this image read-only into the PostgreSQL pods (ImageVolume,
 # spec.postgresql.extensions) and points dynamic_library_path at lib/ and

@@ -1,5 +1,5 @@
 # Only the API Gateway may reach UsageWriteAPI, because UsageWriteAPI trusts
-# tenant_id in the events (HAMSP-26 AC-7). Kubelet probes come from the host
+# tenant_id in the events. Kubelet probes come from the host
 # and are allowed by Cilium's default.
 apiVersion: cilium.io/v2
 kind: CiliumNetworkPolicy

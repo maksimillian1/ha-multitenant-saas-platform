@@ -31,7 +31,7 @@ stringData:
   username: exampleapp_owner
   password: dev-exampleapp-owner
 ---
-# Runtime role of ExampleApp: not the owner, NOSUPERUSER, NOBYPASSRLS (HAMSP-5 AC-7).
+# Runtime role of ExampleApp: not the owner, NOSUPERUSER, NOBYPASSRLS.
 apiVersion: v1
 kind: Secret
 metadata:
@@ -42,7 +42,7 @@ stringData:
   username: exampleapp
   password: dev-exampleapp
 ---
-# Owner of the tenants database of Tenant Management (HAMSP-51). Only its
+# Owner of the tenants database of Tenant Management. Only its
 # migration job uses it.
 apiVersion: v1
 kind: Secret
@@ -117,7 +117,7 @@ spec:
         passwordSecret:
           name: tenants-db
       # The usage database moved to its own cluster (ADR-0008, usage-db). These
-      # drop what HAMSP-26 left here on clusters created before the move.
+      # drop what the usage pipeline left here on clusters created before the move.
       - name: usage_writer
         ensure: absent
       - name: usage_owner
@@ -166,10 +166,10 @@ spec:
     poolMode: transaction
     parameters:
       # Smaller than ExampleApp's own pool, so server connections are reused
-      # across tenants and requests (HAMSP-5 AC-9).
+      # across tenants and requests.
       default_pool_size: "2"
 ---
-# The usage database of HAMSP-26 lived here until it moved to its own cluster
+# The usage database lived here until it moved to its own cluster
 # (ADR-0008). This drops it on clusters created before the move; on new ones
 # it does nothing.
 apiVersion: postgresql.cnpg.io/v1

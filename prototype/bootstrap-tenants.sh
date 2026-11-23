@@ -1,8 +1,8 @@
 #!/bin/bash
-# Creates the two test tenants of the walking skeleton (HAMSP-5): one Zitadel
+# Creates the two test tenants of the walking skeleton: one Zitadel
 # Organization per tenant with one machine user that gets tokens through
 # client_credentials. Also creates the platform API project, whose ID is the
-# audience the API Gateway requires (HAMSP-22), and hands that ID to the
+# audience the API Gateway requires, and hands that ID to the
 # Gateway. For the super admin app (apps/admin) it creates the platform-admin
 # project with the super-admin and viewer roles, an OIDC web app and three
 # human test users, super-admin, viewer and regular-user (no role), and writes
@@ -10,13 +10,13 @@
 # service account admin-app with the instance roles IAM_ORG_MANAGER and
 # IAM_BRANDING_MANAGER (our role, prototype/k8s/apps/zitadel/values.yaml),
 # which the app uses to manage organizations, users, role assignments and
-# branding (HAMSP-34, HAMSP-37, HAMSP-36), and writes its JWT profile key to
+# branding, and writes its JWT profile key to
 # the Secret admin/admin-zitadel (key.json). Writes the credentials to
 # prototype/.tenants.json (git-ignored) for the e2e tests and for signing in.
 #
 # It works as the Zitadel chart's machine user iam-admin (IAM_OWNER), with
 # short-lived tokens from its key in the Secret zitadel/iam-admin. Keys live
-# 30 days (HAMSP-36): every run gives iam-admin and admin-app a new key and
+# 30 days: every run gives iam-admin and admin-app a new key and
 # deletes their other keys and any personal access token, including the
 # chart's iam-admin-pat. A cluster on which this script has not run for 30
 # days has no valid key left: recreate it.
@@ -25,7 +25,7 @@
 # client secrets, the keys and the admin test users' passwords are
 # regenerated.
 #
-# For Tenant Management (HAMSP-51) it creates the project tenant-management
+# For Tenant Management it creates the project tenant-management
 # with the role tenant-manager, the admin app's client of it (Secret
 # admin/admin-tenants) and the service's own account with a new 30-day key
 # (Secret tenants/tenants-zitadel, field key.json; no personal access token).
@@ -57,14 +57,14 @@ ADMIN_SA="admin-app"
 # IAM_BRANDING_MANAGER adds the instance policies (the platform branding)
 # without the rest of IAM_OWNER.
 ADMIN_SA_ROLES='["IAM_BRANDING_MANAGER","IAM_ORG_MANAGER"]'
-# Until HAMSP-36 the platform branding used a second account with IAM_OWNER.
-# It is deleted when found.
+# The platform branding used to have a second account with IAM_OWNER; it is
+# deleted when found.
 OLD_INSTANCE_SA="admin-app-instance"
 # The setup job of the Zitadel chart creates this IAM_OWNER machine user.
 IAM_ADMIN="iam-admin"
 # How long a service account key lives.
 KEY_DAYS=30
-# Tenant Management (apps/tenants, HAMSP-51): its callers need the role
+# Tenant Management (apps/tenants): its callers need the role
 # tenant-manager of this project; the admin app calls it as TM_CLIENT. The
 # service itself calls Zitadel as TM_SA.
 TM_PROJECT="tenant-management"
@@ -75,7 +75,7 @@ TM_SA_ROLE="IAM_ORG_MANAGER"
 TM_URL="http://tenants.tenants.svc:8080"
 
 # Access tokens live 60 s, so the e2e tests can prove that an expired token is
-# rejected (HAMSP-5 AC-5) without waiting hours.
+# rejected without waiting hours.
 ACCESS_TOKEN_LIFETIME="60s"  # protobuf Duration: seconds only
 
 # ── helpers ────────────────────────────────────────────────────────────────────
@@ -375,7 +375,7 @@ sa_key=$(new_key "${sa_id}")
 drop_credentials "${sa_id}" "$(jq -r .keyId <<<"${sa_key}")"
 echo "  new ${KEY_DAYS}-day key for ${ADMIN_SA}; its other keys and tokens are deleted"
 
-# The IAM_OWNER account of the platform branding before HAMSP-36.
+# The former IAM_OWNER account of the platform branding.
 old_id=$(user_id "${OLD_INSTANCE_SA}")
 if [[ -n "${old_id}" ]]; then
   zitadel DELETE "/v2/users/${old_id}" >/dev/null
@@ -390,7 +390,7 @@ kubectl -n admin create secret generic admin-oidc \
   --from-literal=CLIENT_ID="${admin_client_id}" --from-literal=CLIENT_SECRET="${admin_client_secret}" \
   --from-literal=SESSION_KEY="$(openssl rand -hex 32)" \
   --dry-run=client -o yaml | kubectl apply -f - >/dev/null
-# apply replaces the Secret's data, so the tokens of before HAMSP-36 go too.
+# apply replaces the Secret's data, so old tokens go too.
 kubectl -n admin create secret generic admin-zitadel --from-file=key.json=<(printf '%s' "${sa_key}") \
   --dry-run=client -o yaml | kubectl apply -f - >/dev/null
 if kubectl -n admin get deployment admin &>/dev/null; then

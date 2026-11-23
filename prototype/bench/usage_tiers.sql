@@ -1,4 +1,4 @@
--- HAMSP-25 AC-12: the usage tiers under data, in a scratch database with the
+-- The usage tiers under data, in a scratch database with the
 -- usage migrations applied (usage-tiers.sh). Prints one line per result.
 -- psql variables: events, tenants, days.
 \set ON_ERROR_STOP on

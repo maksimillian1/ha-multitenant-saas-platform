@@ -15,7 +15,7 @@ on:
 
 jobs:
   check:
-    # Nothing under /apps may depend on AGPL code (C-03, ADR-0003, HAMSP-21).
+    # Nothing under /apps may depend on AGPL code (C-03, ADR-0003).
     # Restricted (GPL, LGPL) and unknown licenses fail too.
     runs-on: ubuntu-latest
     defaults:
