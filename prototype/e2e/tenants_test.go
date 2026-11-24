@@ -2,7 +2,6 @@ package e2e
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"net/http"
 	"strings"
@@ -89,24 +88,7 @@ func tmCall(t *testing.T, method, path, body string) string {
 // Verifies: tenant-management AC-17
 // Verifies: kafka-client-auth AC-2
 func TestSuspendedTenantLosesAPIAccess(t *testing.T) {
-	out := tmCall(t, "POST", "/tenants", `{"name":"e2e-suspend-`+randomID()+`","admin_email":"e2e-suspend-`+randomID()+`@example.com"}`)
-	if !strings.Contains(out, "status=201") {
-		t.Fatalf("create tenant: %s", out)
-	}
-	var created struct {
-		ID string `json:"id"`
-	}
-	// The pod's output may carry more than the body; the body is its first JSON value.
-	if err := json.NewDecoder(strings.NewReader(out)).Decode(&created); err != nil || created.ID == "" {
-		t.Fatalf("create tenant: %s, %v", out, err)
-	}
-	id := created.ID
-	t.Cleanup(func() {
-		tmCall(t, "POST", "/tenants/"+id+"/suspend", "")
-		if out := tmCall(t, "DELETE", "/tenants/"+id, ""); !strings.Contains(out, "status=200") {
-			t.Errorf("delete tenant %s: %s", id, out)
-		}
-	})
+	id := provisionTenant(t, "e2e-suspend")
 
 	// A machine user of the new tenant, made by iam-admin like a tenant admin would.
 	iamAdmin := keyToken(t, loadServiceKey(t, iamAdminKeySecret, iamAdminKeyField))
