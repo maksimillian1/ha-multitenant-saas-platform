@@ -10,7 +10,7 @@ code:
   - .github/workflows/tenants.yml
 c4: [tenantMgmt, adminPortal, authService]
 links:
-  issues: [HAMSP-51, HAMSP-6, HAMSP-52]
+  issues: [HAMSP-51, HAMSP-6, HAMSP-52, HAMSP-58]
 requirements: [FR-01, QS-02, QS-18, C-03, C-04, C-06]
 
 acceptance:
@@ -135,6 +135,10 @@ acceptance:
       - apps/tenants/events/events_test.go:TestStateChangesArePublished
       - apps/tenants/lifecycle/lifecycle_test.go:TestEveryOperationPublishesTheState
       - apps/tenants/events/contract_test.go:TestRecordsMatchContract
+  AC-19:
+    text: "A pod in tenant A's namespace cannot open a connection to a pod in tenant B's namespace, nor B's to A's, and a pod in a namespace that is not a tenant's cannot connect into one; pods in the same tenant namespace can (QS-02)."
+    level: e2e
+    planned: prototype/e2e/tenant_network_test.go:TestTenantNamespacesAreIsolated
 
 checklist:
   T-01:
@@ -170,7 +174,7 @@ checklist:
     verified:
       - "apps/tenants/api/validate_test.go:FuzzDecodeCreate"
   T-12:
-    planned: "applies — canaries: the route test fails with the tenant-manager role check removed; the e2e network test fails without the ingress CiliumNetworkPolicy. The default-deny policy in each tenant namespace is created here; its cross-tenant test is HAMSP-58."
+    planned: "applies — canaries: the route test fails with the tenant-manager role check removed; the e2e network test fails without the ingress CiliumNetworkPolicy. The cross-tenant e2e test's same-namespace probes are its control."
     verified:
       - "apps/tenants/auth/auth_test.go:TestTokenChecks"
       - "apps/tenants/auth/auth_test.go:TestRequire"
