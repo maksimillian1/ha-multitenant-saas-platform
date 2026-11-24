@@ -76,6 +76,7 @@ const (
 	pathDeleteOrg  = "/zitadel.org.v2.OrganizationService/DeleteOrganization"
 	pathAddHuman   = "/zitadel.user.v2.UserService/AddHumanUser"
 	pathInvite     = "/zitadel.user.v2.UserService/CreateInviteCode"
+	pathGetUser    = "/zitadel.user.v2.UserService/GetUserByID"
 	pathMembers    = "/management/v1/orgs/me/members"
 	tenantID       = "11111111-1111-4111-8111-111111111111"
 )
@@ -148,13 +149,14 @@ func TestCreateAdminIsIdempotent(t *testing.T) {
 	ctx := context.Background()
 	f, c := newFake(t)
 	f.answers[pathAddHuman] = answer(http.StatusConflict, `{"code":"already_exists","message":"user exists"}`)
+	f.answers[pathGetUser] = answer(http.StatusOK, `{"user":{"userId":"`+tenantID+`-admin","details":{"resourceOwner":"`+tenantID+`"}}}`)
 	// 6 = already exists.
 	f.answers[pathMembers] = answer(http.StatusConflict, `{"code":6,"message":"member exists"}`)
 	f.answers[pathInvite] = answer(http.StatusBadRequest, `{"code":"failed_precondition","message":"already initialised"}`)
 	if err := c.CreateAdmin(ctx, tenantID, tenantID+"-admin", "boss@acme.test"); err != nil {
 		t.Fatalf("admin from an earlier attempt: %v", err)
 	}
-	if got := f.paths(); !reflect.DeepEqual(got, []string{pathAddHuman, pathMembers, pathInvite}) {
+	if got := f.paths(); !reflect.DeepEqual(got, []string{pathAddHuman, pathGetUser, pathMembers, pathInvite}) {
 		t.Fatalf("calls = %v", got)
 	}
 
@@ -162,6 +164,32 @@ func TestCreateAdminIsIdempotent(t *testing.T) {
 	f.answers[pathInvite] = answer(http.StatusBadRequest, `{"code":"failed_precondition","message":"no email"}`)
 	if err := c.CreateAdmin(ctx, tenantID, tenantID+"-admin", "boss@acme.test"); !HasCode(err, CodeFailedPrecondition) {
 		t.Fatalf("err = %v", err)
+	}
+}
+
+// The login name is unique in the instance: an email that is already another
+// user's login name makes AddHumanUser answer already_exists although this
+// tenant's admin does not exist.
+//
+// Verifies: tenant-management AC-3; T-01
+func TestCreateAdminRejectsLoginNameOfAnotherUser(t *testing.T) {
+	ctx := context.Background()
+	for name, getUser := range map[string]func() (int, string){
+		"no such user":      answer(http.StatusNotFound, `{"code":"not_found","message":"User could not be found"}`),
+		"user of other org": answer(http.StatusOK, `{"user":{"userId":"`+tenantID+`-admin","details":{"resourceOwner":"other-org"}}}`),
+	} {
+		t.Run(name, func(t *testing.T) {
+			f, c := newFake(t)
+			f.answers[pathAddHuman] = answer(http.StatusConflict, `{"code":"already_exists","message":"user exists"}`)
+			f.answers[pathGetUser] = getUser
+			err := c.CreateAdmin(ctx, tenantID, tenantID+"-admin", "boss@acme.test")
+			if !errors.Is(err, ErrAdminEmailTaken) {
+				t.Fatalf("err = %v, want ErrAdminEmailTaken", err)
+			}
+			if got := f.paths(); !reflect.DeepEqual(got, []string{pathAddHuman, pathGetUser}) {
+				t.Fatalf("calls = %v; want no membership and no invitation", got)
+			}
+		})
 	}
 }
 

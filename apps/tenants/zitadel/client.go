@@ -59,6 +59,8 @@ func HasCode(err error, code string) bool {
 
 var ErrNameTaken = fmt.Errorf("zitadel: another organization has this name: %w", core.ErrForeign)
 
+var ErrAdminEmailTaken = fmt.Errorf("zitadel: the admin email is another user's login name: %w", core.ErrForeign)
+
 // An organization existing from an earlier attempt is success.
 func (c *Client) CreateOrganization(ctx context.Context, id, name string) error {
 	req := struct {
@@ -137,6 +139,10 @@ func (c *Client) CreateAdmin(ctx context.Context, orgID, userID, email string) e
 		if !HasCode(err, CodeAlreadyExists) {
 			return err
 		}
+		// Login names are unique in the instance, so already_exists may be another user's.
+		if err := c.checkOwnUser(ctx, orgID, userID); err != nil {
+			return err
+		}
 		created = false
 	}
 
@@ -160,6 +166,23 @@ func (c *Client) CreateAdmin(ctx context.Context, orgID, userID, email string) e
 	// A user that has already accepted an invitation cannot get another one.
 	if err != nil && !created && HasCode(err, CodeFailedPrecondition) {
 		return nil
+	}
+	return err
+}
+
+func (c *Client) checkOwnUser(ctx context.Context, orgID, userID string) error {
+	var resp struct {
+		User struct {
+			Details struct {
+				ResourceOwner string `json:"resourceOwner"`
+			} `json:"details"`
+		} `json:"user"`
+	}
+	err := c.call(ctx, userService, "GetUserByID", struct {
+		UserID string `json:"userId"`
+	}{userID}, &resp)
+	if HasCode(err, CodeNotFound) || (err == nil && resp.User.Details.ResourceOwner != orgID) {
+		return ErrAdminEmailTaken
 	}
 	return err
 }
