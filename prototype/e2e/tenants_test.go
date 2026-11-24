@@ -89,14 +89,15 @@ func tmCall(t *testing.T, method, path, body string) string {
 // Verifies: tenant-management AC-17
 // Verifies: kafka-client-auth AC-2
 func TestSuspendedTenantLosesAPIAccess(t *testing.T) {
-	out := tmCall(t, "POST", "/tenants", `{"name":"e2e-suspend-`+randomID()+`","admin_email":"e2e-suspend@example.com"}`)
+	out := tmCall(t, "POST", "/tenants", `{"name":"e2e-suspend-`+randomID()+`","admin_email":"e2e-suspend-`+randomID()+`@example.com"}`)
 	if !strings.Contains(out, "status=201") {
 		t.Fatalf("create tenant: %s", out)
 	}
 	var created struct {
 		ID string `json:"id"`
 	}
-	if err := json.Unmarshal([]byte(out[:strings.LastIndex(out, "\nstatus=")]), &created); err != nil || created.ID == "" {
+	// The pod's output may carry more than the body; the body is its first JSON value.
+	if err := json.NewDecoder(strings.NewReader(out)).Decode(&created); err != nil || created.ID == "" {
 		t.Fatalf("create tenant: %s, %v", out, err)
 	}
 	id := created.ID
@@ -127,7 +128,19 @@ func TestSuspendedTenantLosesAPIAccess(t *testing.T) {
 	r.decode(t, &secret)
 	ten := tenant{Name: "e2e-suspend", OrgID: id, ClientID: username, ClientSecret: secret.ClientSecret}
 
-	old := token(t, ten)
+	// Zitadel's projections may not show a secret added a moment ago yet.
+	var old string
+	for deadline := time.Now().Add(30 * time.Second); ; {
+		tok, err := fetchToken(ten)
+		if err == nil {
+			old = tok
+			break
+		}
+		if time.Now().After(deadline) || !strings.Contains(err.Error(), "Secret.NotExisting") {
+			t.Fatal(err)
+		}
+		time.Sleep(time.Second)
+	}
 	mustStatus(t, call(t, "GET", "/items", old, nil), http.StatusOK, "active tenant")
 
 	if out := tmCall(t, "POST", "/tenants/"+id+"/suspend", ""); !strings.Contains(out, "status=200") {
