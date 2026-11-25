@@ -1,0 +1,139 @@
+// Command gateway is the API Gateway (ADR-0004).
+package main
+
+import (
+	"context"
+	"log/slog"
+	"net/http"
+	"os"
+	"os/signal"
+	"syscall"
+	"time"
+
+	"github.com/go-jose/go-jose/v4"
+
+	"github.com/maksimillian1/ha-multitenant-saas-platform/apps/gateway/auth"
+	"github.com/maksimillian1/ha-multitenant-saas-platform/apps/gateway/core"
+	"github.com/maksimillian1/ha-multitenant-saas-platform/apps/gateway/health"
+	"github.com/maksimillian1/ha-multitenant-saas-platform/apps/gateway/jwkssync"
+	"github.com/maksimillian1/ha-multitenant-saas-platform/apps/gateway/proxy"
+	"github.com/maksimillian1/ha-multitenant-saas-platform/apps/gateway/tenantstate"
+	"github.com/maksimillian1/ha-multitenant-saas-platform/apps/gateway/usage"
+)
+
+func main() {
+	log := slog.New(slog.NewJSONHandler(os.Stdout, nil))
+	cfg := core.LoadConfig()
+	if len(os.Args) > 1 && os.Args[1] == "jwks-sync" {
+		os.Exit(runJWKSSync(cfg, log))
+	}
+	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+	defer stop()
+
+	proxyService, usageService, healthService, err := bootstrapServices(ctx, cfg, log)
+	if err != nil {
+		log.Error("bootstrap failed", "err", err)
+		os.Exit(1)
+	}
+
+	mux := http.NewServeMux()
+	mux.HandleFunc("GET /healthz", healthService.Handler)
+	mux.HandleFunc("GET /readyz", healthService.ReadyHandler)
+	mux.Handle("/", core.AccessLog(http.HandlerFunc(proxyService.Handler), log))
+
+	metrics := http.NewServeMux()
+	if usageService != nil {
+		metrics.HandleFunc("GET /metrics", usageService.MetricsHandler)
+	} else {
+		metrics.HandleFunc("GET /metrics", func(w http.ResponseWriter, r *http.Request) {})
+	}
+	go func() {
+		if err := core.Serve(ctx, log, cfg.MetricsAddr, metrics); err != nil {
+			log.Error("metrics listener", "err", err)
+		}
+	}()
+
+	err = core.Serve(ctx, log, cfg.ListenAddr, mux)
+	if usageService != nil {
+		// Events still retrying are given up after this and counted as expired.
+		closeCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		usageService.Close(closeCtx)
+		cancel()
+	}
+	if err != nil {
+		log.Error("exit", "err", err)
+		os.Exit(1)
+	}
+}
+
+func bootstrapServices(ctx context.Context, cfg core.Config, log *slog.Logger) (*proxy.Service, *usage.Service, *health.Service, error) {
+	if err := cfg.Validate(); err != nil {
+		return nil, nil, nil, err
+	}
+	routes, err := proxy.ParseRoutes(cfg.Routes)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	issuerClient, err := auth.NewIssuerClient(cfg.Issuer, cfg.IssuerDialAddr)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	keys := auth.NewKeySet(cfg.JWKSURL, issuerClient, cfg.JWKSCacheFile, log)
+	if err := keys.Load(ctx); err != nil {
+		log.Error("no signing keys yet; not ready until Zitadel answers", "err", err)
+	}
+	go keys.Run(ctx)
+	verifier := auth.NewVerifier(cfg.Issuer, cfg.Audience, cfg.ZitadelAdminOrg, keys)
+	states := tenantstate.New()
+	verifier.Blocked = states.Blocked
+	kafkaAuth, err := tenantstate.ClientAuth(cfg.KafkaCAFile, cfg.KafkaUsername, cfg.KafkaPassword)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	go func() {
+		if err := states.Follow(ctx, cfg.KafkaBrokers, cfg.TenantStates, log, kafkaAuth...); err != nil && ctx.Err() == nil {
+			log.Error("tenant-states follower stopped", "err", err)
+		}
+	}()
+
+	var reporter core.UsageReporter
+	var usageService *usage.Service
+	if cfg.UsageURL != "" {
+		usageService = usage.NewService(cfg.UsageURL, cfg.UsageMaxPending, log)
+		reporter = usageService
+	} else {
+		log.Warn("USAGE_URL is not set: API calls are not reported as usage events")
+	}
+
+	proxyService := proxy.NewService(verifier, routes, reporter, log)
+	healthService := health.NewService(keys.Ready)
+
+	return proxyService, usageService, healthService, nil
+}
+
+func runJWKSSync(cfg core.Config, log *slog.Logger) int {
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	if cfg.Issuer == "" {
+		log.Error("jwks-sync: ISSUER is required")
+		return 1
+	}
+	issuerClient, err := auth.NewIssuerClient(cfg.Issuer, cfg.IssuerDialAddr)
+	if err != nil {
+		log.Error("jwks-sync", "err", err)
+		return 1
+	}
+	store, err := jwkssync.InCluster(cfg.JWKSConfigMapNamespace, cfg.JWKSConfigMap)
+	if err != nil {
+		log.Error("jwks-sync", "err", err)
+		return 1
+	}
+	fetch := func(ctx context.Context) ([]jose.JSONWebKey, error) {
+		return auth.FetchJWKS(ctx, issuerClient, cfg.JWKSURL)
+	}
+	if _, err := jwkssync.Sync(ctx, fetch, store, time.Now(), log); err != nil {
+		log.Error("jwks-sync", "err", err)
+		return 1
+	}
+	return 0
+}

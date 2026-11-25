@@ -1,0 +1,15 @@
+# The SCRAM login of this namespace's Kafka clients (feature
+# kafka-client-auth). Local kind prototype passwords only; they match the
+# KafkaUser passwords in prototype/k8s/apps/kafka/templates/users.yaml. The
+# cluster CA (Secret usage-kafka-ca) is not in Git: prototype/kafka-ca.sh loads it.
+apiVersion: v1
+kind: Secret
+metadata:
+  name: api-gateway-kafka
+  namespace: gateway
+  annotations:
+    argocd.argoproj.io/sync-wave: "-1"
+type: Opaque
+stringData:
+  KAFKA_USERNAME: api-gateway
+  KAFKA_PASSWORD: dev-api-gateway-kafka # gitleaks:allow

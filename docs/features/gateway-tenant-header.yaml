@@ -1,0 +1,21 @@
+feature: gateway-tenant-header
+title: The x-tenant-id header the API Gateway sets for services behind it
+critical: true
+code:
+  - apps/gateway/proxy/**
+  - docs/contracts/gateway-headers.md
+c4: [apiGateway]
+links:
+  issues: [HAMSP-23, HAMSP-59]
+requirements: [QS-12]
+
+acceptance:
+  AC-1:
+    text: The gateway waits for an upstream answer longer than the pooler's 30 s limit, so the app's 504 reaches the client instead of the gateway's 502.
+    level: unit
+    planned: apps/gateway/proxy/proxy_test.go:TestUpstreamTimeoutOutlastsQueryLimit
+
+comments:
+  - at: apps/gateway/proxy/proxy.go:UpstreamTimeout
+    text: "// Longer than the pooler's 30 s query_timeout, so an app's own timeout answer reaches the client."
+    why: ordering dependency between timeouts

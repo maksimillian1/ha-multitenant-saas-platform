@@ -1,0 +1,3 @@
+# Findings in old commits that are not secrets. gitleaks matches by fingerprint.
+# Fake test key; the line now carries gitleaks:allow, but commit 77744a3 predates it.
+77744a30539c77248969e5ba1ebb3d3731c170d5:apps/admin/auth/auth_test.go:generic-api-key:20

@@ -1,0 +1,19 @@
+# Components of the tenant web page and the imports allowed between them.
+# c4sync draws these components.
+version: 3
+workdir: .
+allow:
+  depOnAnyVendor: true
+excludeFiles:
+  - "^.*_test\\.go$"
+components:
+  main:   { in: . }
+  auth:   { in: auth }
+  page:   { in: page }
+  items:  { in: items }
+  health: { in: health }
+  core:   { in: core }
+deps:
+  main:  { anyProjectDeps: true }
+  auth:  { mayDependOn: [core] }
+  page:  { mayDependOn: [core, items] }

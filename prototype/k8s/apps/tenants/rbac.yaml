@@ -1,0 +1,38 @@
+# Tenant Management creates and deletes each tenant's namespace with its
+# ResourceQuota and CiliumNetworkPolicy (ADR-0012). RBAC cannot limit this
+# to namespaces named tenant-*, so the service itself refuses any namespace
+# not labelled with the tenant's ID (apps/tenants/kube). It gets no access to
+# pods, secrets or anything else in those namespaces.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: tenants
+  namespace: tenants
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: tenant-management
+rules:
+  - apiGroups: [""]
+    resources: [namespaces]
+    verbs: [get, create, delete]
+  - apiGroups: [""]
+    resources: [resourcequotas]
+    verbs: [get, create]
+  - apiGroups: [cilium.io]
+    resources: [ciliumnetworkpolicies]
+    verbs: [get, create]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: tenant-management
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: tenant-management
+subjects:
+  - kind: ServiceAccount
+    name: tenants
+    namespace: tenants

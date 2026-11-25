@@ -1,0 +1,159 @@
+// Package testpg needs a superuser DSN of PostgreSQL with TimescaleDB (TSL) in TEST_DATABASE_URL;
+// without it the tests are skipped.
+package testpg
+
+import (
+	"context"
+	"fmt"
+	"net/url"
+	"os"
+	"testing"
+	"time"
+
+	"github.com/jackc/pgx/v5"
+
+	"github.com/maksimillian1/ha-multitenant-saas-platform/apps/usage/internal/migrations"
+)
+
+const (
+	OwnerRole  = "usage_owner"
+	WriterRole = "usage_writer"
+	ReaderRole = "usage_reader"
+	password   = "test-only-password"
+)
+
+type DB struct {
+	Name      string
+	Super     *pgx.Conn // bypasses RLS
+	Owner     *pgx.Conn
+	WriterDSN string
+}
+
+func dsnFor(t testing.TB, base, user, db string) string {
+	t.Helper()
+	u, err := url.Parse(base)
+	if err != nil {
+		t.Fatalf("TEST_DATABASE_URL must be a URL: %v", err)
+	}
+	if user != "" {
+		u.User = url.UserPassword(user, password)
+	}
+	u.Path = "/" + db
+	return u.String()
+}
+
+func New(t testing.TB) DB {
+	t.Helper()
+	base := os.Getenv("TEST_DATABASE_URL")
+	if base == "" {
+		t.Skip("TEST_DATABASE_URL is not set")
+	}
+	ctx := context.Background()
+	admin, err := pgx.Connect(ctx, base)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { admin.Close(ctx) })
+
+	if err := setupRoles(ctx, admin); err != nil {
+		t.Fatal(err)
+	}
+
+	name := fmt.Sprintf("usage_test_%d", time.Now().UnixNano())
+	if _, err := admin.Exec(ctx, fmt.Sprintf("CREATE DATABASE %s OWNER %s", name, OwnerRole)); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _, _ = admin.Exec(ctx, fmt.Sprintf("DROP DATABASE %s WITH (FORCE)", name)) })
+
+	super, err := pgx.Connect(ctx, dsnFor(t, base, "", name))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { super.Close(ctx) })
+	if _, err := super.Exec(ctx, "CREATE EXTENSION IF NOT EXISTS timescaledb"); err != nil {
+		t.Fatal(err)
+	}
+
+	owner, err := pgx.Connect(ctx, dsnFor(t, base, OwnerRole, name))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { owner.Close(ctx) })
+	if err := migrations.Migrate(ctx, owner); err != nil {
+		t.Fatal(err)
+	}
+	pauseJobs(t, super)
+	return DB{Name: name, Super: super, Owner: owner, WriterDSN: dsnFor(t, base, WriterRole, name)}
+}
+
+// "usage" in hex; all callers share the advisory lock space of TEST_DATABASE_URL.
+const rolesLock = 0x7573616765
+
+// Roles are cluster-wide and packages test in parallel: concurrent ALTER/CREATE ROLE fail without the lock.
+func setupRoles(ctx context.Context, admin *pgx.Conn) error {
+	return pgx.BeginFunc(ctx, admin, func(tx pgx.Tx) error {
+		if _, err := tx.Exec(ctx, "SELECT pg_advisory_xact_lock($1)", rolesLock); err != nil {
+			return fmt.Errorf("roles lock: %w", err)
+		}
+		for _, stmt := range []string{
+			fmt.Sprintf(`DO $$ BEGIN
+				IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = '%[1]s') THEN CREATE ROLE %[1]s LOGIN; END IF;
+				IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = '%[2]s') THEN CREATE ROLE %[2]s LOGIN; END IF;
+				IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = '%[3]s') THEN CREATE ROLE %[3]s NOLOGIN; END IF;
+			END $$`, OwnerRole, WriterRole, ReaderRole),
+			fmt.Sprintf("ALTER ROLE %s PASSWORD '%s'", OwnerRole, password),
+			fmt.Sprintf("ALTER ROLE %s PASSWORD '%s' NOSUPERUSER NOBYPASSRLS", WriterRole, password),
+		} {
+			if _, err := tx.Exec(ctx, stmt); err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+}
+
+func (db DB) Count(t testing.TB, ids []string) int {
+	t.Helper()
+	var n int
+	if err := db.Super.QueryRow(context.Background(),
+		"SELECT count(*) FROM usage_events WHERE event_id::text = ANY($1)", ids).Scan(&n); err != nil {
+		t.Fatal(err)
+	}
+	return n
+}
+
+func (db DB) CountTenant(t testing.TB, tenant string, ids []string) int {
+	t.Helper()
+	var n int
+	if err := db.Super.QueryRow(context.Background(),
+		"SELECT count(*) FROM usage_events WHERE tenant_id = $1 AND event_id::text = ANY($2)", tenant, ids).Scan(&n); err != nil {
+		t.Fatal(err)
+	}
+	return n
+}
+
+// Otherwise the scheduler may run a policy a test runs too, and a second refresh fails with 55P03.
+func pauseJobs(t testing.TB, super *pgx.Conn) {
+	t.Helper()
+	ctx := context.Background()
+	// Jobs below 1000 are TimescaleDB's own.
+	if _, err := super.Exec(ctx,
+		"SELECT alter_job(job_id, scheduled => false) FROM timescaledb_information.jobs WHERE job_id >= 1000"); err != nil {
+		t.Fatalf("pause jobs: %v", err)
+	}
+	deadline := time.Now().Add(30 * time.Second)
+	for {
+		var running int
+		if err := super.QueryRow(ctx,
+			"SELECT count(*) FROM timescaledb_information.job_stats WHERE job_id >= 1000 AND job_status = 'Running'").Scan(&running); err != nil {
+			t.Fatalf("job stats: %v", err)
+		}
+		if running == 0 {
+			return
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("%d jobs still running after 30s", running)
+		}
+		time.Sleep(100 * time.Millisecond)
+	}
+}

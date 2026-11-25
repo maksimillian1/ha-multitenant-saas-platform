@@ -1,0 +1,63 @@
+openapi: 3.1.0
+info:
+  title: UsageWriteAPI
+  version: "1"
+  description: |
+    Accepts usage events from senders and writes them to Kafka
+    (docs/contracts/usage-event/README.md, ADR-0010). Only the API Gateway may call it
+    (CiliumNetworkPolicy); it trusts tenant_id in the events because of that.
+servers:
+  - url: http://usage-writeapi.usage.svc:8080
+paths:
+  /v1/events:
+    post:
+      operationId: postEvents
+      summary: Store a batch of usage events once
+      description: |
+        202 only after Kafka confirmed every event (acks=all). The events are
+        stored once however often they are sent, so retry 503 with the same
+        event_id and event_time.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "schemas/http-request.v1.json"
+      responses:
+        "202":
+          description: Kafka confirmed every event.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [accepted]
+                properties:
+                  accepted:
+                    type: integer
+                    minimum: 1
+        "400":
+          description: The batch is invalid; none of its events was accepted. Do not retry it unchanged.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "413":
+          description: The body exceeds 1 MB.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "503":
+          description: Kafka did not confirm the write. Retry with the same event_id and event_time.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+components:
+  schemas:
+    Error:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: string

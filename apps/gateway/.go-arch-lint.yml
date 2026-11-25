@@ -1,0 +1,22 @@
+# Components of the gateway and the imports allowed between them.
+# c4sync draws these components.
+version: 3
+workdir: .
+allow:
+  depOnAnyVendor: true
+excludeFiles:
+  - "^.*_test\\.go$"
+components:
+  main:   { in: . }
+  auth:   { in: auth }
+  proxy:  { in: proxy }
+  usage:  { in: usage }
+  health: { in: health }
+  tenantstate: { in: tenantstate }
+  jwkssync: { in: jwkssync }
+  core:   { in: core }
+deps:
+  main:  { anyProjectDeps: true }
+  proxy: { mayDependOn: [auth, core] }
+  usage: { mayDependOn: [core] }
+  jwkssync: { mayDependOn: [auth] }

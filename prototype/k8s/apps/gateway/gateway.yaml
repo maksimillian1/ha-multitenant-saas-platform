@@ -1,0 +1,39 @@
+# Infrastructure entry point (ADR-0004): Cilium's Gateway API on its built-in
+# Envoy, in host network mode, so the listener binds port 30080 on every node.
+# kind maps it to localhost:30080 (prototype/kind-config.yaml). It routes by
+# host only; authentication happens in the API Gateway service behind it.
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+  name: public
+  namespace: gateway
+spec:
+  gatewayClassName: cilium
+  listeners:
+    - name: http
+      protocol: HTTP
+      port: 30080
+      allowedRoutes:
+        namespaces:
+          # The zitadel namespace attaches its own HTTPRoute (zitadel chart values).
+          from: All
+---
+# Everything on the API host goes through the API Gateway service.
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: api
+  namespace: gateway
+spec:
+  parentRefs:
+    - name: public
+  hostnames:
+    - api.localtest.me
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /
+      backendRefs:
+        - name: api-gateway
+          port: 8080

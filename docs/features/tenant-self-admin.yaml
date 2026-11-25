@@ -1,0 +1,120 @@
+feature: tenant-self-admin
+title: Tenant admins manage their users, roles and SSO in the Zitadel Console; tenant web login for ExampleApp
+critical: true
+c4: [authService, tenantWeb, exampleApp]
+links:
+  issues: [HAMSP-57]
+code:
+  - apps/exampleweb/**
+  - prototype/k8s/apps/exampleweb/**
+  - prototype/e2e/tenant_admin_test.go
+  - prototype/e2e/exampleweb_test.go
+  - .github/workflows/exampleweb.yml
+  - prototype/e2e/human_login_test.go
+requirements: [FR-02, FR-03, QS-11, C-04, C-06]
+
+acceptance:
+  AC-1:
+    text: >-
+      On kind, Zitadel's Login v2 runs (arm64 image) and the Console at /ui/console uses it: a
+      tenant's ORG_OWNER created by provisioning accepts the invite, sets a password and logs
+      in to the Console.
+    level: e2e
+    planned: prototype/e2e/tenant_admin_test.go:TestOrgOwnerLogsInThroughLoginV2
+  AC-2:
+    text: >-
+      In the Console, tenant A's ORG_OWNER creates a user in organization A and grants it a
+      project role; the user then gets a token whose organization ID is tenant A's tenant_id.
+    level: e2e
+    planned: prototype/e2e/tenant_admin_test.go:TestOrgOwnerCreatesUserWithRole
+  AC-3:
+    text: >-
+      With the Console's token, tenant A's ORG_OWNER is denied (permission_denied or not found)
+      when it reads or changes users, role grants, identity providers or the label policy of
+      tenant B's organization, and cannot see organization B in the organization list.
+    level: integration
+    planned: prototype/e2e/tenant_admin_test.go:TestOrgOwnerCannotReachOtherOrg
+  AC-4:
+    text: >-
+      Tenant A's ORG_OWNER cannot change instance settings: adding an instance member, an
+      instance identity provider or changing the instance label policy is denied.
+    level: integration
+    planned: prototype/e2e/tenant_admin_test.go:TestOrgOwnerCannotChangeInstance
+  AC-5:
+    text: >-
+      An OIDC identity provider that tenant A's ORG_OWNER adds to organization A is offered on
+      the login of organization A only; a user logging in through it lands in organization A.
+    level: e2e
+    planned: prototype/e2e/tenant_admin_test.go:TestOrgIdentityProviderOnlyInItsOrg
+  AC-6:
+    text: >-
+      After the admin app sets organization A's branding, the Console and login of tenant A's
+      users serve organization A's logo and colors.
+    level: e2e
+    planned: prototype/e2e/tenant_admin_test.go:TestOrgBrandingSeenByOrgUsers
+  AC-7:
+    text: >-
+      exampleapp-web logs a user in by the OIDC authorization code flow with PKCE against
+      Zitadel; the browser gets only an httpOnly, Secure, SameSite=Lax session cookie, never a
+      token. A request without a valid session is redirected to the login.
+    level: unit
+    planned: apps/exampleweb/auth/auth_test.go:TestLoginSetsOnlySessionCookie
+  AC-8:
+    text: >-
+      On kind, a user of tenant A logs in to exampleapp-web and sees tenant A's items, which
+      exampleapp-web reads from GET /items through the API Gateway with the user's access token;
+      tenant B's items never appear.
+    level: e2e
+    planned: prototype/e2e/exampleweb_test.go:TestExampleWebShowsOnlyOwnItems
+  AC-9:
+    text: >-
+      The page shows a "Manage users" link to the Zitadel Console only when the user's token
+      holds ORG_OWNER of its organization; the Console URL comes from configuration.
+    level: unit
+    planned: apps/exampleweb/page/page_test.go:TestManageUsersLinkOnlyForOrgOwner
+  AC-10:
+    text: >-
+      Logout ends the session in exampleapp-web and at Zitadel (end_session); the old cookie
+      no longer opens the page.
+    level: unit
+    planned: apps/exampleweb/auth/auth_test.go:TestLogoutEndsSession
+  AC-11:
+    text: >-
+      When the API Gateway answers 401 for an expired token, exampleapp-web refreshes the token
+      once and repeats the call; when the refresh fails, it sends the user to the login.
+    level: unit
+    planned: apps/exampleweb/page/page_test.go:TestRefreshOnceOn401
+
+checklist:                          # planned for alpha: basic + critical items
+  T-01:
+    planned: >-
+      applies — tenant A's ORG_OWNER token against org B's users, grants, IdPs and label policy
+      in Zitadel (AC-3); a user of tenant A in exampleapp-web sees only A's items, through
+      exampleapp-web → API Gateway → ExampleApp → PostgreSQL with two tenants (AC-8)
+  T-02:
+    planned: >-
+      applies — exampleapp-web consumes ExampleApp's GET /items response and Zitadel's OIDC and
+      membership answers; it decodes the recorded examples, and a broken body gives an error
+      page, not a panic
+  T-04:
+    planned: >-
+      applies — the ORG_OWNER role against instance actions (AC-4); exampleapp-web routes for an
+      anonymous user, a tenant user and an ORG_OWNER, each in its own and another tenant
+  T-08:
+    planned: does not apply — no migration
+  T-11:
+    planned: >-
+      does not apply — no new decoder of untrusted input; tokens and OIDC answers are parsed by
+      zitadel/oidc, the items JSON comes from our own ExampleApp behind the Gateway
+  T-12:
+    planned: >-
+      applies — the AC-3 test run with iam-admin's token reads org B, showing the test detects
+      cross-org access; the AC-8 test fails when exampleapp-web sends a fixed tenant's token
+      instead of the user's
+
+quality_scenarios:
+  touched: [QS-11]
+  tests: {}
+
+gates:
+  G-07: {status: pass, by: owner, date: 2026-11-23, note: plan for alpha approved in chat}

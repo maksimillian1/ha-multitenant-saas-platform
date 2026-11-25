@@ -1,0 +1,22 @@
+{
+  "http": {
+    "description": "POST /vN/events on UsageWriteAPI",
+    "schema": "http-request",
+    "retention_days": 0,
+    "participants": {
+      "gateway": {"produces": ["v1"]},
+      "writeapi": {"consumes": ["v1"]}
+    },
+    "stopped": {}
+  },
+  "kafka": {
+    "description": "Record value in topic usage-events",
+    "schema": "kafka-record",
+    "retention_days": 7,
+    "participants": {
+      "writeapi": {"produces": ["v1"]},
+      "writer": {"consumes": ["v1"]}
+    },
+    "stopped": {}
+  }
+}
