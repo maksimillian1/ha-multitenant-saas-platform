@@ -239,7 +239,7 @@ c4sync diff -config head/apps/usage/c4sync.yml -base-config base/apps/usage/c4sy
 
 `diff` builds the model of two source trees and prints what changed in Markdown. A common setup checks out the base branch with `git worktree add` and compares it with the working tree. Each tree uses its own configs. A missing base config means an empty base, so a new service shows up as fully added.
 
-Here is the real output for HAMSP-26 "Usage Writer stores each event once" (commit `e57aaaf`):
+Here is the real output for HAMSP-26 "Usage Writer stores each event once" (commit `0602554`):
 
 ```markdown
 ## Structure changes: Usage

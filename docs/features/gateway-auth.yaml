@@ -148,9 +148,9 @@ quality_scenarios:
 
 gates:
   G-01: {status: n/a, by: verify, date: 2026-11-25, note: no release flag}
-  G-02: {status: pass, by: verify, date: 2026-11-25, commit: 05d3f4a}
+  G-02: {status: pass, by: verify, date: 2026-11-25, commit: 2acc511}
   G-03: {status: n/a, by: verify, date: 2026-11-25, note: no new or changed contract}
-  G-04: {status: pass, by: verify, date: 2026-11-25, commit: 05d3f4a, level: basic}
+  G-04: {status: pass, by: verify, date: 2026-11-25, commit: 2acc511, level: basic}
   G-05: {status: pass, by: verify, date: 2026-11-25, note: "QS-11 touched; the e2e test covers a 2-minute outage; the 8-minute run is recommended and not run"}
   G-07: {status: pass, by: owner, date: 2026-11-25}
 
@@ -167,13 +167,13 @@ deviations:
 
 runs:
   - date: 2026-11-11
-    commit: a5d82a6
+    commit: f35bfc4
     stage_checked: proto
     verdict: ready
     failed: []
     not_checked: []
   - date: 2026-11-25
-    commit: 05d3f4a
+    commit: 2acc511
     stage_checked: alpha
     verdict: ready
     failed: []

@@ -106,15 +106,15 @@ quality_scenarios:
 
 gates:
   G-01: {status: n/a, by: verify, date: 2026-11-23, note: no release flag}
-  G-02: {status: pass, by: owner, date: 2026-11-23, commit: c9170c4, note: "AC-1 to AC-7 and AC-9 pass by verify; AC-8 (DLQ retention 7 days on kind) checked by hand and confirmed by the owner in chat"}
+  G-02: {status: pass, by: owner, date: 2026-11-23, commit: 828c9b2, note: "AC-1 to AC-7 and AC-9 pass by verify; AC-8 (DLQ retention 7 days on kind) checked by hand and confirmed by the owner in chat"}
   G-03: {status: n/a, by: verify, date: 2026-11-23, note: "no schema changes; the DLQ headers are documented in docs/contracts/usage-event/README.md under the approved plan, and the contract tests pass"}
-  G-04: {status: pass, by: verify, date: 2026-11-23, level: basic, commit: c9170c4}
+  G-04: {status: pass, by: verify, date: 2026-11-23, level: basic, commit: 828c9b2}
   G-05: {status: not-checked, by: verify, date: 2026-11-23, note: "QS-06 and QS-09 pass in-process; QS-09 load and chaos run on EKS recommended, not run"}
   G-07: {status: pass, by: owner, date: 2026-11-18, note: "alpha plan approved in chat, including the Kafka auth changes (AC-7, AC-9, T-04)"}
 
 runs:
   - date: 2026-11-23
-    commit: c9170c4
+    commit: 828c9b2
     stage_checked: alpha
     verdict: ready
     failed: []

@@ -79,9 +79,9 @@ quality_scenarios:
 
 gates:
   G-01: {status: n/a, by: verify, date: 2026-11-18, note: no release flag}
-  G-02: {status: pass, by: verify, date: 2026-11-18, commit: 520018e}
+  G-02: {status: pass, by: verify, date: 2026-11-18, commit: e340db1}
   G-03: {status: n/a, by: verify, date: 2026-11-18, note: the usage-event and tenant-states schemas do not change}
-  G-04: {status: pass, by: verify, date: 2026-11-18, level: basic, commit: 520018e}
+  G-04: {status: pass, by: verify, date: 2026-11-18, level: basic, commit: e340db1}
   G-05: {status: not-checked, by: verify, date: 2026-11-18, note: "QS-17 load and chaos run on EKS over TLS with SCRAM recommended; not run"}
   G-07: {status: pass, by: owner, date: 2026-11-12, note: plan for alpha approved in chat}
 
@@ -97,7 +97,7 @@ deviations:
     approved: 2026-11-18
 runs:
   - date: 2026-11-18
-    commit: 520018e
+    commit: e340db1
     stage_checked: alpha
     verdict: ready
     failed: []

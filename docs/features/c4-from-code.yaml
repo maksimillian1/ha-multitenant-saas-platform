@@ -94,22 +94,22 @@ quality_scenarios:
   touched: []
 
 gates:
-  G-01: {status: n/a, by: verify, date: 2026-11-07, commit: 12e046d1, note: repository tooling; no runtime behaviour and no release flag}
-  G-02: {status: pass, by: owner, date: 2026-11-07, commit: 12e046d1, note: "AC-1 to AC-11 pass by verify; AC-12 passed in CI (c4 run 42384343886, PR #4); AC-13 checked on PR #8 (create, update, delete), accepted by the owner with the stale-comment case in triage"}
-  G-03: {status: n/a, by: verify, date: 2026-11-07, commit: 12e046d1, note: no schema in docs/contracts}
-  G-04: {status: pass, by: verify, date: 2026-11-07, commit: 12e046d1, level: basic}
-  G-05: {status: n/a, by: verify, date: 2026-11-07, commit: 12e046d1, note: no quality scenario touched}
+  G-01: {status: n/a, by: verify, date: 2026-11-07, commit: 25788457, note: repository tooling; no runtime behaviour and no release flag}
+  G-02: {status: pass, by: owner, date: 2026-11-07, commit: 25788457, note: "AC-1 to AC-11 pass by verify; AC-12 passed in CI (c4 run 42384343886, PR #4); AC-13 checked on PR #8 (create, update, delete), accepted by the owner with the stale-comment case in triage"}
+  G-03: {status: n/a, by: verify, date: 2026-11-07, commit: 25788457, note: no schema in docs/contracts}
+  G-04: {status: pass, by: verify, date: 2026-11-07, commit: 25788457, level: basic}
+  G-05: {status: n/a, by: verify, date: 2026-11-07, commit: 25788457, note: no quality scenario touched}
   G-07: {status: pass, by: owner, date: 2026-11-07, note: plan for alpha approved in chat}
 
 runs:
   - date: 2026-11-07
-    commit: 12e046d1
+    commit: 25788457
     stage_checked: alpha
     verdict: not-ready
     failed: []
     not_checked: [AC-12, AC-13]
   - date: 2026-11-07
-    commit: 12e046d1
+    commit: 25788457
     stage_checked: alpha
     verdict: ready
     failed: []

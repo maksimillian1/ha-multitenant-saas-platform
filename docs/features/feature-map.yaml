@@ -43,34 +43,34 @@ checklist:
     verified: n/a — no migration in the diff
 
 gates:
-  G-01: {status: n/a, by: verify, date: 2026-11-07, commit: fa33fc3d, note: repository tooling; no runtime behaviour and no release flag}
-  G-02: {status: pass, by: owner, date: 2026-11-07, commit: bb26b272, note: AC-1 to AC-4 pass by verify; AC-5 (manual) accepted by the owner without a run}
-  G-03: {status: n/a, by: verify, date: 2026-11-07, commit: fa33fc3d, note: no schema in docs/contracts}
-  G-04: {status: pass, by: verify, date: 2026-11-07, commit: fa33fc3d, level: basic}
-  G-05: {status: n/a, by: verify, date: 2026-11-07, commit: fa33fc3d, note: no quality scenario touched}
+  G-01: {status: n/a, by: verify, date: 2026-11-07, commit: 7475577d, note: repository tooling; no runtime behaviour and no release flag}
+  G-02: {status: pass, by: owner, date: 2026-11-07, commit: 3afa472f, note: AC-1 to AC-4 pass by verify; AC-5 (manual) accepted by the owner without a run}
+  G-03: {status: n/a, by: verify, date: 2026-11-07, commit: 7475577d, note: no schema in docs/contracts}
+  G-04: {status: pass, by: verify, date: 2026-11-07, commit: 7475577d, level: basic}
+  G-05: {status: n/a, by: verify, date: 2026-11-07, commit: 7475577d, note: no quality scenario touched}
   G-07: {status: pass, by: owner, date: 2026-11-07, note: "approved for alpha on PR #5"}
 
 runs:
   - date: 2026-11-07
-    commit: 9f76446e
+    commit: 0a482278
     stage_checked: alpha
     verdict: not-ready
     failed: [AC-1, AC-2, AC-3, AC-4, G-07]
     not_checked: [AC-5]
   - date: 2026-11-07
-    commit: 5fbb2883
+    commit: 00150af7
     stage_checked: alpha
     verdict: not-ready
     failed: [G-07]
     not_checked: [AC-4 comment posted on GitHub, AC-5]
   - date: 2026-11-07
-    commit: fa33fc3d
+    commit: 7475577d
     stage_checked: alpha
     verdict: not-ready
     failed: [G-07]
     not_checked: [AC-5]
   - date: 2026-11-07
-    commit: bb26b272
+    commit: 3afa472f
     stage_checked: alpha
     verdict: ready
     failed: []

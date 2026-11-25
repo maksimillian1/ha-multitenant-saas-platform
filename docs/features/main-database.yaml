@@ -69,15 +69,15 @@ quality_scenarios:
 
 gates:
   G-01: {status: n/a, by: verify, date: 2026-11-25, note: no release flag}
-  G-02: {status: pass, by: verify, date: 2026-11-25, commit: 89dbc0d}
+  G-02: {status: pass, by: verify, date: 2026-11-25, commit: a476e1f}
   G-03: {status: n/a, by: verify, date: 2026-11-25, note: no new or changed contract}
-  G-04: {status: pass, by: verify, date: 2026-11-25, commit: 89dbc0d, level: basic}
+  G-04: {status: pass, by: verify, date: 2026-11-25, commit: a476e1f, level: basic}
   G-05: {status: pass, by: verify, date: 2026-11-25, note: "QS-12 touched; the e2e test covers it at low load; the k6 run is recommended and not run"}
   G-07: {status: not-checked, by: owner, date: 2026-11-25, note: "plan approval is out of scope for now, owner 2026-11-25"}
 
 runs:
   - date: 2026-11-25
-    commit: 89dbc0d
+    commit: a476e1f
     stage_checked: alpha
     verdict: not-ready
     failed: [G-07]
