@@ -139,6 +139,8 @@ acceptance:
     text: "A pod in tenant A's namespace cannot open a connection to a pod in tenant B's namespace, nor B's to A's, and a pod in a namespace that is not a tenant's cannot connect into one; pods in the same tenant namespace can (QS-02)."
     level: e2e
     planned: prototype/e2e/tenant_network_test.go:TestTenantNamespacesAreIsolated
+    verified:
+      - prototype/e2e/tenant_network_test.go:TestTenantNamespacesAreIsolated
 
 checklist:
   T-01:
@@ -146,6 +148,7 @@ checklist:
     verified:
       - "apps/tenants/lifecycle/lifecycle_test.go:TestDeleteLeavesTombstoneAndOtherTenants"
       - "apps/tenants/kube/client_test.go:TestNamespaceOfAnotherTenantIsNeverTouched"
+      - "prototype/e2e/tenant_network_test.go:TestTenantNamespacesAreIsolated"
   T-02:
     planned: "applies — new API in docs/contracts/tenants/openapi.yaml; Tenant Management's handlers and the admin BFF's client are tested against its examples; a broken body gets 400."
     verified:
@@ -180,6 +183,7 @@ checklist:
       - "apps/tenants/auth/auth_test.go:TestRequire"
       - "prototype/e2e/tenants_test.go:TestOnlyAdminNamespaceReachesTenantManagement"
       - "apps/tenants/lifecycle/lifecycle_test.go:TestEveryOperationPublishesTheState"
+      - "prototype/e2e/tenant_network_test.go:TestTenantNamespacesAreIsolated"
 
 quality_scenarios:
   touched: [QS-02, QS-18]
@@ -190,7 +194,7 @@ gates:
   G-02: {status: pass, by: verify, date: 2026-11-11, commit: a5d82a6}
   G-03: {status: pass, by: verify, date: 2026-11-11, commit: a5d82a6, note: "docs/contracts/tenants/openapi.yaml and docs/contracts/tenant-states/record.v1.json with their examples; tenant-states added by verify, approved by the owner 2026-11-11"}
   G-04: {status: pass, by: verify, date: 2026-11-11, commit: a5d82a6, level: basic}
-  G-05: {status: pass, by: verify, date: 2026-11-11, note: "QS-02 and QS-18 listed; no cheap QS test planned; QS-02's cross-tenant network test is HAMSP-58; QS-18's every-store deletion test not run; no load or chaos run recommended"}
+  G-05: {status: pass, by: verify, date: 2026-11-25, commit: 6ad2d24, note: "QS-02 passed on kind (TestTenantNamespacesAreIsolated, canary checked by hand); QS-18 every-store deletion test not run; no load or chaos run recommended"}
   G-07: {status: pass, by: owner, date: 2026-11-09}
 
 deviations:
@@ -203,6 +207,9 @@ deviations:
   - item: T-02
     change: "added by verify: the tenant-states record crosses from Tenant Management to the API Gateway and is a new contract (docs/contracts/tenant-states); approved by the owner in chat"
     approved: "2026-11-11"
+  - item: AC-19
+    change: added after the plan was approved (HAMSP-58, cross-tenant network test for QS-02), on the owner's request in chat
+    approved: "2026-11-25"
 
 runs:
   - date: 2026-11-10
@@ -219,6 +226,12 @@ runs:
     not_checked: []
   - date: 2026-11-11
     commit: a5d82a6
+    stage_checked: alpha
+    verdict: ready
+    failed: []
+    not_checked: []
+  - date: 2026-11-25
+    commit: 6ad2d24
     stage_checked: alpha
     verdict: ready
     failed: []
