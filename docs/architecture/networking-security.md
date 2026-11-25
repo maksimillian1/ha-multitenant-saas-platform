@@ -14,6 +14,10 @@ Browsers and API clients enter through the Cilium Gateway API (`public` Gateway,
 | UsageWriteAPI, UsageReadAPI | their callers only | `prototype/k8s/apps/usage/network-policy.yaml` |
 | Tenant Management | admin app pods only (namespace `admin`, label `app.kubernetes.io/name=admin`) | `prototype/k8s/apps/tenants/network-policy.yaml` |
 
+## Zitadel signing keys (QS-11)
+
+The API Gateway checks tokens itself with Zitadel's public keys (JWKS). At start it fetches them from Zitadel; when Zitadel does not answer, it reads the last known set from the ConfigMap `gateway/zitadel-jwks` if that is at most 24 h old, and is not Ready without keys. The CronJob `gateway/jwks-sync` writes the ConfigMap every minute and is the only ServiceAccount that may update it; the gateway mounts it read-only. A key that only the cache has is dropped as soon as Zitadel answers. The JWKS is public, so it is not a secret; the risk is a planted key, which the narrow write access covers.
+
 ## Tenant namespaces (QS-02)
 
 Tenant Management creates `tenant-<tenant_id>` for every tenant (ADR-0012), labelled `hamsp.io/tenant-id`, with a ResourceQuota and the CiliumNetworkPolicy `tenant-isolation` that selects every pod in it:

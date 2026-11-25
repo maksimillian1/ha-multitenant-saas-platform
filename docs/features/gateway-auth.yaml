@@ -7,6 +7,7 @@ code:
   - apps/gateway/tenantstate/**
   - apps/gateway/jwkssync/**
   - prototype/k8s/apps/gateway/jwks-sync.yaml
+  - prototype/e2e/zitadel_outage_test.go
 c4: [apiGateway]
 links:
   issues: [HAMSP-23, HAMSP-24, HAMSP-52, HAMSP-60]
