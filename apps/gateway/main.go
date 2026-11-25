@@ -10,9 +10,12 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/go-jose/go-jose/v4"
+
 	"github.com/maksimillian1/ha-multitenant-saas-platform/apps/gateway/auth"
 	"github.com/maksimillian1/ha-multitenant-saas-platform/apps/gateway/core"
 	"github.com/maksimillian1/ha-multitenant-saas-platform/apps/gateway/health"
+	"github.com/maksimillian1/ha-multitenant-saas-platform/apps/gateway/jwkssync"
 	"github.com/maksimillian1/ha-multitenant-saas-platform/apps/gateway/proxy"
 	"github.com/maksimillian1/ha-multitenant-saas-platform/apps/gateway/tenantstate"
 	"github.com/maksimillian1/ha-multitenant-saas-platform/apps/gateway/usage"
@@ -21,6 +24,9 @@ import (
 func main() {
 	log := slog.New(slog.NewJSONHandler(os.Stdout, nil))
 	cfg := core.LoadConfig()
+	if len(os.Args) > 1 && os.Args[1] == "jwks-sync" {
+		os.Exit(runJWKSSync(cfg, log))
+	}
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 
@@ -103,4 +109,31 @@ func bootstrapServices(ctx context.Context, cfg core.Config, log *slog.Logger) (
 	healthService := health.NewService(keys.Ready)
 
 	return proxyService, usageService, healthService, nil
+}
+
+func runJWKSSync(cfg core.Config, log *slog.Logger) int {
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	if cfg.Issuer == "" {
+		log.Error("jwks-sync: ISSUER is required")
+		return 1
+	}
+	issuerClient, err := auth.NewIssuerClient(cfg.Issuer, cfg.IssuerDialAddr)
+	if err != nil {
+		log.Error("jwks-sync", "err", err)
+		return 1
+	}
+	store, err := jwkssync.InCluster(cfg.JWKSConfigMapNamespace, cfg.JWKSConfigMap)
+	if err != nil {
+		log.Error("jwks-sync", "err", err)
+		return 1
+	}
+	fetch := func(ctx context.Context) ([]jose.JSONWebKey, error) {
+		return auth.FetchJWKS(ctx, issuerClient, cfg.JWKSURL)
+	}
+	if _, err := jwkssync.Sync(ctx, fetch, store, time.Now(), log); err != nil {
+		log.Error("jwks-sync", "err", err)
+		return 1
+	}
+	return 0
 }
