@@ -8,4 +8,11 @@ code:
   - apps/exampleapp/main.go
 c4: [exampleApp]
 links:
-  issues: [HAMSP-23]
+  issues: [HAMSP-23, HAMSP-59]
+requirements: [QS-12]
+
+acceptance:
+  AC-1:
+    text: When the database cancels an ExampleApp query on statement_timeout, the client gets 504 with the error "query timed out".
+    level: integration
+    planned: apps/exampleapp/store/store_test.go:TestStatementTimeoutIsQueryTimeout, apps/exampleapp/items/items_test.go:TestQueryTimeoutIs504
