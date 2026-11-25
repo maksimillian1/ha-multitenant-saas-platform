@@ -86,3 +86,13 @@ jobs:
         run: .github/security-scan/test.sh case_trivy_config case_trivy_ignore_expiry
       - name: Kind manifests
         run: trivy config --severity HIGH,CRITICAL --exit-code 1 --ignorefile .trivyignore.yaml prototype/k8s
+
+  semgrep:
+    runs-on: ubuntu-latest
+    container: semgrep/semgrep:1.144.0
+    steps:
+      - uses: actions/checkout@v4
+      - name: The rule's test cases
+        run: semgrep --test --metrics=off --config .semgrep/log-secrets.yaml .semgrep/log-secrets.go
+      - name: Go code
+        run: semgrep scan --config .semgrep/log-secrets.yaml --error --metrics=off apps tools prototype
