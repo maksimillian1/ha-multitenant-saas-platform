@@ -13,8 +13,10 @@ components:
   usage:  { in: usage }
   health: { in: health }
   tenantstate: { in: tenantstate }
+  jwkssync: { in: jwkssync }
   core:   { in: core }
 deps:
   main:  { anyProjectDeps: true }
   proxy: { mayDependOn: [auth, core] }
   usage: { mayDependOn: [core] }
+  jwkssync: { mayDependOn: [auth] }

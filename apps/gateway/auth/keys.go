@@ -26,9 +26,9 @@ const (
 var ErrNoKeys = errors.New("no signing keys from Zitadel or the cache")
 
 type CacheFile struct {
-	Updated  time.Time            `json:"updated"`
-	Keys     []jose.JSONWebKey    `json:"keys"`
-	LastSeen map[string]time.Time `json:"last_seen"`
+	Updated time.Time            `json:"updated"`
+	Keys    []jose.JSONWebKey    `json:"keys"`
+	Retired map[string]time.Time `json:"retired,omitempty"`
 }
 
 func ParseJWKS(b []byte) ([]jose.JSONWebKey, error) {
