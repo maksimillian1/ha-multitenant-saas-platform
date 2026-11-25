@@ -18,6 +18,11 @@ spec:
       labels:
         app.kubernetes.io/name: usage-writeapi
     spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        runAsGroup: 65532
+        seccompProfile: {type: RuntimeDefault}
       serviceAccountName: usage-writeapi
       automountServiceAccountToken: false
       containers:

@@ -74,3 +74,15 @@ jobs:
               --ignorefile .trivyignore.yaml --platform ${{ matrix.platform }} "$img" || status=1
           done
           exit $status
+
+  trivy-config:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: aquasecurity/setup-trivy@v0.2.3
+        with:
+          version: v0.76.2
+      - name: The check fails on HIGH, and the ignore file expires (fixtures)
+        run: .github/security-scan/test.sh case_trivy_config case_trivy_ignore_expiry
+      - name: Kind manifests
+        run: trivy config --severity HIGH,CRITICAL --exit-code 1 --ignorefile .trivyignore.yaml prototype/k8s

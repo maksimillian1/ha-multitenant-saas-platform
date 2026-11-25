@@ -48,6 +48,24 @@ case_trivy_image() {
   fi
 }
 
+# Verifies: guardrails AC-13
+case_trivy_config() {
+  local out rc
+  out=$(trivy config -q --severity HIGH,CRITICAL --exit-code 1 "$fixtures/k8s-high" 2>&1); rc=$?
+  expect_refused "AC-13 trivy config fails on a privileged container" "KSV-?0*17" "$out" $rc
+  out=$(trivy config -q --severity HIGH,CRITICAL --exit-code 1 "$fixtures/k8s-low" 2>&1); rc=$?
+  expect_passed "AC-13 trivy config passes a manifest with only LOW and MEDIUM findings" "$out" $rc
+}
+
+# Verifies: guardrails AC-14
+case_trivy_ignore_expiry() {
+  local out rc
+  out=$(trivy config -q --severity HIGH,CRITICAL --exit-code 1 --ignorefile "$fixtures/trivyignore-future.yaml" "$fixtures/k8s-high" 2>&1); rc=$?
+  expect_passed "AC-14 an ignored finding whose expired_at is in the future does not fail" "$out" $rc
+  out=$(trivy config -q --severity HIGH,CRITICAL --exit-code 1 --ignorefile "$fixtures/trivyignore-past.yaml" "$fixtures/k8s-high" 2>&1); rc=$?
+  expect_refused "AC-14 an ignored finding whose expired_at has passed fails again" "KSV-?0*17" "$out" $rc
+}
+
 [ $# -gt 0 ] || set -- $(declare -F | awk '$3 ~ /^case_/ {print $3}')
 for c in "$@"; do "$c"; done
 
