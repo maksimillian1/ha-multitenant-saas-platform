@@ -168,6 +168,8 @@ spec:
       # Smaller than ExampleApp's own pool, so server connections are reused
       # across tenants and requests.
       default_pool_size: "2"
+      # Backstop above the app roles' 30 s statement_timeout, which an app can lift with SET and this cannot.
+      query_timeout: "35s"
 ---
 # The usage database lived here until it moved to its own cluster
 # (ADR-0008). This drops it on clusters created before the move; on new ones

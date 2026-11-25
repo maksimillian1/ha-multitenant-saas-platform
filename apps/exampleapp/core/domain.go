@@ -15,6 +15,8 @@ var TenantRe = regexp.MustCompile(`^[A-Za-z0-9_-]{1,64}$`)
 // Also returned for another tenant's item, so IDs are not probed.
 var ErrNotFound = errors.New("item not found")
 
+var ErrQueryTimeout = errors.New("query timed out")
+
 type Item struct {
 	ID        string    `json:"id"`
 	TenantID  string    `json:"tenant_id"`

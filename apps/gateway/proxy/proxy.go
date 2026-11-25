@@ -57,6 +57,9 @@ type Service struct {
 type upstreamKey struct{}
 
 // A nil reporter disables usage reporting.
+// Longer than the pooler's 35 s query_timeout, so an app's own timeout answer reaches the client.
+const UpstreamTimeout = 40 * time.Second
+
 func NewService(authn core.Authenticator, routes []Route, reporter core.UsageReporter, log *slog.Logger) *Service {
 	// Longest prefix first, so "/items/archive" wins over "/items".
 	routes = append([]Route(nil), routes...)
@@ -75,7 +78,7 @@ func NewService(authn core.Authenticator, routes []Route, reporter core.UsageRep
 			Proxy:                 nil,
 			MaxIdleConnsPerHost:   256,
 			IdleConnTimeout:       90 * time.Second,
-			ResponseHeaderTimeout: 30 * time.Second,
+			ResponseHeaderTimeout: UpstreamTimeout,
 		},
 		ErrorHandler: func(w http.ResponseWriter, r *http.Request, err error) {
 			log.ErrorContext(r.Context(), "upstream failed", "path", r.URL.Path, "err", err)

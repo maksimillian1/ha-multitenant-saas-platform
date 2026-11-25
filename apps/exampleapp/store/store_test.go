@@ -200,3 +200,39 @@ func TestStoreIsolatesTenants(t *testing.T) {
 		t.Fatalf("Get by A = %+v, %v; want unchanged item", got, err)
 	}
 }
+
+// Verifies: tenant-query-timeout AC-5; T-12
+func TestStatementTimeoutIsQueryTimeout(t *testing.T) {
+	db := newTestDB(t)
+	ctx := context.Background()
+	u, err := url.Parse(db.appDSN)
+	if err != nil {
+		t.Fatal(err)
+	}
+	q := u.Query()
+	q.Set("statement_timeout", "300ms")
+	u.RawQuery = q.Encode()
+	st, err := Open(ctx, u.String())
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(st.Close)
+
+	lock, err := db.owner.Begin(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = lock.Rollback(ctx) })
+	if _, err := lock.Exec(ctx, "LOCK TABLE items IN ACCESS EXCLUSIVE MODE"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := st.List(ctx, "tenant-a"); !errors.Is(err, core.ErrQueryTimeout) {
+		t.Fatalf("List on a locked table: %v, want core.ErrQueryTimeout", err)
+	}
+	if err := lock.Rollback(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := st.List(ctx, "tenant-a"); err != nil {
+		t.Fatalf("List after the lock is gone: %v", err)
+	}
+}

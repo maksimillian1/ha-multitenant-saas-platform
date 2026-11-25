@@ -12,6 +12,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/maksimillian1/ha-multitenant-saas-platform/apps/gateway/auth"
 	"github.com/maksimillian1/ha-multitenant-saas-platform/apps/gateway/core"
@@ -232,5 +233,14 @@ func TestBlockedTenantGets403(t *testing.T) {
 	rec := send(g, "/items", "Bearer token-suspended")
 	if rec.Code != http.StatusForbidden || items.calls != 0 {
 		t.Fatalf("status %d, upstream calls %d; want 403 and none", rec.Code, items.calls)
+	}
+}
+
+// Verifies: tenant-query-timeout AC-6
+func TestUpstreamTimeoutOutlastsQueryLimit(t *testing.T) {
+	const poolerQueryTimeout = 35 * time.Second
+	s := NewService(fakeAuth{}, nil, nil, slog.New(slog.NewTextHandler(io.Discard, nil)))
+	if got := s.proxy.Transport.(*http.Transport).ResponseHeaderTimeout; got <= poolerQueryTimeout {
+		t.Fatalf("the gateway gives up on an upstream after %s, before the pooler's %s query limit", got, poolerQueryTimeout)
 	}
 }
