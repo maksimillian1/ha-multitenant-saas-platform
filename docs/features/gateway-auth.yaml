@@ -6,6 +6,7 @@ code:
   - apps/gateway/auth/**
   - apps/gateway/tenantstate/**
   - apps/gateway/jwkssync/**
+  - prototype/k8s/apps/gateway/jwks-sync.yaml
 c4: [apiGateway]
 links:
   issues: [HAMSP-23, HAMSP-24, HAMSP-52, HAMSP-60]

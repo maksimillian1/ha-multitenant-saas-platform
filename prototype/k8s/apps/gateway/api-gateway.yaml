@@ -59,9 +59,14 @@ spec:
             # Every API call becomes a usage event.
             - name: USAGE_URL
               value: http://usage-writeapi.usage.svc:8080/v1/events
+            - name: JWKS_CACHE_FILE
+              value: /etc/zitadel-jwks/jwks.json
           volumeMounts:
             - name: kafka-ca
               mountPath: /etc/kafka-ca
+              readOnly: true
+            - name: zitadel-jwks
+              mountPath: /etc/zitadel-jwks
               readOnly: true
           # On delete the endpoints are removed while SIGTERM is already on its way:
           # keep serving for 5 s until every node stops sending new connections here.
@@ -69,7 +74,7 @@ spec:
             preStop:
               sleep: {seconds: 5}
           readinessProbe:
-            httpGet: {path: /healthz, port: http}
+            httpGet: {path: /readyz, port: http}
             periodSeconds: 5
           livenessProbe:
             httpGet: {path: /healthz, port: http}
@@ -87,6 +92,10 @@ spec:
           secret:
             secretName: usage-kafka-ca
             defaultMode: 0444
+        - name: zitadel-jwks
+          configMap:
+            name: zitadel-jwks
+            optional: true
 ---
 apiVersion: v1
 kind: Service
