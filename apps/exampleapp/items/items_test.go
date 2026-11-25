@@ -3,6 +3,7 @@ package items
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"log/slog"
 	"net/http"
@@ -133,5 +134,22 @@ func TestCreateValidatesName(t *testing.T) {
 		if rec := do(t, svc.CreateHandler, http.MethodPost, "", "tenant-a", body); rec.Code != http.StatusBadRequest {
 			t.Errorf("body %.20q: status = %d, want 400", body, rec.Code)
 		}
+	}
+}
+
+type slowStore struct{ *fakeStore }
+
+func (slowStore) List(context.Context, string) ([]core.Item, error) {
+	return nil, fmt.Errorf("list: %w", core.ErrQueryTimeout)
+}
+
+// Verifies: exampleapp AC-1
+func TestQueryTimeoutIs504(t *testing.T) {
+	s := NewService(slowStore{&fakeStore{}}, slog.New(slog.NewTextHandler(io.Discard, nil)))
+	rec := do(t, s.ListHandler, http.MethodGet, "", "tenant-a", "")
+	var body map[string]string
+	_ = json.Unmarshal(rec.Body.Bytes(), &body)
+	if rec.Code != http.StatusGatewayTimeout || body["error"] != "query timed out" {
+		t.Fatalf("status %d, body %s; want 504 and \"query timed out\"", rec.Code, rec.Body)
 	}
 }

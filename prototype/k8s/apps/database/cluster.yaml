@@ -129,6 +129,8 @@ spec:
       log_autovacuum_min_duration: "0"
       log_lock_waits: "on"
       log_checkpoints: "on"
+      # PgBouncer's query_timeout only closes the connection; this makes the backend stop the query too.
+      client_connection_check_interval: "10s"
     # Quorum synchronous replication: a commit waits for ANY 1 standby.
     synchronous:
       method: any
@@ -168,6 +170,8 @@ spec:
       # Smaller than ExampleApp's own pool, so server connections are reused
       # across tenants and requests.
       default_pool_size: "2"
+      # The tenant query limit (QS-12): only pooled connections get it, so admins and platform services on -rw do not.
+      query_timeout: "30"
 ---
 # The usage database lived here until it moved to its own cluster
 # (ADR-0008). This drops it on clusters created before the move; on new ones
