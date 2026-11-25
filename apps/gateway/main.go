@@ -32,6 +32,7 @@ func main() {
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /healthz", healthService.Handler)
+	mux.HandleFunc("GET /readyz", healthService.ReadyHandler)
 	mux.Handle("/", core.AccessLog(http.HandlerFunc(proxyService.Handler), log))
 
 	metrics := http.NewServeMux()
@@ -71,7 +72,12 @@ func bootstrapServices(ctx context.Context, cfg core.Config, log *slog.Logger) (
 	if err != nil {
 		return nil, nil, nil, err
 	}
-	verifier := auth.NewVerifier(cfg.Issuer, cfg.Audience, cfg.ZitadelAdminOrg, cfg.JWKSURL, issuerClient)
+	keys := auth.NewKeySet(cfg.JWKSURL, issuerClient, cfg.JWKSCacheFile, log)
+	if err := keys.Load(ctx); err != nil {
+		log.Error("no signing keys yet; not ready until Zitadel answers", "err", err)
+	}
+	go keys.Run(ctx)
+	verifier := auth.NewVerifier(cfg.Issuer, cfg.Audience, cfg.ZitadelAdminOrg, keys)
 	states := tenantstate.New()
 	verifier.Blocked = states.Blocked
 	kafkaAuth, err := tenantstate.ClientAuth(cfg.KafkaCAFile, cfg.KafkaUsername, cfg.KafkaPassword)
@@ -94,7 +100,7 @@ func bootstrapServices(ctx context.Context, cfg core.Config, log *slog.Logger) (
 	}
 
 	proxyService := proxy.NewService(verifier, routes, reporter, log)
-	healthService := health.NewService()
+	healthService := health.NewService(keys.Ready)
 
 	return proxyService, usageService, healthService, nil
 }

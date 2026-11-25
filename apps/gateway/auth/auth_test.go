@@ -55,7 +55,11 @@ func newTestVerifier(t *testing.T, key jose.JSONWebKey) *Verifier {
 		_ = json.NewEncoder(w).Encode(jwks)
 	}))
 	t.Cleanup(srv.Close)
-	return NewVerifier(issuer, audience, zitadelAdminOrg, srv.URL, srv.Client())
+	keys := NewKeySet(srv.URL, srv.Client(), "", nil)
+	if err := keys.Load(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	return NewVerifier(issuer, audience, zitadelAdminOrg, keys)
 }
 
 func claims(mod func(map[string]any)) map[string]any {

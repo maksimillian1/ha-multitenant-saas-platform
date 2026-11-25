@@ -15,6 +15,7 @@ type Config struct {
 	Audience        string
 	ZitadelAdminOrg string
 	JWKSURL         string
+	JWKSCacheFile   string
 	IssuerDialAddr  string
 	Routes          string
 	UsageURL        string
@@ -43,6 +44,7 @@ func LoadConfig() Config {
 		Audience:        GetEnv("AUDIENCE", ""),
 		ZitadelAdminOrg: GetEnv("ZITADEL_ADMIN_ORG_ID", ""),
 		JWKSURL:         GetEnv("JWKS_URL", issuer+"/oauth/v2/keys"),
+		JWKSCacheFile:   GetEnv("JWKS_CACHE_FILE", ""),
 		IssuerDialAddr:  GetEnv("ISSUER_DIAL_ADDR", ""),
 		Routes:          GetEnv("ROUTES", ""),
 		UsageURL:        GetEnv("USAGE_URL", ""),
