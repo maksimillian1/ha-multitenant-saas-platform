@@ -17,6 +17,7 @@ Specific technical constraints must be sourced from the specialized files below:
 - [Control Plane (Automated Recovery, RTO < 5s)](architecture/control-plane.md)
 - [Operations & Infrastructure (Terraform)](ops/terraform.md)
 - [Contracts](contracts/)
+- [Integrating a business app](INTEGRATION.md): how a business app in its own repository runs on the platform (ADR-0013)
 - [C4 model](architecture/c4/README.md): diagrams generated from [workspace.dsl](architecture/c4/workspace.dsl)
 - [Roadmap](roadmap.md): what gets built, in what order, for v1 and v2
 - [Feature stages](process/feature-stages.md): how a feature goes from `proto` to `stable`, and which gates each stage needs
