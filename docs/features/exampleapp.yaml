@@ -13,6 +13,11 @@ requirements: [QS-12]
 
 acceptance:
   AC-1:
-    text: When the database cancels an ExampleApp query on statement_timeout, the client gets 504 with the error "query timed out".
+    text: When PgBouncer cuts an ExampleApp query (query timeout) or PostgreSQL cancels it (SQLSTATE 57014), the client gets 504 with the error "query timed out".
     level: integration
-    planned: apps/exampleapp/store/store_test.go:TestStatementTimeoutIsQueryTimeout, apps/exampleapp/items/items_test.go:TestQueryTimeoutIs504
+    planned: apps/exampleapp/store/store_test.go:TestPoolerTimeoutIsQueryTimeout, apps/exampleapp/store/store_test.go:TestStatementTimeoutIsQueryTimeout, apps/exampleapp/items/items_test.go:TestQueryTimeoutIs504
+
+comments:
+  - at: apps/exampleapp/store/store.go:isQueryTimeout
+    text: "// PgBouncer's query_timeout arrives as a protocol error with this text, not as 57014."
+    why: external behaviour of PgBouncer

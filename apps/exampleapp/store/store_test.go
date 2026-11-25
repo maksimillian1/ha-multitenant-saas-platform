@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 
 	"github.com/maksimillian1/ha-multitenant-saas-platform/apps/exampleapp/core"
 )
@@ -234,5 +235,23 @@ func TestStatementTimeoutIsQueryTimeout(t *testing.T) {
 	}
 	if _, err := st.List(ctx, "tenant-a"); err != nil {
 		t.Fatalf("List after the lock is gone: %v", err)
+	}
+}
+
+// Verifies: exampleapp AC-1
+func TestPoolerTimeoutIsQueryTimeout(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		err  error
+		want bool
+	}{
+		{"PgBouncer query_timeout", &pgconn.PgError{Severity: "FATAL", Code: "08P01", Message: "query timeout"}, true},
+		{"PostgreSQL statement_timeout", fmt.Errorf("list: %w", &pgconn.PgError{Code: "57014"}), true},
+		{"another PgBouncer protocol error", &pgconn.PgError{Code: "08P01", Message: "server conn crashed?"}, false},
+		{"connection refused", errors.New("dial tcp: connection refused"), false},
+	} {
+		if got := isQueryTimeout(tc.err); got != tc.want {
+			t.Errorf("%s: %v, want %v", tc.name, got, tc.want)
+		}
 	}
 }

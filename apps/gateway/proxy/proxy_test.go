@@ -238,7 +238,7 @@ func TestBlockedTenantGets403(t *testing.T) {
 
 // Verifies: gateway-tenant-header AC-1
 func TestUpstreamTimeoutOutlastsQueryLimit(t *testing.T) {
-	const poolerQueryTimeout = 35 * time.Second
+	const poolerQueryTimeout = 30 * time.Second
 	s := NewService(fakeAuth{}, nil, nil, slog.New(slog.NewTextHandler(io.Discard, nil)))
 	if got := s.proxy.Transport.(*http.Transport).ResponseHeaderTimeout; got <= poolerQueryTimeout {
 		t.Fatalf("the gateway gives up on an upstream after %s, before the pooler's %s query limit", got, poolerQueryTimeout)

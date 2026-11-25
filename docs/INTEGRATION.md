@@ -79,7 +79,7 @@ The header is safe to trust only because nothing but the Gateway can reach your 
 
   The pool is shared between tenants (PgBouncer in transaction mode), so a session-level `SET` would leak the tenant to the next request. ORMs that open their own connections or transactions need a wrapper; check it with a test.
 * A record of another tenant is answered with **404**, never 403, so record IDs cannot be probed.
-* A statement of the app role runs **at most 30 s**. PostgreSQL then cancels it with SQLSTATE `57014` (`canceling statement due to statement timeout`); answer the request with **504**. Do not lift the limit with `SET statement_timeout`: the pooler cuts every query at 35 s anyway, and then the connection is closed instead of the statement cancelled. Migrations run as the owner role, which has no limit.
+* A query through the pooler runs **at most 30 s**. PgBouncer then closes the connection with `FATAL: query timeout` (SQLSTATE `08P01`); answer the request with **504**, not with the 503 you give when the database is down. Recognise it by the code and that exact message. Your app cannot lift this limit with `SET statement_timeout`. Migrations connect to the primary directly and have no limit.
 * Background jobs do not pass through request middleware. Each job carries its tenant and sets it the same way.
 * Data outside Postgres is outside RLS: caches, queues, files, search indexes, websocket rooms. Put the tenant in every key, path or channel name, and check it on read.
 

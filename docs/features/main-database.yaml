@@ -10,21 +10,21 @@ requirements: [QS-12, C-04]
 
 acceptance:
   AC-1:
-    text: A query that an app role runs for tenant A through the pooler is cancelled by PostgreSQL 30 s after it starts (SQLSTATE 57014, statement timeout).
+    text: A query that an app runs for tenant A through the pooler is cut by PgBouncer 30 s after it starts (FATAL query timeout), also when the app has set statement_timeout = 0.
     level: e2e
-    planned: prototype/e2e/query_timeout_test.go:TestTenantQueryCancelledAfter30s
+    planned: prototype/e2e/query_timeout_test.go:TestTenantQueryCutAfter30s
   AC-2:
     text: While tenant A's query runs, every GET /items of tenant B through the gateway succeeds, and their p95 is at most twice the p95 measured before plus 200 ms.
     level: e2e
-    planned: prototype/e2e/query_timeout_test.go:TestTenantQueryCancelledAfter30s
+    planned: prototype/e2e/query_timeout_test.go:TestTenantQueryCutAfter30s
   AC-3:
-    text: A query that lifts its own limit (SET LOCAL statement_timeout = 0) through the pooler is cut by PgBouncer between 35 and 40 s after it starts.
+    text: Within 15 s after PgBouncer cuts the query, PostgreSQL no longer runs it.
     level: e2e
-    planned: prototype/e2e/query_timeout_test.go:TestAppCannotLiftQueryLimit
+    planned: prototype/e2e/query_timeout_test.go:TestTenantQueryCutAfter30s
   AC-4:
-    text: The platform sets statement_timeout = 30s on every app role in the main cluster and no limit on owner roles; migrations connect to the primary directly, not through the pooler.
+    text: Connections to the primary that bypass the pooler (admins, platform services, migrations) have no query limit; migrations connect to the primary directly.
     level: e2e
-    planned: prototype/e2e/query_timeout_test.go:TestAppRolesHaveQueryLimit
+    planned: prototype/e2e/query_timeout_test.go:TestDirectConnectionsHaveNoQueryLimit
 
 checklist:
   T-01:
@@ -34,25 +34,25 @@ checklist:
   T-04:
     planned: does not apply — no endpoint and no role changes who may call what
   T-08:
-    planned: does not apply — no schema migration; the role setting is applied by a platform Job, not a migration
+    planned: does not apply — no schema migration
   T-11:
     planned: does not apply — no new input parser
   T-12:
-    planned: applies — the canary lifts the role's limit with SET LOCAL and the PgBouncer backstop still cuts the query (AC-3); the 57014 mapping is proven in exampleapp AC-1
+    planned: applies — the cut query sets statement_timeout = 0, so a limit an app can lift would not pass (AC-1); the server side is checked in pg_stat_activity, not only the client's error (AC-3)
 
 comments:
-  - at: prototype/k8s/apps/database/role-settings.yaml
-    text: "# CNPG managed roles cannot carry parameters, so the platform sets them with SQL after every sync."
-    why: external constraint
   - at: prototype/k8s/apps/database/cluster.yaml:Pooler.parameters.query_timeout
-    text: "# Backstop above the app roles' 30 s statement_timeout, which an app can lift with SET and this cannot."
-    why: hidden invariant between two settings
+    text: "# The tenant query limit (QS-12): only pooled connections get it, so admins and platform services on -rw do not."
+    why: hidden invariant, the limit is deliberately not in PostgreSQL
+  - at: prototype/k8s/apps/database/cluster.yaml:postgresql.parameters.client_connection_check_interval
+    text: "# PgBouncer's query_timeout only closes the connection; this makes the backend stop the query too."
+    why: external behaviour of PgBouncer
 
 quality_scenarios:
   touched: [QS-12]
   tests:
     QS-12:
-      planned: prototype/e2e/query_timeout_test.go:TestTenantQueryCancelledAfter30s
+      planned: prototype/e2e/query_timeout_test.go:TestTenantQueryCutAfter30s
 
 gates:
   G-07: {status: not-checked, by: owner, date: 2026-11-25, note: plan for alpha waits for approval in the pull request review}

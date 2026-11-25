@@ -39,8 +39,6 @@ func (s *Postgres) Close() { s.pool.Close() }
 
 func (s *Postgres) Ping(ctx context.Context) error { return s.pool.Ping(ctx) }
 
-const queryCanceled = "57014"
-
 func (s *Postgres) inTenantTx(ctx context.Context, tenantID string, fn func(pgx.Tx) error) error {
 	err := pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
 		// set_config(..., true) is SET LOCAL with a bind parameter.
@@ -49,10 +47,19 @@ func (s *Postgres) inTenantTx(ctx context.Context, tenantID string, fn func(pgx.
 		}
 		return fn(tx)
 	})
-	if pgErr := (*pgconn.PgError)(nil); errors.As(err, &pgErr) && pgErr.Code == queryCanceled {
+	if isQueryTimeout(err) {
 		return fmt.Errorf("%w: %w", core.ErrQueryTimeout, err)
 	}
 	return err
+}
+
+func isQueryTimeout(err error) bool {
+	var pgErr *pgconn.PgError
+	if !errors.As(err, &pgErr) {
+		return false
+	}
+	// PgBouncer's query_timeout arrives as a protocol error with this text, not as 57014.
+	return pgErr.Code == "57014" || (pgErr.Code == "08P01" && pgErr.Message == "query timeout")
 }
 
 const itemColumns = "id::text, tenant_id, name, created_at"
