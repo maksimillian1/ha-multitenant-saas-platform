@@ -73,6 +73,8 @@ From [Review](review.md), "Architecture fitness functions".
 | Services that trust `x-tenant-id` admit only the API Gateway | CI | [gateway-headers](../contracts/gateway-headers.md), [Review](review.md) | none | missing, HAMSP-70 |
 | Dangerous constructs outside critical code make the change critical | CI | [Feature stages](feature-stages.md), "Critical features" | semgrep rules | missing, HAMSP-46 |
 | Contracts stay compatible | CI | [ADR-0010](../adr/0010-usage-event-contracts.md) | `contracts.yml`: JSON Schema examples, `oasdiff` against the base branch | runs |
+| Charts of registered business apps render with the new library chart and validate against the new CRDs | CI | [ADR-0013](../adr/0013-business-app-integration.md), item 6 | none | missing, HAMSP-102 |
+| Business apps cannot create network policies or reach past the Gateway | CI | [ADR-0013](../adr/0013-business-app-integration.md), item 5 | none | missing, HAMSP-99 |
 
 ## Feature gates
 
