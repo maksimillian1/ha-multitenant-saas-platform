@@ -16,23 +16,30 @@ import (
 // Feature is one docs/features/<slug>.yaml file. The format is described in
 // docs/features/README.md.
 type Feature struct {
-	Feature           string              `yaml:"feature"`
-	Title             string              `yaml:"title"`
-	Stage             string              `yaml:"stage"`
-	Critical          bool                `yaml:"critical"`
-	Flag              string              `yaml:"flag"`
-	Code              []string            `yaml:"code"`
-	C4                []string            `yaml:"c4"`
-	Links             Links               `yaml:"links"`
-	Requirements      []string            `yaml:"requirements"`
-	Acceptance        map[string]AC       `yaml:"acceptance"`
-	Checklist         map[string]Item     `yaml:"checklist"`
-	QualityScenarios  QualityScenarios    `yaml:"quality_scenarios"`
-	Gates             map[string]Gate     `yaml:"gates"`
-	Deviations        []map[string]string `yaml:"deviations"`
-	Runs              []Run               `yaml:"runs"`
+	Feature          string              `yaml:"feature"`
+	Title            string              `yaml:"title"`
+	Stage            string              `yaml:"stage"`
+	Critical         bool                `yaml:"critical"`
+	Flag             string              `yaml:"flag"`
+	Code             []string            `yaml:"code"`
+	C4               []string            `yaml:"c4"`
+	Links            Links               `yaml:"links"`
+	Requirements     []string            `yaml:"requirements"`
+	Acceptance       map[string]AC       `yaml:"acceptance"`
+	Checklist        map[string]Item     `yaml:"checklist"`
+	Comments         []Comment           `yaml:"comments"`
+	QualityScenarios QualityScenarios    `yaml:"quality_scenarios"`
+	Gates            map[string]Gate     `yaml:"gates"`
+	Deviations       []map[string]string `yaml:"deviations"`
+	Runs             []Run               `yaml:"runs"`
 
 	file string // path relative to the repo root
+}
+
+type Comment struct {
+	At   string `yaml:"at"`
+	Text string `yaml:"text"`
+	Why  string `yaml:"why"`
 }
 
 type Links struct {
