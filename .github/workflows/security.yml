@@ -25,3 +25,16 @@ jobs:
             (cd "$m" && govulncheck ./...) || status=1
           done
           exit $status
+
+  npm-audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: apps/admin/ui/app/.nvmrc
+      - name: The check fails on a production advisory, not on a dev one (fixtures)
+        run: .github/security-scan/test.sh case_npm_audit
+      - name: Admin SPA
+        working-directory: apps/admin/ui/app
+        run: npm audit --omit=dev --audit-level=high

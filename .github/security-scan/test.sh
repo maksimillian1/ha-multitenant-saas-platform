@@ -26,6 +26,15 @@ case_govulncheck() {
   expect_refused "AC-10 govulncheck fails on a reachable vulnerability and names it" "GO-2022-1059" "$out" $rc
 }
 
+# Verifies: guardrails AC-11
+case_npm_audit() {
+  local out rc
+  out=$(cd "$fixtures/npm-prod" && npm audit --omit=dev --audit-level=high 2>&1); rc=$?
+  expect_refused "AC-11 npm audit fails on a production dependency with a critical advisory" "Severity: critical" "$out" $rc
+  out=$(cd "$fixtures/npm-dev" && npm audit --omit=dev --audit-level=high 2>&1); rc=$?
+  expect_passed "AC-11 npm audit passes when only a dev dependency has the advisory" "$out" $rc
+}
+
 [ $# -gt 0 ] || set -- $(declare -F | awk '$3 ~ /^case_/ {print $3}')
 for c in "$@"; do "$c"; done
 

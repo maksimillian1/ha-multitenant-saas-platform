@@ -1,0 +1,5 @@
+{
+  "name": "npm-dev-fixture",
+  "private": true,
+  "devDependencies": { "minimist": "0.0.8" }
+}
