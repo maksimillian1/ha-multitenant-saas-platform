@@ -57,7 +57,7 @@ func listLatencies(t *testing.T, tok string, n int, every time.Duration, stop <-
 	return out
 }
 
-// Verifies: main-database AC-1, AC-2, AC-3; T-01, T-12
+// Verifies: main-database AC-1, AC-2, AC-3; T-01, T-12; QS-12
 func TestTenantQueryCutAfter30s(t *testing.T) {
 	if testing.Short() {
 		t.Skip("runs a 30-second query")
