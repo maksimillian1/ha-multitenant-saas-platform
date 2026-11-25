@@ -201,7 +201,7 @@ func TestStoreIsolatesTenants(t *testing.T) {
 	}
 }
 
-// Verifies: tenant-query-timeout AC-5; T-12
+// Verifies: exampleapp AC-1; T-12
 func TestStatementTimeoutIsQueryTimeout(t *testing.T) {
 	db := newTestDB(t)
 	ctx := context.Background()

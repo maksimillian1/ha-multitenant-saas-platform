@@ -143,7 +143,7 @@ func (slowStore) List(context.Context, string) ([]core.Item, error) {
 	return nil, fmt.Errorf("list: %w", core.ErrQueryTimeout)
 }
 
-// Verifies: tenant-query-timeout AC-5
+// Verifies: exampleapp AC-1
 func TestQueryTimeoutIs504(t *testing.T) {
 	s := NewService(slowStore{&fakeStore{}}, slog.New(slog.NewTextHandler(io.Discard, nil)))
 	rec := do(t, s.ListHandler, http.MethodGet, "", "tenant-a", "")

@@ -57,7 +57,7 @@ func listLatencies(t *testing.T, tok string, n int, every time.Duration, stop <-
 	return out
 }
 
-// Verifies: tenant-query-timeout AC-1, AC-2; T-01
+// Verifies: main-database AC-1, AC-2; T-01
 func TestTenantQueryCancelledAfter30s(t *testing.T) {
 	if testing.Short() {
 		t.Skip("runs a 30-second query")
@@ -85,7 +85,7 @@ func TestTenantQueryCancelledAfter30s(t *testing.T) {
 	}
 }
 
-// Verifies: tenant-query-timeout AC-3; T-12
+// Verifies: main-database AC-3; T-12
 func TestAppCannotLiftQueryLimit(t *testing.T) {
 	if testing.Short() {
 		t.Skip("runs a 35-second query")
@@ -100,7 +100,7 @@ func TestAppCannotLiftQueryLimit(t *testing.T) {
 	}
 }
 
-// Verifies: tenant-query-timeout AC-4
+// Verifies: main-database AC-4
 func TestAppRolesHaveQueryLimit(t *testing.T) {
 	settings, err := psql(t, `SELECT r.rolname || '=' || coalesce(array_to_string(s.setconfig, ','), '')
 		FROM pg_roles r LEFT JOIN pg_db_role_setting s ON s.setrole = r.oid AND s.setdatabase = 0

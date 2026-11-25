@@ -236,7 +236,7 @@ func TestBlockedTenantGets403(t *testing.T) {
 	}
 }
 
-// Verifies: tenant-query-timeout AC-6
+// Verifies: gateway-tenant-header AC-1
 func TestUpstreamTimeoutOutlastsQueryLimit(t *testing.T) {
 	const poolerQueryTimeout = 35 * time.Second
 	s := NewService(fakeAuth{}, nil, nil, slog.New(slog.NewTextHandler(io.Discard, nil)))
