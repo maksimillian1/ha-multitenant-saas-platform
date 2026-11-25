@@ -9,8 +9,6 @@ import (
 	"time"
 )
 
-// provisionTenant creates a tenant through Tenant Management and deletes it
-// when the test ends; it returns the tenant's ID.
 func provisionTenant(t *testing.T, prefix string) string {
 	t.Helper()
 	out := tmCall(t, "POST", "/tenants", `{"name":"`+prefix+`-`+randomID()+`","admin_email":"`+prefix+`-`+randomID()+`@example.com"}`)
@@ -34,7 +32,6 @@ func provisionTenant(t *testing.T, prefix string) string {
 	return id
 }
 
-// The tenant namespaces' ResourceQuota rejects pods without requests and limits.
 func podOverrides(name string, command []string) string {
 	b, _ := json.Marshal(map[string]any{"spec": map[string]any{"containers": []map[string]any{{
 		"name": name, "image": "busybox:1.37", "command": command,
@@ -46,7 +43,6 @@ func podOverrides(name string, command []string) string {
 	return string(b)
 }
 
-// tenantServer starts an HTTP server pod in namespace ns and returns its IP.
 func tenantServer(t *testing.T, ns string) string {
 	t.Helper()
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Minute)
@@ -71,7 +67,6 @@ func tenantServer(t *testing.T, ns string) string {
 	return strings.TrimSpace(ip)
 }
 
-// connects reports whether a pod in namespace ns gets an HTTP answer from ip.
 func connects(t *testing.T, ns, ip string) bool {
 	t.Helper()
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Minute)
@@ -93,10 +88,6 @@ func connects(t *testing.T, ns, ip string) bool {
 	return false
 }
 
-// A pod in a tenant's namespace cannot connect to a pod of another tenant,
-// and pods outside tenant namespaces cannot connect in. The same-namespace
-// probes are the control: they show the server answers and the probe works.
-//
 // Verifies: tenant-management AC-19; QS-02; T-01, T-12
 func TestTenantNamespacesAreIsolated(t *testing.T) {
 	nsA := "tenant-" + provisionTenant(t, "e2e-net")
