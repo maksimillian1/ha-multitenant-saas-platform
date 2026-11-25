@@ -1,7 +1,7 @@
 feature: gateway-auth
 title: JWT validation and tenant context in the API Gateway
 critical: true
-stage: proto
+stage: alpha
 code:
   - apps/gateway/auth/**
   - apps/gateway/tenantstate/**
@@ -34,60 +34,96 @@ acceptance:
     text: "While Zitadel is down for 2 minutes (zitadel and zitadel-login scaled to 0), requests with tokens issued before the outage get 200 through the API Gateway the whole time and after Zitadel is back."
     level: e2e
     planned: prototype/e2e/zitadel_outage_test.go:TestTokensWorkWhileZitadelIsDown
+    verified:
+      - prototype/e2e/zitadel_outage_test.go:TestTokensWorkWhileZitadelIsDown
   AC-4:
     text: "A gateway pod restarted while Zitadel is down becomes Ready from the keys in the ConfigMap zitadel-jwks and accepts tokens issued before the outage."
     level: e2e
     planned: prototype/e2e/zitadel_outage_test.go:TestTokensWorkWhileZitadelIsDown
+    verified:
+      - prototype/e2e/zitadel_outage_test.go:TestTokensWorkWhileZitadelIsDown
   AC-5:
     text: "At start the gateway fetches the JWKS from Zitadel; when Zitadel is unreachable it loads the ConfigMap's file if that is at most 24 h old. With neither, its readiness probe answers 503 and the pod gets no traffic."
     level: unit
     planned: apps/gateway/auth/keys_test.go:TestStartLoadsKeysOrStaysUnready
+    verified:
+      - apps/gateway/auth/keys_test.go:TestStartLoadsKeysOrStaysUnready
   AC-6:
     text: "A token with an unknown kid makes the gateway fetch the JWKS from Zitadel again; when Zitadel answers, its set replaces the cached one, so a key that is only in the ConfigMap is no longer accepted."
     level: unit
     planned: apps/gateway/auth/keys_test.go:TestZitadelAnswerReplacesCachedKeys
+    verified:
+      - apps/gateway/auth/keys_test.go:TestZitadelAnswerReplacesCachedKeys
   AC-7:
     text: "The sync job writes the union of the cached keys and Zitadel's current JWKS; a key is dropped once Zitadel no longer publishes it and one access token lifetime (10 min) has passed. It writes only on a change, and a response that is not a JWKS of RS256 public keys is rejected and leaves the ConfigMap unchanged."
     level: unit
     planned: apps/gateway/jwkssync/sync_test.go:TestSyncMergesAndRejectsBadSets
+    verified:
+      - apps/gateway/jwkssync/sync_test.go:TestSyncMergesAndRejectsBadSets
   AC-8:
     text: "Only the sync job's ServiceAccount may update the ConfigMap zitadel-jwks; the gateway's ServiceAccount may only read it."
     level: e2e
     planned: prototype/e2e/zitadel_outage_test.go:TestOnlySyncJobWritesKeyCache
+    verified:
+      - prototype/e2e/zitadel_outage_test.go:TestOnlySyncJobWritesKeyCache
   AC-9:
     text: "After the sync job runs, the keys in the ConfigMap equal Zitadel's JWKS; the CronJob runs every minute."
     level: e2e
     planned: prototype/e2e/zitadel_outage_test.go:TestSyncJobMirrorsZitadelKeys
+    verified:
+      - prototype/e2e/zitadel_outage_test.go:TestSyncJobMirrorsZitadelKeys
   AC-10:
     text: "While Zitadel is down, sign-in to exampleweb and to the admin app answers 503 within 10 s with a page saying sign-in is temporarily unavailable, not a raw error or a hang."
     level: e2e
     planned: prototype/e2e/zitadel_outage_test.go:TestTokensWorkWhileZitadelIsDown
+    verified:
+      - prototype/e2e/zitadel_outage_test.go:TestTokensWorkWhileZitadelIsDown
+      - apps/exampleweb/auth/auth_test.go:TestLoginWhileZitadelIsDownShowsUnavailablePage
+      - apps/admin/auth/auth_test.go:TestLoginWhileZitadelIsDownShowsUnavailablePage
   AC-11:
     text: "A user signed in to exampleweb before the outage sees their items during it, without the Manage users link; when the token has expired and cannot be refreshed, the user gets the 503 page."
     level: e2e
     planned: prototype/e2e/zitadel_outage_test.go:TestTokensWorkWhileZitadelIsDown
+    verified:
+      - prototype/e2e/zitadel_outage_test.go:TestTokensWorkWhileZitadelIsDown
   AC-13:
     text: "exampleweb refreshes a user's access token before the page call once less than half of its lifetime is left, so a session meets an outage with at least 5 min of token left."
     level: unit
     planned: apps/exampleweb/page/page_test.go:TestRefreshesEarlyAtHalfLifetime
+    verified:
+      - apps/exampleweb/page/page_test.go:TestRefreshesEarlyAtHalfLifetime
   AC-12:
     text: "The admin app with a session opened before the outage keeps serving routes that do not need Zitadel; routes that need it answer 502, or 504 on a timeout, with the message Zitadel is unavailable."
     level: unit
     planned: apps/admin/api/api_test.go:TestSessionWorksWhileZitadelIsDown
+    verified:
+      - apps/admin/api/api_test.go:TestSessionWorksWhileZitadelIsDown
 
 checklist:
   T-01:
     planned: "applies — during the outage the pre-outage tokens of tenants A and B pass a gateway running on cached keys; A sees only its items, B only its. Gateway → ExampleApp → PostgreSQL."
+    verified:
+      - "prototype/e2e/zitadel_outage_test.go:TestTokensWorkWhileZitadelIsDown"
   T-02:
     planned: "does not apply — the JWKS file (RFC 7517) is written and read by the gateway module itself"
+    verified: n/a — no schema crosses a service boundary
   T-04:
     planned: "applies — RBAC on ConfigMap zitadel-jwks: update only for the sync job's ServiceAccount, get only for the gateway's, nothing for default (AC-8)"
+    verified:
+      - "prototype/e2e/zitadel_outage_test.go:TestOnlySyncJobWritesKeyCache"
   T-08:
     planned: "does not apply — no migration"
+    verified: n/a — no migration in the diff
   T-11:
     planned: "applies — fuzz target for the JWKS parser, used for Zitadel's answer and for the cache file"
+    verified:
+      - "apps/gateway/auth/keys_test.go:FuzzParseJWKS"
   T-12:
     planned: "applies — canaries: the restart e2e (AC-4) fails without the cache mount; the AC-6 unit test fails when a cache-only key stays accepted after Zitadel answers; the RBAC test fails when the gateway's ServiceAccount gets update"
+    verified:
+      - "apps/gateway/auth/keys_test.go:TestZitadelAnswerReplacesCachedKeys"
+      - "prototype/e2e/zitadel_outage_test.go:TestOnlySyncJobWritesKeyCache"
+      - "prototype/e2e/zitadel_outage_test.go:TestTokensWorkWhileZitadelIsDown"
 
 comments:
   - at: apps/gateway/auth/keys.go:KeySet
@@ -108,16 +144,37 @@ comments:
 
 quality_scenarios:
   touched: [QS-11]
-  recommended_runs: [QS-11 on kind with an 8-minute outage]
+  recommended_runs: [QS-11 on kind with an 8-minute outage (not run)]
 
 gates:
+  G-01: {status: n/a, by: verify, date: 2026-11-25, note: no release flag}
+  G-02: {status: pass, by: verify, date: 2026-11-25, commit: 05d3f4a}
+  G-03: {status: n/a, by: verify, date: 2026-11-25, note: no new or changed contract}
+  G-04: {status: pass, by: verify, date: 2026-11-25, commit: 05d3f4a, level: basic}
+  G-05: {status: pass, by: verify, date: 2026-11-25, note: "QS-11 touched; the e2e test covers a 2-minute outage; the 8-minute run is recommended and not run"}
   G-07: {status: pass, by: owner, date: 2026-11-25}
-  G-01: {status: n/a, by: verify, date: 2026-11-11, note: no release flag}
+
+deviations:
+  - item: AC-3, AC-4, AC-10, AC-11
+    change: "the outage is a temporary CiliumNetworkPolicy on the zitadel pods instead of scaling them to 0, because Argo CD self-heal restores the replicas"
+    approved: "2026-11-25"
+  - item: AC-7
+    change: "the job also rewrites the cache hourly without a key change, so the file never passes the 24 h limit"
+    approved: "2026-11-25"
+  - item: AC-11
+    change: "the expired-token part (no refresh during the outage → 503 page) has no e2e test; it relies on the redirect to /auth/login, whose 503 page AC-10 covers"
+    approved: "2026-11-25"
 
 runs:
   - date: 2026-11-11
     commit: a5d82a6
     stage_checked: proto
+    verdict: ready
+    failed: []
+    not_checked: []
+  - date: 2026-11-25
+    commit: 05d3f4a
+    stage_checked: alpha
     verdict: ready
     failed: []
     not_checked: []
