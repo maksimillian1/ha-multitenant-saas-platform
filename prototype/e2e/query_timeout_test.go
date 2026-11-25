@@ -57,8 +57,8 @@ func listLatencies(t *testing.T, tok string, n int, every time.Duration, stop <-
 	return out
 }
 
-// Verifies: main-database AC-1, AC-2; T-01
-func TestTenantQueryCancelledAfter30s(t *testing.T) {
+// Verifies: main-database AC-1, AC-2, AC-3; T-01, T-12
+func TestTenantQueryCutAfter30s(t *testing.T) {
 	if testing.Short() {
 		t.Skip("runs a 30-second query")
 	}
@@ -66,51 +66,55 @@ func TestTenantQueryCancelledAfter30s(t *testing.T) {
 	createItem(t, tokB, "query-timeout-b-"+randomID())
 	before := listLatencies(t, tokB, 20, 200*time.Millisecond, nil)
 
+	marker := "qs12-" + randomID()
 	stop := make(chan struct{})
 	during := make(chan []time.Duration)
 	go func() { during <- listLatencies(t, tokB, 0, 500*time.Millisecond, stop) }()
-	took, out, err := longQuery(t, "BEGIN; SELECT set_config('app.current_tenant_id', '"+tenA.OrgID+"', true); SELECT pg_sleep(60); COMMIT;")
+	took, out, err := longQuery(t, "BEGIN; SET LOCAL statement_timeout = 0; SELECT set_config('app.current_tenant_id', '"+tenA.OrgID+"', true); SELECT pg_sleep(60) /* "+marker+" */; COMMIT;")
+	cut := time.Now()
 	close(stop)
 	latencies := <-during
 
-	if err == nil || !strings.Contains(out, "canceling statement due to statement timeout") {
-		t.Fatalf("tenant A's 60 s query: err %v, output %q; want a statement timeout", err, out)
+	if err == nil || !strings.Contains(out, "query timeout") {
+		t.Fatalf("tenant A's 60 s query: err %v, output %q; want PgBouncer's query timeout", err, out)
 	}
 	if took < 29*time.Second || took > 34*time.Second {
-		t.Errorf("tenant A's query was cancelled after %s, want about 30 s", took.Round(100*time.Millisecond))
+		t.Errorf("tenant A's query was cut after %s, want about 30 s", took.Round(100*time.Millisecond))
 	}
 	if limit := 2*p95(before) + 200*time.Millisecond; p95(latencies) > limit {
 		t.Errorf("tenant B's p95 during tenant A's query: %s over %d requests, want at most %s (before: %s)",
 			p95(latencies), len(latencies), limit, p95(before))
 	}
-}
-
-// Verifies: main-database AC-3; T-12
-func TestAppCannotLiftQueryLimit(t *testing.T) {
-	if testing.Short() {
-		t.Skip("runs a 35-second query")
-	}
-	took, out, err := longQuery(t, "BEGIN; SET LOCAL statement_timeout = 0; SELECT pg_sleep(60); COMMIT;")
-	if err == nil || !strings.Contains(out, "query timeout") {
-		t.Fatalf("a 60 s query with statement_timeout = 0: err %v after %s, output %q; want PgBouncer's query timeout", err, took, out)
-	}
-	if took < 35*time.Second || took > 40*time.Second {
-		t.Errorf("the query without a statement_timeout was cut after %s, want between 35 and 40 s (PgBouncer query_timeout); output %q",
-			took.Round(100*time.Millisecond), out)
+	for {
+		n, err := psql(t, "SELECT count(*) FROM pg_stat_activity WHERE query LIKE '%"+marker+" */%' AND pid <> pg_backend_pid()")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if n == "0" {
+			break
+		}
+		if time.Since(cut) > 15*time.Second {
+			t.Fatalf("PostgreSQL still runs tenant A's query %s after PgBouncer cut it", time.Since(cut).Round(time.Second))
+		}
+		time.Sleep(time.Second)
 	}
 }
 
 // Verifies: main-database AC-4
-func TestAppRolesHaveQueryLimit(t *testing.T) {
-	settings, err := psql(t, `SELECT r.rolname || '=' || coalesce(array_to_string(s.setconfig, ','), '')
-		FROM pg_roles r LEFT JOIN pg_db_role_setting s ON s.setrole = r.oid AND s.setdatabase = 0
-		WHERE r.rolname IN ('exampleapp', 'exampleapp_owner', 'tenants_owner') ORDER BY r.rolname`)
+func TestDirectConnectionsHaveNoQueryLimit(t *testing.T) {
+	if testing.Short() {
+		t.Skip("runs a 32-second query")
+	}
+	start := time.Now()
+	if out, err := psql(t, "SELECT pg_sleep(32)"); err != nil {
+		t.Fatalf("a 32 s query of an admin on the primary failed after %s: %v: %s", time.Since(start).Round(time.Second), err, out)
+	}
+	settings, err := psql(t, "SELECT current_setting('statement_timeout') || ' ' || current_setting('client_connection_check_interval')")
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := "exampleapp=statement_timeout=30s\nexampleapp_owner=\ntenants_owner="
-	if settings != want {
-		t.Errorf("role settings:\n%s\nwant:\n%s", settings, want)
+	if settings != "0 10s" {
+		t.Errorf("statement_timeout and client_connection_check_interval: %q, want \"0 10s\"", settings)
 	}
 	for _, s := range []struct{ ns, secret string }{{"exampleapp", "exampleapp-db"}, {"tenants", "tenants-db"}} {
 		raw, err := base64.StdEncoding.DecodeString(kube(t, time.Minute, "-n", s.ns, "get", "secret", s.secret, "-o", "jsonpath={.data.MIGRATE_DATABASE_URL}"))

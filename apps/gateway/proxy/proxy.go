@@ -57,7 +57,7 @@ type Service struct {
 type upstreamKey struct{}
 
 // A nil reporter disables usage reporting.
-// Longer than the pooler's 35 s query_timeout, so an app's own timeout answer reaches the client.
+// Longer than the pooler's 30 s query_timeout, so an app's own timeout answer reaches the client.
 const UpstreamTimeout = 40 * time.Second
 
 func NewService(authn core.Authenticator, routes []Route, reporter core.UsageReporter, log *slog.Logger) *Service {
