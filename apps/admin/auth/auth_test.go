@@ -1,6 +1,8 @@
 package auth
 
 import (
+	"context"
+	"errors"
 	"io"
 	"log/slog"
 	"net/http"
@@ -107,5 +109,19 @@ func TestLogoutClearsSession(t *testing.T) {
 	}
 	if !cleared {
 		t.Fatal("logout did not delete the session cookie")
+	}
+}
+
+// Verifies: gateway-auth AC-10
+func TestLoginWhileZitadelIsDownShowsUnavailablePage(t *testing.T) {
+	s := newTestService(testKey)
+	s.Probe = func(context.Context) error { return errors.New("connection refused") }
+	rec := httptest.NewRecorder()
+	s.LoginHandler(rec, httptest.NewRequest(http.MethodGet, "/auth/login", nil))
+	if rec.Code != http.StatusServiceUnavailable || !strings.Contains(rec.Body.String(), `id="sign-in-unavailable"`) {
+		t.Fatalf("login with Zitadel down: status %d, body %.200s; want 503 and the unavailable page", rec.Code, rec.Body.String())
+	}
+	if rec.Header().Get("Location") != "" {
+		t.Error("login with Zitadel down still redirects")
 	}
 }

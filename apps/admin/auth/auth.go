@@ -7,6 +7,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"fmt"
 	"log/slog"
 	"net"
 	"net/http"
@@ -34,14 +35,41 @@ type Service struct {
 	PublicURL string
 	ClientID  string
 	Log       *slog.Logger
+	Probe     func(ctx context.Context) error
 	now       func() time.Time
 }
 
 var _ core.SessionReader = (*Service)(nil)
 
 func NewService(provider rp.RelyingParty, cookies *httphelper.CookieHandler, publicURL, clientID string, log *slog.Logger) *Service {
-	return &Service{Provider: provider, Cookies: cookies, PublicURL: publicURL, ClientID: clientID, Log: log, now: time.Now}
+	return &Service{Provider: provider, Cookies: cookies, PublicURL: publicURL, ClientID: clientID, Log: log, now: time.Now,
+		Probe: func(ctx context.Context) error { return probeIssuer(ctx, provider.HttpClient(), provider.Issuer()) }}
 }
+
+func probeIssuer(ctx context.Context, client *http.Client, issuer string) error {
+	ctx, cancel := context.WithTimeout(ctx, 3*time.Second)
+	defer cancel()
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, issuer+"/.well-known/openid-configuration", nil)
+	if err != nil {
+		return err
+	}
+	resp, err := client.Do(req)
+	if err != nil {
+		return err
+	}
+	_ = resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("issuer: status %d", resp.StatusCode)
+	}
+	return nil
+}
+
+var unavailablePage = []byte(`<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><title>Sign-in unavailable</title></head>
+<body><main id="sign-in-unavailable"><h1>Sign-in is temporarily unavailable</h1><p>Please try again in a few minutes.</p></main></body>
+</html>
+`)
 
 // Not Secure: the prototype runs on plain HTTP.
 func NewCookies(sessionKey string) *httphelper.CookieHandler {
@@ -69,7 +97,19 @@ func NewProvider(ctx context.Context, log *slog.Logger, cfg core.Config, client 
 	}
 }
 
+// The login only redirects; probe Zitadel first so an outage gets our 503 page, not a dead redirect.
 func (s *Service) LoginHandler(w http.ResponseWriter, r *http.Request) {
+	if s.Probe != nil {
+		if err := s.Probe(r.Context()); err != nil {
+			s.Log.WarnContext(r.Context(), "Zitadel not reachable, sign-in unavailable", "err", err)
+			w.Header().Set("Content-Type", "text/html; charset=utf-8")
+			w.Header().Set("Cache-Control", "no-store")
+			w.Header().Set("Retry-After", "60")
+			w.WriteHeader(http.StatusServiceUnavailable)
+			_, _ = w.Write(unavailablePage)
+			return
+		}
+	}
 	rp.AuthURLHandler(randomState, s.Provider)(w, r)
 }
 

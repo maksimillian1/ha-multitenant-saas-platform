@@ -2,6 +2,7 @@ package api
 
 import (
 	"encoding/json"
+	"errors"
 	"io"
 	"log/slog"
 	"net/http"
@@ -59,5 +60,23 @@ func TestMeReturnsTheSession(t *testing.T) {
 	}
 	if rec.Header().Get("Cache-Control") != "no-store" {
 		t.Error("the response may be cached")
+	}
+}
+
+// Verifies: gateway-auth AC-12
+func TestSessionWorksWhileZitadelIsDown(t *testing.T) {
+	e := newEnv(t)
+	e.z.err = errors.New("zitadel: dial tcp 10.0.0.1:8080: connect: connection refused")
+
+	if rec := e.do("GET", "/api/me", nil); rec.Code != http.StatusOK {
+		t.Errorf("/api/me with Zitadel down: status %d, want 200", rec.Code)
+	}
+	if rec := e.do("GET", "/api/tenants", nil); rec.Code != http.StatusOK {
+		t.Errorf("/api/tenants with Zitadel down: status %d, want 200", rec.Code)
+	}
+	rec := e.do("GET", "/api/orgs", nil)
+	var body Error
+	if rec.Code != http.StatusBadGateway || json.Unmarshal(rec.Body.Bytes(), &body) != nil || body.Error != "Zitadel is unavailable" {
+		t.Errorf("/api/orgs with Zitadel down: status %d, body %s; want 502 Zitadel is unavailable", rec.Code, rec.Body)
 	}
 }
