@@ -14,7 +14,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/zitadel/oidc/v3/pkg/client/rp"
 	"github.com/zitadel/oidc/v3/pkg/oidc"
 	"github.com/zitadel/oidc/v3/pkg/op"
 )
@@ -41,8 +40,7 @@ type Verifier struct {
 }
 
 // An unknown key ID triggers a JWKS refetch, so key rotation needs no restart.
-func NewVerifier(issuer, audience, zitadelAdminOrg, jwksURL string, client *http.Client) *Verifier {
-	keys := rp.NewRemoteKeySet(client, jwksURL)
+func NewVerifier(issuer, audience, zitadelAdminOrg string, keys oidc.KeySet) *Verifier {
 	return &Verifier{verifier: op.NewAccessTokenVerifier(issuer, keys), audience: audience, zitadelAdminOrg: zitadelAdminOrg}
 }
 
