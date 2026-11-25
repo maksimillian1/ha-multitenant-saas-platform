@@ -7,7 +7,8 @@ code:
   - apps/gateway/tenantstate/**
 c4: [apiGateway]
 links:
-  issues: [HAMSP-23, HAMSP-24, HAMSP-52]
+  issues: [HAMSP-23, HAMSP-24, HAMSP-52, HAMSP-60]
+requirements: [QS-11, FR-02, C-04, C-06]
 
 acceptance:
   AC-1:
@@ -25,6 +26,37 @@ acceptance:
       - apps/gateway/tenantstate/contract_test.go:TestContractExamples
       - apps/gateway/auth/auth_test.go:TestBlockedTenantIsRejected
       - apps/gateway/proxy/proxy_test.go:TestBlockedTenantGets403
+
+  AC-3:
+    text: "While Zitadel is down for 2 minutes (zitadel and zitadel-login scaled to 0), requests with tokens issued before the outage get 200 through the API Gateway the whole time and after Zitadel is back."
+    level: e2e
+  AC-4:
+    text: "A gateway pod restarted while Zitadel is down becomes Ready from the keys in the ConfigMap zitadel-jwks and accepts tokens issued before the outage."
+    level: e2e
+  AC-5:
+    text: "At start the gateway fetches the JWKS from Zitadel; when Zitadel is unreachable it loads the ConfigMap's file if that is at most 24 h old. With neither, its readiness probe answers 503 and the pod gets no traffic."
+    level: unit
+  AC-6:
+    text: "A token with an unknown kid makes the gateway fetch the JWKS from Zitadel again; when Zitadel answers, its set replaces the cached one, so a key that is only in the ConfigMap is no longer accepted."
+    level: unit
+  AC-7:
+    text: "The sync job writes the union of the cached keys and Zitadel's current JWKS; a key is dropped once Zitadel no longer publishes it and the longest access token lifetime has passed. It writes only on a change, and a response that is not a JWKS of RS256 public keys is rejected and leaves the ConfigMap unchanged."
+    level: unit
+  AC-8:
+    text: "Only the sync job's ServiceAccount may update the ConfigMap zitadel-jwks; the gateway's ServiceAccount may only read it."
+    level: e2e
+  AC-9:
+    text: "After the sync job runs, the keys in the ConfigMap equal Zitadel's JWKS; the CronJob runs every minute."
+    level: e2e
+  AC-10:
+    text: "While Zitadel is down, sign-in to exampleweb and to the admin app answers 503 within 10 s with a page saying sign-in is temporarily unavailable, not a raw error or a hang."
+    level: e2e
+  AC-11:
+    text: "A user signed in to exampleweb before the outage sees their items during it, without the Manage users link; when the token has expired and cannot be refreshed, the user gets the 503 page."
+    level: e2e
+  AC-12:
+    text: "The admin app with a session opened before the outage keeps serving routes that do not need Zitadel; routes that need it answer 503 with a clear message."
+    level: unit
 
 gates:
   G-01: {status: n/a, by: verify, date: 2026-11-11, note: no release flag}
