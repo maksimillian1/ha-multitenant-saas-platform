@@ -1,0 +1,101 @@
+feature: guardrails
+title: Commit and CI guardrails for format, lint, secrets, vulnerable dependencies, built images, kind manifests and secrets in logs
+critical: false
+code:
+  - lefthook.yml
+  - .golangci.yml
+  - .claude/hooks/pre-commit.sh
+  - .claude/settings.json
+  - tools/hooktest/**
+  - .github/workflows/lint.yml
+  - .github/workflows/security.yml
+  - .github/security-scan/**
+  - .semgrep/**
+  - .trivyignore.yaml
+links:
+  issues: [HAMSP-40, HAMSP-46]
+requirements: [C-03, C-06]
+
+acceptance:
+  AC-1:
+    text: A commit with a hard-coded secret is refused by the pre-commit hook (gitleaks), and a pull request whose commits contain one fails the gitleaks CI job.
+    level: integration
+    planned: tools/hooktest/test.sh:case_secret
+  AC-2:
+    text: A //nolint without a linter name or without a reason fails golangci-lint, locally and in CI.
+    level: integration
+    planned: tools/hooktest/test.sh:case_nolint
+  AC-3:
+    text: CI runs the shared .golangci.yml on every Go app with zero findings, so any finding fails CI; the local hook reports only findings in lines changed since HEAD.
+    level: integration
+    planned: tools/hooktest/test.sh:case_lint_baseline
+  AC-4:
+    text: A staged Go file that is not formatted fails the go-fmt hook, which shows the diff and does not change or stage files.
+    level: integration
+    planned: tools/hooktest/test.sh:case_gofmt
+  AC-5:
+    text: The depguard boundaries of apps/usage are checked by the hook and in CI.
+    level: integration
+    planned: tools/hooktest/test.sh:case_depguard
+  AC-6:
+    text: An oxlint or tsc error in a staged TypeScript file of the admin SPA fails the hook; CI runs both in admin.yml.
+    level: integration
+    planned: tools/hooktest/test.sh:case_spa
+  AC-7:
+    text: The Claude Code hook before git commit refuses --no-verify and -n, formats and stages fully staged Go files and leaves partially staged ones unchanged, and blocks the commit when lefthook fails.
+    level: integration
+    planned: tools/hooktest/test.sh:case_claude_hook
+  AC-8:
+    text: AGENTS.md has a Guardrails section with the rules not to weaken a check without an issue, not to change a test to make it pass, to read the feature file first and announce critical changes with boundary tests first, and to run lint and the touched tests before reporting done.
+    level: manual
+    planned: "manual: open AGENTS.md, section Guardrails, and check that rules 1, 2, 3 with 4, and 5 say these four things; a text rule has no behaviour to test"
+  AC-9:
+    text: The skills feature-clarify, feature-plan and feature-verify reference the Guardrails section of AGENTS.md.
+    level: integration
+    planned: tools/hooktest/test.sh:case_skill_refs
+  AC-10:
+    text: A pull request that adds a Go dependency with a known vulnerability reachable from the code of a module under apps/ or tools/ fails CI, and govulncheck names the vulnerability.
+    level: integration
+    planned: .github/security-scan/test.sh:case_govulncheck
+  AC-11:
+    text: A pull request that adds a production npm dependency of the admin SPA with a known HIGH or CRITICAL advisory fails CI; a dev-only dependency with an advisory does not.
+    level: integration
+    planned: .github/security-scan/test.sh:case_npm_audit
+  AC-12:
+    text: CI scans every image built from apps/* and images/timescaledb, for linux/arm64 too, and fails on a HIGH or CRITICAL vulnerability that has a fixed version; a vulnerability with no fix does not fail CI.
+    level: integration
+    planned: .github/security-scan/test.sh:case_trivy_image
+  AC-13:
+    text: CI fails on a HIGH or CRITICAL misconfiguration in prototype/k8s, such as a privileged container or a hostPath volume; lower severities do not fail CI.
+    level: integration
+    planned: .github/security-scan/test.sh:case_trivy_config
+  AC-14:
+    text: A finding listed in .trivyignore.yaml with a statement and an expired_at date in the future does not fail CI; once expired_at has passed, the same finding fails CI again.
+    level: integration
+    planned: .github/security-scan/test.sh:case_trivy_ignore_expiry
+  AC-15:
+    text: A Semgrep rule fails CI on a Go slog or log call whose key or argument is named token, secret, password or authorization, or that logs the Authorization header value; the rule has at least one positive and one negative test case, and the test cases run in CI.
+    level: unit
+    planned: .semgrep/log-secrets.go:logSecretsCases
+
+checklist:
+  T-01:
+    planned: does not apply — CI and commit tooling; it reads no tenant data and serves no tenant request
+  T-02:
+    planned: does not apply — no input or output across a service boundary
+  T-08:
+    planned: does not apply — no migration
+
+comments:
+  - at: .github/workflows/security.yml:trivy-image
+    text: "--ignore-unfixed: fail only when a fixed version exists, so every red build has an update to apply."
+    why: owner decision on the threshold; a reader would otherwise drop the flag as too lenient
+  - at: .github/security-scan/testdata/vulnerable-go/go.mod
+    text: "Pinned to a version with a known reachable vulnerability on purpose: the negative fixture of AC-10."
+    why: intentionally odd code; a dependency bot or a reader would bump it
+
+quality_scenarios:
+  touched: []
+
+gates:
+  G-07: {status: pass, by: owner, date: 2026-11-25, note: plan for alpha approved in chat}
