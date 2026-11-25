@@ -42,6 +42,7 @@ These rules hold while you write code. Checks run at commit (`lefthook.yml`, and
 
 ## Code comments
 
+- New comments come from the plan. `feature-plan` lists each one (where, text, why) under `comments` in the feature file, and the owner approves the list. A comment that turns out to be needed during implementation is proposed to the owner in chat first and added to the list once approved.
 - Comment only WHY, never WHAT. If the code says it, don't repeat it.
 - Write a comment only if without it a competent developer would make
   a mistake or "fix" something that isn't broken: business rules,

@@ -68,6 +68,11 @@ checklist:                          # planned for alpha → level basic; owner r
   T-11:
     planned: unsure — depends on whether the request body gets its own decoder
 
+comments:                           # planned code comments; approved with the plan
+  - at: apps/gateway/suspend/cache.go:Lookup
+    text: "A miss counts as active: the tenant-states topic is the source, not this cache."
+    why: hidden invariant
+
 quality_scenarios:
   touched: [QS-03, QS-18]
   tests:
@@ -89,6 +94,9 @@ Then run `go -C tools/featuremap run .` and commit the file and the map on the f
 - QS-01: covered by the AC-2 integration test.
 - C-04: the new Helm values go through ArgoCD.
 
+**Code comments** (each one needs your approval)
+- `apps/gateway/suspend/cache.go:Lookup`: "A miss counts as active: …" — hidden invariant
+
 **Steps**
 - [ ] S1: <what> — `<paths>` — AC-1
 - [ ] S2: ...
@@ -105,6 +113,7 @@ Rules:
 - `code` names what this feature owns, as globs from the repo root. Code that belongs to another feature stays in that feature's file; the change to it is listed in the plan.
 - Tests come first in the steps that introduce them, or in the same step as the code. Never in a final "add tests" step.
 - Steps are small enough for one commit each and name the files they touch.
+- **Code comments.** List every comment the implementation will add, under `comments` in the file and as a list in the issue: where (`file:function` or `file:type`), the exact text, and why it is needed (business rule, external constraint, workaround with its link, hidden invariant, ordering dependency, magic number, intentionally odd code; `AGENTS.md`, "Code comments"). The `// Verifies:` lines of tests are not listed. Write "none" when the plan adds no comment. Show the list separately so the owner can approve, cut or reword each item.
 - Use the test names you intend to create, so `feature-verify` can find them. Update `planned` if names change during implementation.
 - Commits follow `AGENTS.md`: `HAMSP-N: <summary>`.
 

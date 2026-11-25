@@ -70,6 +70,11 @@ checklist:                          # gate G-04; Testing, sections 4 and 5
     planned: does not apply — no migration
     verified: n/a — no migration in the diff
 
+comments:                           # code comments the plan adds, approved with it (G-07)
+  - at: apps/gateway/suspend/cache.go:Lookup
+    text: "A miss counts as active: the tenant-states topic is the source, not this cache."
+    why: hidden invariant
+
 quality_scenarios:                  # gate G-05; Testing, section 7
   touched: [QS-03]
   tests:                            # cheap QS tests, counted like ACs
@@ -102,7 +107,7 @@ runs:                               # one entry per feature-verify run, newest l
 | Field | Written by |
 |---|---|
 | `feature`, `title`, `acceptance.*.text`, `requirements`, `links` | `feature-clarify` |
-| `code`, `flag`, `critical`, `c4`, the `planned` entries, `quality_scenarios.touched` | `feature-plan` |
+| `code`, `flag`, `critical`, `c4`, the `planned` entries, `comments`, `quality_scenarios.touched` | `feature-plan` |
 | Gates `by: owner` (G-06, G-07, G-08, and any gate the owner accepts by hand), `deviations` approvals, setting or lowering `stage` by hand | The owner, in chat or in the file; an agent may write the line on the owner's word. |
 | Gates `by: verify`, `stage` when the gates back it, the `verified` entries, `recommended_runs`, `runs` | `feature-verify` |
 

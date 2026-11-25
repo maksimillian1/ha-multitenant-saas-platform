@@ -52,6 +52,8 @@ One test may cover several IDs; it is listed under each of them.
 
 ### Plan and docs
 
+Compare the comments the diff adds (lines added in the feature's `code`, not counting `// Verifies:` lines) with the feature file's `comments`. A comment that is not in the list, or whose text differs in meaning, is listed for the owner as *comment not in the plan*; a planned comment that is missing is listed too. Neither fails the verdict.
+
 Check every Plan step in the issue is done (`S1`…`Sn`) and nothing in the diff contradicts an Accepted ADR or a constraint C-xx (for example a multi-tenant table without RLS, a manual cluster change, an AGPL dependency under `/apps`).
 
 ## 3. Run
@@ -77,7 +79,7 @@ Ask the user before writing:
 
 Lead with the verdict for the stage checked: **Ready for `<stage>`** (every required row passed or is `n/a` with a reason), or **Not ready** with the count of failing and not-run rows. Load and chaos runs do not change the verdict.
 
-Then, before the table, the part the owner reads (`docs/process/review.md`, R-3): **deviations from the plan**, **items added by verify** and **reviewed features touched**, one line each. Say "none" when there are none.
+Then, before the table, the part the owner reads (`docs/process/review.md`, R-3): **deviations from the plan**, **items added by verify** and **reviewed features touched** and **comments not in the plan**, one line each. Say "none" when there are none.
 
 Then the table:
 
