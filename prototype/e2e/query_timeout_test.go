@@ -91,8 +91,8 @@ func TestAppCannotLiftQueryLimit(t *testing.T) {
 		t.Skip("runs a 35-second query")
 	}
 	took, out, err := longQuery(t, "BEGIN; SET LOCAL statement_timeout = 0; SELECT pg_sleep(60); COMMIT;")
-	if err == nil {
-		t.Fatalf("a 60 s query with statement_timeout = 0 finished after %s: %q", took, out)
+	if err == nil || !strings.Contains(out, "query timeout") {
+		t.Fatalf("a 60 s query with statement_timeout = 0: err %v after %s, output %q; want PgBouncer's query timeout", err, took, out)
 	}
 	if took < 35*time.Second || took > 40*time.Second {
 		t.Errorf("the query without a statement_timeout was cut after %s, want between 35 and 40 s (PgBouncer query_timeout); output %q",
