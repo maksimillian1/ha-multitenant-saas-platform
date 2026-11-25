@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 
 	"github.com/maksimillian1/ha-multitenant-saas-platform/apps/exampleapp/core"
 )
@@ -198,5 +199,59 @@ func TestStoreIsolatesTenants(t *testing.T) {
 	got, err := st.Get(ctx, "tenant-a", a.ID)
 	if err != nil || got.Name != "a-item" {
 		t.Fatalf("Get by A = %+v, %v; want unchanged item", got, err)
+	}
+}
+
+// Verifies: exampleapp AC-1; T-12
+func TestStatementTimeoutIsQueryTimeout(t *testing.T) {
+	db := newTestDB(t)
+	ctx := context.Background()
+	u, err := url.Parse(db.appDSN)
+	if err != nil {
+		t.Fatal(err)
+	}
+	q := u.Query()
+	q.Set("statement_timeout", "300ms")
+	u.RawQuery = q.Encode()
+	st, err := Open(ctx, u.String())
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(st.Close)
+
+	lock, err := db.owner.Begin(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = lock.Rollback(ctx) })
+	if _, err := lock.Exec(ctx, "LOCK TABLE items IN ACCESS EXCLUSIVE MODE"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := st.List(ctx, "tenant-a"); !errors.Is(err, core.ErrQueryTimeout) {
+		t.Fatalf("List on a locked table: %v, want core.ErrQueryTimeout", err)
+	}
+	if err := lock.Rollback(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := st.List(ctx, "tenant-a"); err != nil {
+		t.Fatalf("List after the lock is gone: %v", err)
+	}
+}
+
+// Verifies: exampleapp AC-1
+func TestPoolerTimeoutIsQueryTimeout(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		err  error
+		want bool
+	}{
+		{"PgBouncer query_timeout", &pgconn.PgError{Severity: "FATAL", Code: "08P01", Message: "query timeout"}, true},
+		{"PostgreSQL statement_timeout", fmt.Errorf("list: %w", &pgconn.PgError{Code: "57014"}), true},
+		{"another PgBouncer protocol error", &pgconn.PgError{Code: "08P01", Message: "server conn crashed?"}, false},
+		{"connection refused", errors.New("dial tcp: connection refused"), false},
+	} {
+		if got := isQueryTimeout(tc.err); got != tc.want {
+			t.Errorf("%s: %v, want %v", tc.name, got, tc.want)
+		}
 	}
 }
