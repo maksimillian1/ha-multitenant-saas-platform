@@ -10,11 +10,13 @@ const (
 // Session is what exampleweb keeps on the server for a signed-in browser; the
 // browser holds only the session's random ID.
 type Session struct {
-	Subject      string
-	Name         string
-	OrgID        string
-	AccessToken  string
-	RefreshToken string
-	IDToken      string
-	Expires      time.Time
+	Subject       string
+	Name          string
+	OrgID         string
+	AccessToken   string
+	RefreshToken  string
+	IDToken       string
+	AccessIssued  time.Time
+	AccessExpires time.Time
+	Expires       time.Time
 }

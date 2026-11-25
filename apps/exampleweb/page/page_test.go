@@ -9,6 +9,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/maksimillian1/ha-multitenant-saas-platform/apps/exampleweb/core"
 	"github.com/maksimillian1/ha-multitenant-saas-platform/apps/exampleweb/items"
@@ -135,5 +136,41 @@ func TestRefreshOnceOn401(t *testing.T) {
 	if rec.Code != http.StatusFound || rec.Header().Get("Location") != "/auth/login" || len(i.tokens) != 1 {
 		t.Errorf("failed refresh: status %d to %q after %d calls; want one call and 302 to /auth/login",
 			rec.Code, rec.Header().Get("Location"), len(i.tokens))
+	}
+}
+
+// Verifies: gateway-auth AC-13
+func TestRefreshesEarlyAtHalfLifetime(t *testing.T) {
+	now := time.Now()
+	for _, tc := range []struct {
+		name        string
+		issuedAgo   time.Duration
+		refreshErr  error
+		wantRefresh bool
+		wantToken   string
+	}{
+		{"fresh token", 4 * time.Minute, nil, false, "old"},
+		{"half the lifetime spent", 5 * time.Minute, nil, true, "fresh"},
+		{"early refresh fails", 7 * time.Minute, errors.New("Zitadel down"), true, "old"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			s := signedIn()
+			s.session.AccessIssued = now.Add(-tc.issuedAgo)
+			s.session.AccessExpires = s.session.AccessIssued.Add(10 * time.Minute)
+			s.refreshErr = tc.refreshErr
+			i := &fakeItems{}
+			p := newPage(s, i, &fakeOwners{})
+			p.Now = func() time.Time { return now }
+			rec := get(p)
+			if rec.Code != http.StatusOK {
+				t.Fatalf("status %d, want 200", rec.Code)
+			}
+			if (s.refreshes > 0) != tc.wantRefresh {
+				t.Errorf("refreshed %d times, want refresh %v", s.refreshes, tc.wantRefresh)
+			}
+			if len(i.tokens) != 1 || i.tokens[0] != tc.wantToken {
+				t.Errorf("items read with %v, want once with %q", i.tokens, tc.wantToken)
+			}
+		})
 	}
 }

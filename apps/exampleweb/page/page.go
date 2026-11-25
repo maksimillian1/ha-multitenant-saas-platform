@@ -7,6 +7,7 @@ import (
 	"html/template"
 	"log/slog"
 	"net/http"
+	"time"
 
 	"github.com/maksimillian1/ha-multitenant-saas-platform/apps/exampleweb/core"
 	"github.com/maksimillian1/ha-multitenant-saas-platform/apps/exampleweb/items"
@@ -31,6 +32,7 @@ type Service struct {
 	Owners     OwnerChecker
 	ConsoleURL string
 	Log        *slog.Logger
+	Now        func() time.Time
 }
 
 var tmpl = template.Must(template.New("page").Parse(`<!doctype html>
@@ -62,6 +64,14 @@ func (s *Service) Handler(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		http.Redirect(w, r, "/auth/login", http.StatusFound)
 		return
+	}
+
+	if s.halfSpent(session) {
+		if fresh, err := s.Sessions.Refresh(ctx, id, session); err != nil {
+			s.Log.WarnContext(ctx, "early refresh failed, using the current token", "err", err)
+		} else {
+			session = fresh
+		}
 	}
 
 	list, err := s.Items.List(ctx, session.AccessToken)
@@ -99,4 +109,16 @@ func (s *Service) Handler(w http.ResponseWriter, r *http.Request) {
 	if err := tmpl.Execute(w, v); err != nil {
 		s.Log.ErrorContext(ctx, "page not rendered", "err", err)
 	}
+}
+
+func (s *Service) halfSpent(session core.Session) bool {
+	if session.AccessExpires.IsZero() || session.AccessIssued.IsZero() {
+		return false
+	}
+	now := time.Now
+	if s.Now != nil {
+		now = s.Now
+	}
+	half := session.AccessIssued.Add(session.AccessExpires.Sub(session.AccessIssued) / 2)
+	return !now().Before(half)
 }

@@ -7,6 +7,7 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"errors"
+	"fmt"
 	"log/slog"
 	"net"
 	"net/http"
@@ -45,11 +46,46 @@ type Service struct {
 	PublicURL string
 	ClientID  string
 	Log       *slog.Logger
+	Probe     func(ctx context.Context) error
 	now       func() time.Time
 }
 
 func NewService(provider rp.RelyingParty, store *Store, publicURL, clientID string, log *slog.Logger) *Service {
-	return &Service{Provider: provider, Store: store, PublicURL: publicURL, ClientID: clientID, Log: log, now: time.Now}
+	return &Service{Provider: provider, Store: store, PublicURL: publicURL, ClientID: clientID, Log: log, now: time.Now,
+		Probe: func(ctx context.Context) error { return ProbeIssuer(ctx, provider.HttpClient(), provider.Issuer()) }}
+}
+
+func ProbeIssuer(ctx context.Context, client *http.Client, issuer string) error {
+	ctx, cancel := context.WithTimeout(ctx, 3*time.Second)
+	defer cancel()
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, issuer+"/.well-known/openid-configuration", nil)
+	if err != nil {
+		return err
+	}
+	resp, err := client.Do(req)
+	if err != nil {
+		return err
+	}
+	_ = resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("issuer: status %d", resp.StatusCode)
+	}
+	return nil
+}
+
+var unavailablePage = []byte(`<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><title>Sign-in unavailable</title></head>
+<body><main id="sign-in-unavailable"><h1>Sign-in is temporarily unavailable</h1><p>Please try again in a few minutes.</p></main></body>
+</html>
+`)
+
+func Unavailable(w http.ResponseWriter) {
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	w.Header().Set("Cache-Control", "no-store")
+	w.Header().Set("Retry-After", "60")
+	w.WriteHeader(http.StatusServiceUnavailable)
+	_, _ = w.Write(unavailablePage)
 }
 
 // NewCookies holds the short-lived OIDC state and PKCE verifier during sign-in,
@@ -89,7 +125,15 @@ func (s *Service) secure() bool {
 	return strings.HasPrefix(s.PublicURL, "https://")
 }
 
+// The login only redirects; probe Zitadel first so an outage gets our 503 page, not a dead redirect.
 func (s *Service) LoginHandler(w http.ResponseWriter, r *http.Request) {
+	if s.Probe != nil {
+		if err := s.Probe(r.Context()); err != nil {
+			s.Log.WarnContext(r.Context(), "Zitadel not reachable, sign-in unavailable", "err", err)
+			Unavailable(w)
+			return
+		}
+	}
 	rp.AuthURLHandler(randomState, s.Provider)(w, r)
 }
 
@@ -111,10 +155,12 @@ func (s *Service) signIn(w http.ResponseWriter, r *http.Request, tokens *oidc.To
 
 func (s *Service) sessionFromTokens(tokens *oidc.Tokens[*oidc.IDTokenClaims]) core.Session {
 	session := core.Session{
-		AccessToken:  tokens.AccessToken,
-		RefreshToken: tokens.RefreshToken,
-		IDToken:      tokens.IDToken,
-		Expires:      s.now().Add(sessionLifetime),
+		AccessToken:   tokens.AccessToken,
+		RefreshToken:  tokens.RefreshToken,
+		IDToken:       tokens.IDToken,
+		AccessIssued:  s.now(),
+		AccessExpires: tokens.Expiry,
+		Expires:       s.now().Add(sessionLifetime),
 	}
 	if c := tokens.IDTokenClaims; c != nil {
 		session.Subject = c.Subject
@@ -181,6 +227,7 @@ func (s *Service) Refresh(ctx context.Context, id string, session core.Session) 
 		return core.Session{}, err
 	}
 	session.AccessToken = tokens.AccessToken
+	session.AccessIssued, session.AccessExpires = s.now(), tokens.Expiry
 	if tokens.RefreshToken != "" {
 		session.RefreshToken = tokens.RefreshToken
 	}

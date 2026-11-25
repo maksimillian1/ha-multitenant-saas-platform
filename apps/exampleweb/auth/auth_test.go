@@ -3,6 +3,7 @@ package auth
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"io"
 	"log/slog"
 	"net/http"
@@ -148,5 +149,30 @@ func TestExpiredSessionIsGone(t *testing.T) {
 	req.AddCookie(&http.Cookie{Name: SessionCookie, Value: id})
 	if _, _, err := s.Session(req); err == nil {
 		t.Error("an expired session still opens the page")
+	}
+}
+
+// Verifies: gateway-auth AC-10
+func TestLoginWhileZitadelIsDownShowsUnavailablePage(t *testing.T) {
+	s := newTestService(t)
+	s.Probe = func(context.Context) error { return errors.New("connection refused") }
+	rec := httptest.NewRecorder()
+	s.LoginHandler(rec, httptest.NewRequest(http.MethodGet, "/auth/login", nil))
+	if rec.Code != http.StatusServiceUnavailable || !strings.Contains(rec.Body.String(), `id="sign-in-unavailable"`) {
+		t.Fatalf("login with Zitadel down: status %d, body %.200s; want 503 and the unavailable page", rec.Code, rec.Body.String())
+	}
+	if rec.Header().Get("Location") != "" {
+		t.Error("login with Zitadel down still redirects")
+	}
+}
+
+func TestProbeIssuer(t *testing.T) {
+	issuer := fakeIssuer(t)
+	if err := ProbeIssuer(context.Background(), issuer.Client(), issuer.URL); err != nil {
+		t.Errorf("reachable issuer: %v", err)
+	}
+	issuer.Close()
+	if err := ProbeIssuer(context.Background(), issuer.Client(), issuer.URL); err == nil {
+		t.Error("a closed issuer is reported reachable")
 	}
 }
