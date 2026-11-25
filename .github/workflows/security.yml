@@ -38,3 +38,39 @@ jobs:
       - name: Admin SPA
         working-directory: apps/admin/ui/app
         run: npm audit --omit=dev --audit-level=high
+
+  trivy-image:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        platform: [linux/amd64, linux/arm64]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - uses: aquasecurity/setup-trivy@v0.2.3
+        with:
+          version: v0.76.2
+      - name: The check fails on a fixable vulnerability (negative fixture)
+        if: matrix.platform == 'linux/amd64'
+        run: .github/security-scan/test.sh case_trivy_image
+      - name: Build every image we ship
+        run: |
+          for a in gateway admin exampleapp exampleweb tenants; do
+            docker buildx build --platform ${{ matrix.platform }} --load -t scan/$a apps/$a
+          done
+          for t in writeapi writer migrate; do
+            (cd apps/usage && docker buildx bake --set "$t.platform=${{ matrix.platform }}" \
+              --set "$t.tags=scan/usage-$t" --load $t)
+          done
+          docker buildx build --platform ${{ matrix.platform }} --load -t scan/timescaledb images/timescaledb
+      # --ignore-unfixed: fail only when a fixed version exists, so every red build has an update to apply.
+      - name: Scan the images
+        run: |
+          status=0
+          for img in $(docker images 'scan/*' --format '{{.Repository}}'); do
+            echo "== $img"
+            trivy image --severity HIGH,CRITICAL --ignore-unfixed --exit-code 1 \
+              --ignorefile .trivyignore.yaml --platform ${{ matrix.platform }} "$img" || status=1
+          done
+          exit $status

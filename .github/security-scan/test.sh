@@ -35,6 +35,19 @@ case_npm_audit() {
   expect_passed "AC-11 npm audit passes when only a dev dependency has the advisory" "$out" $rc
 }
 
+# Verifies: guardrails AC-12
+case_trivy_image() {
+  local out rc
+  docker build -q -t security-scan/vulnerable-image "$fixtures/vulnerable-image" >/dev/null
+  out=$(trivy image -q --severity HIGH,CRITICAL --ignore-unfixed --exit-code 1 security-scan/vulnerable-image 2>&1); rc=$?
+  expect_refused "AC-12 trivy image fails on a HIGH or CRITICAL vulnerability with a fixed version" "CVE-[0-9]+-[0-9]+" "$out" $rc
+  if grep -q -- '--ignore-unfixed' "$here/../workflows/security.yml"; then
+    ok "AC-12 the image scan in CI ignores vulnerabilities with no fixed version"
+  else
+    bad "AC-12 the image scan in CI does not pass --ignore-unfixed"
+  fi
+}
+
 [ $# -gt 0 ] || set -- $(declare -F | awk '$3 ~ /^case_/ {print $3}')
 for c in "$@"; do "$c"; done
 
