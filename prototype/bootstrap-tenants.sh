@@ -76,9 +76,8 @@ TM_SA="tenant-management"
 TM_SA_ROLE="IAM_ORG_MANAGER"
 TM_URL="http://tenants.tenants.svc:8080"
 
-# Access tokens live 60 s, so the e2e tests can prove that an expired token is
-# rejected without waiting hours.
-ACCESS_TOKEN_LIFETIME="60s"  # protobuf Duration: seconds only
+# 10 min: QS-11 needs issued tokens to outlive an 8-minute Zitadel outage.
+ACCESS_TOKEN_LIFETIME="600s"  # protobuf Duration: seconds only
 
 # ── helpers ────────────────────────────────────────────────────────────────────
 
@@ -99,8 +98,8 @@ key_token() {
     --data-urlencode "assertion=${header}.${payload}.${sig}" | jq -er .access_token
 }
 
-# admin_token — the IAM admin's current access token. Access tokens live 60 s
-# on this instance (ACCESS_TOKEN_LIFETIME), so it gets a new one every 40 s.
+# admin_token — the IAM admin's current access token. Access tokens live 10 min
+# on this instance (ACCESS_TOKEN_LIFETIME); it still gets a new one every 40 s.
 TOKEN="" TOKEN_AT=0
 admin_token() {
   if [[ -z "${TOKEN}" || $(( $(date +%s) - TOKEN_AT )) -ge 40 ]]; then
@@ -555,4 +554,4 @@ chmod 600 "${OUT}"
 echo ""
 echo "Wrote ${OUT}. Super admin page: ${ADMIN_URL} (users: jq .admin.users ${OUT})"
 echo "Run the e2e tests:"
-echo "  go test -C ${SCRIPT_DIR}/e2e -count=1 ./..."
+echo "  go test -C ${SCRIPT_DIR}/e2e -count=1 -timeout 45m ./..."

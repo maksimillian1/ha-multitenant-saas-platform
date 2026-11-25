@@ -131,8 +131,8 @@ func TestGatewayRejectsTokenWithoutPlatformAudience(t *testing.T) {
 	}
 }
 
-// AC-5: an expired Zitadel token is rejected. Takes about a minute, because
-// bootstrap-tenants.sh sets the access token lifetime to 60 s.
+// AC-5: an expired Zitadel token is rejected. Takes about 10 minutes, because
+// bootstrap-tenants.sh sets the access token lifetime to 10 min.
 func TestGatewayRejectsExpiredToken(t *testing.T) {
 	if testing.Short() {
 		t.Skip("waits for a token to expire")
@@ -146,8 +146,8 @@ func TestGatewayRejectsExpiredToken(t *testing.T) {
 	mustStatus(t, call(t, http.MethodGet, "/items", tok, nil), http.StatusOK, "fresh token")
 
 	wait := time.Until(time.Unix(int64(exp), 0)) + 5*time.Second
-	if wait > 3*time.Minute {
-		t.Fatalf("token lives %s; run bootstrap-tenants.sh to set the 60 s lifetime", wait)
+	if wait > 11*time.Minute {
+		t.Fatalf("token lives %s; run bootstrap-tenants.sh to set the 10 min lifetime", wait)
 	}
 	time.Sleep(wait)
 
