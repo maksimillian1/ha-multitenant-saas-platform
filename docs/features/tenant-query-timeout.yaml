@@ -1,0 +1,69 @@
+feature: tenant-query-timeout
+title: The platform cancels a tenant's query after 30 s
+critical: false
+code:
+  - prototype/k8s/apps/database/role-settings.yaml
+c4: [postgres]
+links:
+  issues: [HAMSP-59]
+requirements: [QS-12, C-04]
+
+acceptance:
+  AC-1:
+    text: A query that an app role runs for tenant A through the pooler is cancelled by PostgreSQL 30 s after it starts (SQLSTATE 57014, statement timeout).
+    level: e2e
+    planned: prototype/e2e/query_timeout_test.go:TestTenantQueryCancelledAfter30s
+  AC-2:
+    text: While tenant A's query runs, every GET /items of tenant B through the gateway succeeds, and their p95 is at most twice the p95 measured before plus 200 ms.
+    level: e2e
+    planned: prototype/e2e/query_timeout_test.go:TestTenantQueryCancelledAfter30s
+  AC-3:
+    text: A query that lifts its own limit (SET LOCAL statement_timeout = 0) through the pooler is cut by PgBouncer between 35 and 40 s after it starts.
+    level: e2e
+    planned: prototype/e2e/query_timeout_test.go:TestAppCannotLiftQueryLimit
+  AC-4:
+    text: The platform sets statement_timeout = 30s on every app role in the main cluster and no limit on owner roles; migrations connect to the primary directly, not through the pooler.
+    level: e2e
+    planned: prototype/e2e/query_timeout_test.go:TestAppRolesHaveQueryLimit
+  AC-5:
+    text: When the database cancels an ExampleApp query on statement_timeout, the client gets 504 with the error "query timed out".
+    level: integration
+    planned: apps/exampleapp/store/store_test.go:TestStatementTimeoutIsQueryTimeout, apps/exampleapp/items/items_test.go:TestQueryTimeoutIs504
+  AC-6:
+    text: The gateway waits for an upstream answer longer than the pooler's 35 s limit, so the app's 504 reaches the client instead of the gateway's 502.
+    level: unit
+    planned: apps/gateway/proxy/proxy_test.go:TestUpstreamTimeoutOutlastsQueryLimit
+
+checklist:
+  T-01:
+    planned: applies — tenant A's long query and tenant B's requests at the same time; e2e through the gateway, ExampleApp, PgBouncer and PostgreSQL (AC-1, AC-2)
+  T-02:
+    planned: does not apply — ExampleApp has no published contract in docs/contracts; the new 504 is described in docs/INTEGRATION.md
+  T-04:
+    planned: does not apply — no endpoint and no role changes who may call what
+  T-08:
+    planned: does not apply — no schema migration; the role setting is applied by a platform Job, not a migration
+  T-11:
+    planned: does not apply — no new input parser
+  T-12:
+    planned: applies — the canary lifts the role's limit with SET LOCAL and the PgBouncer backstop still cuts the query (AC-3); the store test proves the 57014 mapping against a real PostgreSQL (AC-5)
+
+comments:
+  - at: prototype/k8s/apps/database/role-settings.yaml
+    text: "# CNPG managed roles cannot carry parameters, so the platform sets them with SQL after every sync."
+    why: external constraint
+  - at: prototype/k8s/apps/database/cluster.yaml:Pooler.parameters.query_timeout
+    text: "# Backstop above the app roles' 30 s statement_timeout, which an app can lift with SET and this cannot."
+    why: hidden invariant between two settings
+  - at: apps/gateway/proxy/proxy.go:UpstreamTimeout
+    text: "// Longer than the pooler's 35 s query_timeout, so an app's own timeout answer reaches the client."
+    why: ordering dependency between timeouts
+
+quality_scenarios:
+  touched: [QS-12]
+  tests:
+    QS-12:
+      planned: prototype/e2e/query_timeout_test.go:TestTenantQueryCancelledAfter30s
+
+gates:
+  G-07: {status: not-checked, by: owner, date: 2026-11-25, note: plan for alpha waits for approval in the pull request review}

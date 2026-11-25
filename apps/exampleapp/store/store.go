@@ -4,10 +4,12 @@ package store
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log/slog"
 	"time"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/maksimillian1/ha-multitenant-saas-platform/apps/exampleapp/core"
@@ -37,14 +39,20 @@ func (s *Postgres) Close() { s.pool.Close() }
 
 func (s *Postgres) Ping(ctx context.Context) error { return s.pool.Ping(ctx) }
 
+const queryCanceled = "57014"
+
 func (s *Postgres) inTenantTx(ctx context.Context, tenantID string, fn func(pgx.Tx) error) error {
-	return pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
+	err := pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
 		// set_config(..., true) is SET LOCAL with a bind parameter.
 		if _, err := tx.Exec(ctx, "SELECT set_config('app.current_tenant_id', $1, true)", tenantID); err != nil {
 			return err
 		}
 		return fn(tx)
 	})
+	if pgErr := (*pgconn.PgError)(nil); errors.As(err, &pgErr) && pgErr.Code == queryCanceled {
+		return fmt.Errorf("%w: %w", core.ErrQueryTimeout, err)
+	}
+	return err
 }
 
 const itemColumns = "id::text, tenant_id, name, created_at"

@@ -154,6 +154,11 @@ func (s *Service) fail(w http.ResponseWriter, r *http.Request, err error) {
 		core.WriteError(w, http.StatusNotFound, "item not found")
 		return
 	}
+	if errors.Is(err, core.ErrQueryTimeout) {
+		s.Log.WarnContext(r.Context(), "query timed out", "path", r.URL.Path, "err", err)
+		core.WriteError(w, http.StatusGatewayTimeout, "query timed out")
+		return
+	}
 	s.Log.ErrorContext(r.Context(), "request failed", "path", r.URL.Path, "err", err)
 	core.WriteError(w, http.StatusServiceUnavailable, "storage unavailable")
 }
