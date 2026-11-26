@@ -51,6 +51,9 @@ VIEWER_ROLE="viewer"
 ADMIN_URL="http://admin.localtest.me:30080"
 EXAMPLEWEB_APP="exampleweb"
 EXAMPLEWEB_URL="http://exampleweb.localtest.me:30080"
+KANTOR_APP="kantor"
+KANTOR_URL="http://kantor.localtest.me:30080"
+KANTOR_NAMESPACE="app-kantor"
 ADMIN_EMAIL_DOMAIN="admin.localtest.me"
 # The admin app calls the Zitadel APIs as this machine user. IAM_ORG_MANAGER
 # covers the organizations, users, role assignments and projects of every
@@ -536,6 +539,35 @@ if kubectl -n exampleweb get deployment exampleweb &>/dev/null; then
   kubectl -n exampleweb rollout restart deployment/exampleweb >/dev/null
 fi
 
+# ── 10. the KANTOR SPA (ADR-0013) ────────────────────────────────────────────
+
+# A public client with PKCE in the platform API project: the SPA keeps no
+# secret, and its tokens carry the audience the API Gateway requires.
+kantor_cfg=$(jq -nc --arg n "${KANTOR_APP}" --arg url "${KANTOR_URL}" \
+  '{name: $n, redirectUris: [$url + "/auth/callback"], postLogoutRedirectUris: [$url + "/"],
+    responseTypes: ["OIDC_RESPONSE_TYPE_CODE"],
+    grantTypes: ["OIDC_GRANT_TYPE_AUTHORIZATION_CODE", "OIDC_GRANT_TYPE_REFRESH_TOKEN"],
+    appType: "OIDC_APP_TYPE_USER_AGENT", authMethodType: "OIDC_AUTH_METHOD_TYPE_NONE", devMode: true,
+    accessTokenType: "OIDC_TOKEN_TYPE_JWT", idTokenUserinfoAssertion: true}')
+app=$(zitadel POST "/management/v1/projects/${project_id}/apps/_search" "$(jq -nc --arg n "${KANTOR_APP}" \
+  '{queries: [{nameQuery: {name: $n, method: "TEXT_QUERY_METHOD_EQUALS"}}]}')" | jq -c '.result[0] // empty')
+if [[ -z "${app}" ]]; then
+  kantor_client_id=$(zitadel POST "/management/v1/projects/${project_id}/apps/oidc" "${kantor_cfg}" | jq -r '.clientId')
+  echo "Created OIDC app ${KANTOR_APP}"
+else
+  kantor_client_id=$(jq -r '.oidcConfig.clientId' <<<"${app}")
+  if ! out=$(zitadel PUT "/management/v1/projects/${project_id}/apps/$(jq -r '.id' <<<"${app}")/oidc_config" "$(jq -c 'del(.name)' <<<"${kantor_cfg}")"); then
+    grep -q "No changes" <<<"${out}" || { echo "ERROR: ${out}"; exit 1; }
+  fi
+  echo "Reusing OIDC app ${KANTOR_APP}"
+fi
+# The KANTOR frontend image writes /platform-config.json from these variables.
+kubectl create namespace "${KANTOR_NAMESPACE}" --dry-run=client -o yaml | kubectl apply -f - >/dev/null
+kubectl -n "${KANTOR_NAMESPACE}" create secret generic kantor-oidc \
+  --from-literal=PLATFORM_OIDC_ISSUER="${ISSUER}" --from-literal=PLATFORM_OIDC_CLIENT_ID="${kantor_client_id}" \
+  --from-literal=PLATFORM_OIDC_AUDIENCE="${project_id}" \
+  --dry-run=client -o yaml | kubectl apply -f - >/dev/null
+
 tm_json=$(jq -nc --arg aud "${tm_project_id}" --arg role "${TM_ROLE}" \
   --arg cid "$(jq -r '.clientId' <<<"${tm_secret}")" --arg cs "$(jq -r '.clientSecret' <<<"${tm_secret}")" \
   '{audience: $aud, role: $role, client_id: $cid, client_secret: $cs}')
@@ -548,8 +580,9 @@ admin_json=$(jq -nc --arg url "${ADMIN_URL}" --arg role "${ADMIN_ROLE}" --arg vr
 
 jq -n --arg issuer "${ISSUER}" --arg gw "${GATEWAY}" --arg aud "${project_id}" --argjson t "${tenants_json}" \
   --argjson admin "${admin_json}" --argjson tm "${tm_json}" --arg web "${EXAMPLEWEB_URL}" \
+  --arg kurl "${KANTOR_URL}" --arg kcid "${kantor_client_id}" \
   '{issuer: $issuer, gateway: $gw, audience: $aud, tenants: $t, admin: $admin, tenant_management: $tm,
-    exampleweb: {url: $web}}' >"${OUT}"
+    exampleweb: {url: $web}, kantor: {url: $kurl, client_id: $kcid}}' >"${OUT}"
 chmod 600 "${OUT}"
 echo ""
 echo "Wrote ${OUT}. Super admin page: ${ADMIN_URL} (users: jq .admin.users ${OUT})"

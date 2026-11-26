@@ -42,6 +42,10 @@ type config struct {
 	// Audience is the Zitadel project ID of the platform API.
 	Audience string   `json:"audience"`
 	Tenants  []tenant `json:"tenants"`
+	Kantor   struct {
+		URL      string `json:"url"`
+		ClientID string `json:"client_id"`
+	} `json:"kantor"`
 }
 
 type item struct {
