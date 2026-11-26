@@ -1,0 +1,45 @@
+feature: kantor-oidc
+title: The Zitadel OIDC client of the KANTOR SPA
+critical: false
+code:
+  - prototype/bootstrap-tenants.sh
+c4: [authService]
+links:
+  issues: [HAMSP-105, HAMSP-118]
+requirements: [C-03, C-04]
+
+acceptance:
+  AC-1:
+    text: bootstrap-tenants.sh creates, or on a rerun updates, the OIDC app kantor in the platform API project as a public client (user agent, no client secret, code flow with PKCE and refresh tokens, JWT access tokens), with the redirect URI of the KANTOR host, and writes its issuer, client ID and audience to the Secret app-kantor/kantor-oidc.
+    level: e2e
+    planned: prototype/e2e/kantor_oidc_test.go:TestKantorSPASignInIsAcceptedByTheGateway
+  AC-2:
+    text: A human user of tenant A who signs in with the kantor client gets an access token with the platform API audience and tenant A as resource owner; the API Gateway accepts it and returns only tenant A's data.
+    level: e2e
+    planned: prototype/e2e/kantor_oidc_test.go:TestKantorSPASignInIsAcceptedByTheGateway
+  AC-3:
+    text: Zitadel does not redirect a sign-in with the kantor client to a redirect URI outside the KANTOR host.
+    level: e2e
+    planned: prototype/e2e/kantor_oidc_test.go:TestKantorClientRefusesForeignRedirect
+
+checklist:
+  T-01:
+    planned: applies — the KANTOR user of tenant A lists items through the gateway and sees none of tenant B's (AC-2)
+  T-02:
+    planned: does not apply — no API contract
+  T-04:
+    planned: does not apply — no endpoint or role; KANTOR's own roles are given by KANTOR (first user is its admin)
+  T-08:
+    planned: does not apply — no schema migration
+  T-11:
+    planned: does not apply — no new input parser
+  T-12:
+    planned: applies — a foreign redirect URI must not get a code (AC-3)
+
+comments:
+  - at: prototype/bootstrap-tenants.sh:kantor_cfg
+    text: "# A public client with PKCE in the platform API project: the SPA keeps no secret, and its tokens carry the audience the API Gateway requires."
+    why: why this client differs from exampleweb's confidential one
+  - at: prototype/bootstrap-tenants.sh:kantor-oidc Secret
+    text: "# The KANTOR frontend image writes /platform-config.json from these variables."
+    why: the variable names are a contract with the fork's image
