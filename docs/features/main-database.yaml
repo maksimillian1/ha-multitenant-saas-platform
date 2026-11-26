@@ -5,7 +5,7 @@ code:
   - prototype/k8s/apps/database/**
 c4: [postgres]
 links:
-  issues: [HAMSP-59]
+  issues: [HAMSP-59, HAMSP-117]
 requirements: [QS-12, C-04]
 
 acceptance:
@@ -29,6 +29,22 @@ acceptance:
     level: e2e
     planned: prototype/e2e/query_timeout_test.go:TestDirectConnectionsHaveNoQueryLimit
     verified: [prototype/e2e/query_timeout_test.go:TestDirectConnectionsHaveNoQueryLimit]
+  AC-5:
+    text: The kantor database is owned by kantor_owner; KANTOR's runtime role kantor_app is NOSUPERUSER, NOBYPASSRLS, NOCREATEROLE, NOCREATEDB, NOINHERIT and not a member of kantor_owner; kantor_owner is neither superuser nor BYPASSRLS nor CREATEROLE. Both are CNPG managed roles.
+    level: e2e
+    planned: prototype/e2e/kantor_database_test.go:TestKantorRoles
+  AC-6:
+    text: Through the pooler, kantor_app sees only the rows of the tenant in app.current_tenant, none without it, cannot write a row for another tenant, and cannot disable RLS, drop a policy, turn row_security off, become the owner, gain BYPASSRLS or create a database.
+    level: e2e
+    planned: prototype/e2e/kantor_database_test.go:TestKantorAppRoleCannotLeaveItsTenant
+  AC-7:
+    text: The pooler keeps protocol-level prepared statements across server connections (max_prepared_statements = 200).
+    level: e2e
+    planned: prototype/e2e/kantor_database_test.go:TestPoolerKeepsPreparedStatements
+  AC-8:
+    text: The pooler closes a client whose transaction stays idle for more than 60 s (idle_transaction_timeout, in place of idle_in_transaction_session_timeout on the role, as for QS-12).
+    level: e2e
+    planned: prototype/e2e/kantor_database_test.go:TestPoolerClosesIdleTransaction
 
 checklist:
   T-01:
@@ -57,6 +73,15 @@ comments:
   - at: prototype/k8s/apps/database/cluster.yaml:postgresql.parameters.client_connection_check_interval
     text: "# PgBouncer's query_timeout only closes the connection; this makes the backend stop the query too."
     why: external behaviour of PgBouncer
+  - at: prototype/k8s/apps/database/cluster.yaml:managed.roles.kantor_app
+    text: "# KANTOR's migrations grant table rights to kantor_app only if it exists, so it must exist before they run."
+    why: ordering dependency on the app's migrations
+  - at: prototype/k8s/apps/database/cluster.yaml:Pooler.parameters.max_prepared_statements
+    text: "# pgx caches prepared statements per connection; PgBouncer re-prepares them on whichever server connection it picks."
+    why: external behaviour of pgx and PgBouncer
+  - at: prototype/k8s/apps/database/cluster.yaml:Pooler.parameters.idle_transaction_timeout
+    text: "# Closes a client that holds a transaction open without a query, so it cannot pin a server connection."
+    why: reason for the limit
 
 quality_scenarios:
   touched: [QS-12]

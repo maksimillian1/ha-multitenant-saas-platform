@@ -65,6 +65,28 @@ stringData:
   username: tenants
   password: dev-tenants
 ---
+# Owner of the kantor database (ADR-0013). Only KANTOR's migration job uses it.
+apiVersion: v1
+kind: Secret
+metadata:
+  name: kantor-owner
+  namespace: database
+type: kubernetes.io/basic-auth
+stringData:
+  username: kantor_owner
+  password: dev-kantor-owner
+---
+# Runtime role of KANTOR: not the owner, NOSUPERUSER, NOBYPASSRLS.
+apiVersion: v1
+kind: Secret
+metadata:
+  name: kantor-db
+  namespace: database
+type: kubernetes.io/basic-auth
+stringData:
+  username: kantor_app
+  password: dev-kantor-app
+---
 apiVersion: postgresql.cnpg.io/v1
 kind: Cluster
 metadata:
@@ -116,6 +138,25 @@ spec:
         inherit: false
         passwordSecret:
           name: tenants-db
+      - name: kantor_owner
+        ensure: present
+        login: true
+        superuser: false
+        createdb: false
+        createrole: false
+        passwordSecret:
+          name: kantor-owner
+      # KANTOR's migrations grant table rights to kantor_app only if it exists, so it must exist before they run.
+      - name: kantor_app
+        ensure: present
+        login: true
+        superuser: false
+        bypassrls: false
+        createdb: false
+        createrole: false
+        inherit: false
+        passwordSecret:
+          name: kantor-db
       # The usage database moved to its own cluster (ADR-0008, usage-db). These
       # drop what the usage pipeline left here on clusters created before the move.
       - name: usage_writer
@@ -172,6 +213,10 @@ spec:
       default_pool_size: "2"
       # The tenant query limit (QS-12): only pooled connections get it, so admins and platform services on -rw do not.
       query_timeout: "30"
+      # pgx caches prepared statements per connection; PgBouncer re-prepares them on whichever server connection it picks.
+      max_prepared_statements: "200"
+      # Closes a client that holds a transaction open without a query, so it cannot pin a server connection.
+      idle_transaction_timeout: "60"
 ---
 # The usage database lived here until it moved to its own cluster
 # (ADR-0008). This drops it on clusters created before the move; on new ones
@@ -208,5 +253,17 @@ metadata:
 spec:
   name: tenants
   owner: tenants_owner
+  cluster:
+    name: main-pg-cluster
+---
+# KANTOR, the first business app (ADR-0013), in its own database.
+apiVersion: postgresql.cnpg.io/v1
+kind: Database
+metadata:
+  name: kantor
+  namespace: database
+spec:
+  name: kantor
+  owner: kantor_owner
   cluster:
     name: main-pg-cluster
