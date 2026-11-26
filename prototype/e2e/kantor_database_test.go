@@ -69,8 +69,10 @@ func TestKantorAppRoleCannotLeaveItsTenant(t *testing.T) {
 	if got != "a" {
 		t.Fatalf("tenant A sees %q, want only a", got)
 	}
-	if got, err := kantorApp(t, time.Minute, "SELECT count(*) FROM "+table); err != nil || got != "0" {
-		t.Fatalf("no tenant: %q, %v; want 0 rows", got, err)
+	// On a pooled server connection the GUC reads '' once any transaction has set it, and ''::uuid fails.
+	if got, err := kantorApp(t, time.Minute, "SELECT count(*) FROM "+table); err == nil && got != "0" ||
+		err != nil && !strings.Contains(err.Error(), "invalid input syntax for type uuid") {
+		t.Fatalf("no tenant: %q, %v; want 0 rows or the uuid error", got, err)
 	}
 	if _, err := kantorApp(t, time.Minute, asTenant(tenantA, "INSERT INTO "+table+" VALUES ('"+tenantB+"', 'forged')")); err == nil || !strings.Contains(err.Error(), "row-level security") {
 		t.Fatalf("insert for tenant B as tenant A: %v, want a row-level security violation", err)
