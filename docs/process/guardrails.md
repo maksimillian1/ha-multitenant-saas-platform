@@ -26,7 +26,6 @@ Runtime controls are not rows here: RLS policies, token validation, the tenant h
 | oxlint and `tsc` on changed files | L1 | [Testing](testing.md) §1 | `lefthook.yml`: `spa-oxlint`, `spa-tsc` | runs |
 | gitleaks on staged changes | L1 | [Testing](testing.md) §1 | `lefthook.yml`: `gitleaks` | runs |
 | Claude Code runs the pre-commit checks before every `git commit` | L1 | `AGENTS.md`, "Guardrails" | `.claude/hooks/pre-commit.sh` (`.claude/settings.json`) | runs |
-| semgrep on changed files | L1 | [Testing](testing.md) §1 | lefthook | missing, HAMSP-46 |
 | Unit and contract tests of the touched packages before push | L2 | [Testing](testing.md) §1 | lefthook `pre-push` | missing, HAMSP-87 |
 | The agent runs lint and the touched tests before it reports done | L2 | `AGENTS.md`, "Guardrails" 5; [Testing](testing.md) §1 | the agent itself; nothing enforces it | runs |
 
@@ -48,7 +47,9 @@ Every pull request, every stage ([Feature stages](feature-stages.md), "Gates per
 | Go builds for `arm64` (C-06) | CI | [requirements](../architecture/requirements.md) C-06 | `Build for arm64` step in the four Go workflows | runs |
 | Every image we build is multi-arch (C-06) | CI | [requirements](../architecture/requirements.md) C-06 | `timescaledb.yml` only; the app images build for the runner's architecture | missing, HAMSP-27 |
 | No AGPL dependency under `/apps` (C-03) | CI | [requirements](../architecture/requirements.md) C-03 | `licenses.yml`: Go modules with a negative fixture, and npm | runs |
-| govulncheck, trivy, npm audit | CI | [Testing](testing.md) §1 | none | missing, HAMSP-46 |
+| govulncheck on every Go module; `npm audit --omit=dev` on the admin SPA | CI | [Testing](testing.md) §1 | `security.yml`, jobs `govulncheck` and `npm-audit`, each with a negative fixture | runs |
+| trivy on every image we build (amd64 and arm64) and on `prototype/k8s`: HIGH and CRITICAL fail; accepted findings expire (`.trivyignore.yaml`) | CI | [Testing](testing.md) §1 | `security.yml`, jobs `trivy-image` and `trivy-config`, with fixtures | runs |
+| No token, secret, password or Authorization header in a Go log call | CI | [Testing](testing.md) §1 | `security.yml`, job `semgrep` (`.semgrep/log-secrets.yaml` and its test cases) | runs |
 | Generated Go and TS types match `openapi.yaml` | CI | [ADR-0009](../adr/0009-admin-app-go-bff-react-spa.md) | `admin.yml` | runs |
 | Usage binaries link only their own packages | CI | `apps/usage/README.md` | `usage.yml`: depguard, `scripts/check-linked-deps.sh`, the `images` job | runs |
 | TimescaleDB image works and updates from the previous release | CI | [ADR-0008](../adr/0008-usage-store-on-timescaledb.md) | `timescaledb.yml`, `smoke-test.sh` | runs |
@@ -71,7 +72,6 @@ From [Review](review.md), "Architecture fitness functions".
 | No runtime leak into lower stages | CI | [Testing](testing.md) §3 | none | missing, HAMSP-86 |
 | RLS enabled and forced on every multi-tenant table (QS-01) | CI | [ADR-0002](../adr/0002-data-isolation-strategy.md), [Review](review.md) | `TestMigrationsLeaveNoUnprotectedTables` and the isolation tests in `apps/exampleapp/store` and `apps/usage/internal/store` (`exampleapp.yml`, `usage.yml`) | runs |
 | Services that trust `x-tenant-id` admit only the API Gateway | CI | [gateway-headers](../contracts/gateway-headers.md), [Review](review.md) | none | missing, HAMSP-70 |
-| Dangerous constructs outside critical code make the change critical | CI | [Feature stages](feature-stages.md), "Critical features" | semgrep rules | missing, HAMSP-46 |
 | Contracts stay compatible | CI | [ADR-0010](../adr/0010-usage-event-contracts.md) | `contracts.yml`: JSON Schema examples, `oasdiff` against the base branch | runs |
 | Charts of registered business apps render with the new library chart and validate against the new CRDs | CI | [ADR-0013](../adr/0013-business-app-integration.md), item 6 | none | missing, HAMSP-102 |
 | Business apps cannot create network policies or reach past the Gateway | CI | [ADR-0013](../adr/0013-business-app-integration.md), item 5 | none | missing, HAMSP-99 |

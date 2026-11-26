@@ -15,6 +15,11 @@ spec:
       labels:
         app.kubernetes.io/name: exampleapp
     spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        runAsGroup: 65532
+        seccompProfile: {type: RuntimeDefault}
       containers:
         - name: exampleapp
           # Built and loaded into kind by prototype/create-cluster.sh.

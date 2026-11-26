@@ -1,0 +1,10 @@
+misconfigurations:
+  - id: KSV-0014
+    statement: Fixture for the expiry check of AC-14.
+    expired_at: 2000-01-01
+  - id: KSV-0017
+    statement: Fixture for the expiry check of AC-14.
+    expired_at: 2000-01-01
+  - id: KSV-0118
+    statement: Fixture for the expiry check of AC-14.
+    expired_at: 2000-01-01
